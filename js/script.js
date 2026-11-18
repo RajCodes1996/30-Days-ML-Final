@@ -49,7 +49,7 @@
   /* Minimal Python highlighter */
   function highlight(code, lang) {
     if (lang !== "python") return esc(code);
-    var re = /(#.*$)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\b(import|from|as|print|input|float|int|for|in|if|else|def|return|None|True|False|len|range)\b|\b(\d+\.?\d*)\b/gm;
+    var re = /(#.*$)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\b(import|from|as|print|input|float|int|for|in|if|else|def|return|None|True|False|len|range|lambda)\b|\b(\d+\.?\d*)\b/gm;
     var out = "", last = 0, m;
     while ((m = re.exec(code))) {
       out += esc(code.slice(last, m.index));

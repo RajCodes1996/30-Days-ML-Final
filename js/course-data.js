@@ -480,6 +480,378 @@ Average used to fill: 245.0
           why: "fillna() replaces missing values, and mean() supplies the average."
         }
       ]
+    },
+    {
+        "day": 2,
+        "title": "NumPy + Pandas: Real Data Skills",
+        "subtitle": "Understand how ML handles data internally, then clean, filter and manipulate real datasets with confidence.",
+        "level": "Beginner",
+        "duration": "90-120 min",
+        "tags": [
+            "NumPy",
+            "Pandas",
+            "Filtering",
+            "Feature Engineering",
+            "Sorting",
+            "groupby"
+        ],
+        "goals": [
+            "Understand how ML handles data internally",
+            "Perform real-world data operations",
+            "Clean, filter and manipulate datasets confidently"
+        ],
+        "sections": [
+            {
+                "id": "numpy",
+                "icon": "⚡",
+                "title": "Step 1: NumPy, the Fast Brain of ML",
+                "meta": "Super-fast arrays used inside ML models",
+                "blocks": [
+                    {
+                        "type": "p",
+                        "text": "NumPy arrays hold numbers in a compact block and run math on every element at once. Try this:"
+                    },
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "day2_numpy.py",
+                        "code": "import numpy as np\n\n# Create array\narr = np.array([10, 20, 30, 40])\nprint(\"Array:\", arr)\n\n# Basic operations\nprint(\"Add 5:\", arr + 5)\nprint(\"Multiply by 2:\", arr * 2)\n\n# Mean\nprint(\"Average:\", np.mean(arr))",
+                        "output": "Array: [10 20 30 40]\nAdd 5: [15 25 35 45]\nMultiply by 2: [20 40 60 80]\nAverage: 25.0"
+                    },
+                    {
+                        "type": "p",
+                        "text": "Compare with a plain Python list to see why vectorization matters:"
+                    },
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "list_vs_array.py",
+                        "code": "import numpy as np\n\nlst = [10, 20, 30, 40]\narr = np.array(lst)\n\nprint(\"List * 2 :\", lst * 2)\nprint(\"Array * 2:\", arr * 2)\nprint(\"Shape:\", arr.shape)",
+                        "output": "List * 2 : [10, 20, 30, 40, 10, 20, 30, 40]\nArray * 2: [20 40 60 80]\nShape: (4,)"
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "info",
+                        "text": "Key understanding: ML models use NumPy arrays, not lists. Operations are vectorized, so there is no manual loop and it runs much faster."
+                    }
+                ]
+            },
+            {
+                "id": "pandas-load",
+                "icon": "🛠️",
+                "title": "Step 2: Pandas, Your Main Weapon",
+                "meta": "The daily tool of ML",
+                "blocks": [
+                    {
+                        "type": "p",
+                        "text": "Load the upgraded dataset. Every step below continues with this same df."
+                    },
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "day2_pandas.py",
+                        "code": "import pandas as pd\n\ndata = {\n    \"name\": [\"A\", \"B\", \"C\", \"D\", \"E\"],\n    \"hours_studied\": [2, 4, 1, 5, 3],\n    \"marks\": [40, 60, 30, 70, 50]\n}\n\ndf = pd.DataFrame(data)\nprint(df)",
+                        "output": "  name  hours_studied  marks\n0    A              2     40\n1    B              4     60\n2    C              1     30\n3    D              5     70\n4    E              3     50"
+                    }
+                ]
+            },
+            {
+                "id": "explore",
+                "icon": "🔍",
+                "title": "Step 3: Data Exploration",
+                "blocks": [
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "explore.py",
+                        "code": "print(df.head())      # first rows\nprint(df.columns)     # column names\nprint(df.shape)       # (rows, columns)",
+                        "output": "  name  hours_studied  marks\n0    A              2     40\n1    B              4     60\n2    C              1     30\n3    D              5     70\n4    E              3     50\nIndex(['name', 'hours_studied', 'marks'], dtype='object')\n(5, 3)"
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "tip",
+                        "text": "df.shape has no brackets because it is an attribute, not a method. Writing df.shape() causes an error."
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "info",
+                        "text": "On newer Pandas versions the columns line may show dtype='str' instead of dtype='object'. Both are fine."
+                    }
+                ]
+            },
+            {
+                "id": "filter",
+                "icon": "🧹",
+                "title": "Step 4: Data Filtering",
+                "meta": "Very important",
+                "blocks": [
+                    {
+                        "type": "p",
+                        "text": "A condition inside df[...] keeps only the rows where it is True."
+                    },
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "filter.py",
+                        "code": "# Students who scored more than 50\nprint(df[df[\"marks\"] > 50])",
+                        "output": "  name  hours_studied  marks\n1    B              4     60\n3    D              5     70"
+                    }
+                ]
+            },
+            {
+                "id": "feature",
+                "icon": "➕",
+                "title": "Step 5: Create a New Column",
+                "meta": "Feature engineering starts here",
+                "blocks": [
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "new_column.py",
+                        "code": "df[\"performance\"] = df[\"marks\"] * 2\nprint(df)",
+                        "output": "  name  hours_studied  marks  performance\n0    A              2     40           80\n1    B              4     60          120\n2    C              1     30           60\n3    D              5     70          140\n4    E              3     50          100"
+                    },
+                    {
+                        "type": "p",
+                        "text": "A column built from other columns is called a feature. Good features make models smarter."
+                    }
+                ]
+            },
+            {
+                "id": "sort",
+                "icon": "🔄",
+                "title": "Step 6: Sorting Data",
+                "blocks": [
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "sort.py",
+                        "code": "df_sorted = df.sort_values(by=\"marks\", ascending=False)\nprint(df_sorted)",
+                        "output": "  name  hours_studied  marks  performance\n3    D              5     70          140\n1    B              4     60          120\n4    E              3     50          100\n0    A              2     40           80\n2    C              1     30           60"
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "info",
+                        "text": "sort_values returns a new sorted table. The original df keeps its order."
+                    }
+                ]
+            },
+            {
+                "id": "missing",
+                "icon": "🧼",
+                "title": "Step 7: Handling Missing Data",
+                "blocks": [
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "missing.py",
+                        "code": "# Make one marks value missing\ndf.loc[2, \"marks\"] = None\nprint(df)\n\nprint(\"\\nMissing values:\")\nprint(df.isnull().sum())\n\n# Fill missing value with the average\ndf[\"marks\"] = df[\"marks\"].fillna(df[\"marks\"].mean())\nprint(df)",
+                        "output": "  name  hours_studied  marks  performance\n0    A              2   40.0           80\n1    B              4   60.0          120\n2    C              1    NaN           60\n3    D              5   70.0          140\n4    E              3   50.0          100\n\nMissing values:\nname             0\nhours_studied    0\nmarks            1\nperformance      0\ndtype: int64\n  name  hours_studied  marks  performance\n0    A              2   40.0           80\n1    B              4   60.0          120\n2    C              1   55.0           60\n3    D              5   70.0          140\n4    E              3   50.0          100"
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "warn",
+                        "text": "Older tutorials write df[\"marks\"].fillna(..., inplace=True). In recent Pandas it shows a FutureWarning and may not change df. Assign the result back as above."
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "info",
+                        "text": "df.loc[row, column] selects by label. Here it targets row 2 and column marks."
+                    }
+                ]
+            },
+            {
+                "id": "group",
+                "icon": "🧠",
+                "title": "Step 8: Grouping",
+                "meta": "Real ML use case",
+                "blocks": [
+                    {
+                        "type": "code",
+                        "lang": "python",
+                        "title": "groupby.py",
+                        "code": "# Add category\ndf[\"category\"] = [\"avg\", \"good\", \"avg\", \"good\", \"avg\"]\n\ngrouped = df.groupby(\"category\")[\"marks\"].mean()\nprint(grouped)",
+                        "output": "category\navg     48.333333\ngood    65.000000\nName: marks, dtype: float64"
+                    },
+                    {
+                        "type": "p",
+                        "text": "groupby splits rows into groups, then calculates one value per group, such as the average marks of each category."
+                    }
+                ]
+            },
+            {
+                "id": "mini",
+                "icon": "🔥",
+                "title": "Mini Project: Student Analyzer v1",
+                "meta": "Build it yourself",
+                "blocks": [
+                    {
+                        "type": "p",
+                        "text": "Features to build:"
+                    },
+                    {
+                        "type": "list",
+                        "items": [
+                            "Show top student",
+                            "Show average marks",
+                            "Filter students above 50",
+                            "Handle missing data"
+                        ]
+                    },
+                    {
+                        "type": "p",
+                        "text": "Challenge: add a status column. Marks above 50 mean Pass, otherwise Fail."
+                    },
+                    {
+                        "type": "callout",
+                        "tone": "tip",
+                        "text": "Hint: df[\"status\"] = df[\"marks\"].apply(lambda x: \"Pass\" if x > 50 else \"Fail\")"
+                    },
+                    {
+                        "type": "details",
+                        "summary": "Show the challenge solution",
+                        "blocks": [
+                            {
+                                "type": "code",
+                                "lang": "python",
+                                "title": "status.py",
+                                "code": "df[\"status\"] = df[\"marks\"].apply(lambda x: \"Pass\" if x > 50 else \"Fail\")\nprint(df[[\"name\", \"marks\", \"status\"]])",
+                                "output": "  name  marks status\n0    A   40.0   Fail\n1    B   60.0   Pass\n2    C   55.0   Pass\n3    D   70.0   Pass\n4    E   50.0   Fail"
+                            },
+                            {
+                                "type": "p",
+                                "text": "The full Student Analyzer v1 is in the Final Program below."
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "id": "learned",
+                "icon": "✅",
+                "title": "What You Actually Learned",
+                "blocks": [
+                    {
+                        "type": "list",
+                        "items": [
+                            "How to manipulate data (about 70% of ML work)",
+                            "How to clean messy datasets",
+                            "How to create features, very important later"
+                        ]
+                    }
+                ]
+            }
+        ],
+        "finalProgram": {
+            "title": "Student Analyzer v1",
+            "file": "day2_final.py",
+            "description": "One program combining everything from Day 2: NumPy math, loading, exploring, cleaning, filtering, new features, sorting and grouping.",
+            "concepts": [
+                "NumPy arrays",
+                "DataFrame",
+                "shape / columns",
+                "fillna",
+                "filtering",
+                "new columns",
+                "apply + lambda",
+                "sort_values",
+                "groupby"
+            ],
+            "code": "import numpy as np\nimport pandas as pd\n\n# 1. LOAD: student data (C's marks are missing)\ndata = {\n    \"name\": [\"A\", \"B\", \"C\", \"D\", \"E\"],\n    \"hours_studied\": [2, 4, 1, 5, 3],\n    \"marks\": [40, 60, None, 70, 50],\n    \"category\": [\"avg\", \"good\", \"avg\", \"good\", \"avg\"]\n}\ndf = pd.DataFrame(data)\n\n# 2. EXPLORE\nprint(\"=== STUDENT ANALYZER v1 ===\")\nprint(df)\nprint(\"\\nShape:\", df.shape)\nprint(\"Columns:\", list(df.columns))\n\n# 3. CLEAN: handle missing data\nprint(\"\\nMissing values:\")\nprint(df.isnull().sum())\ndf[\"marks\"] = df[\"marks\"].fillna(df[\"marks\"].mean())\n\n# 4. NUMPY: fast math on the marks column\nmarks_arr = df[\"marks\"].to_numpy()\nprint(\"\\nNumPy average:\", np.mean(marks_arr))\nprint(\"NumPy max:\", np.max(marks_arr))\n\n# 5. FEATURES: new columns\ndf[\"performance\"] = df[\"marks\"] * 2\ndf[\"status\"] = df[\"marks\"].apply(lambda x: \"Pass\" if x > 50 else \"Fail\")\n\n# 6. ANALYSIS\nprint(\"\\nTop student:\")\nprint(df[df[\"marks\"] == df[\"marks\"].max()])\n\nprint(\"\\nAverage marks:\", round(df[\"marks\"].mean(), 2))\n\nprint(\"\\nStudents who scored more than 50:\")\nprint(df[df[\"marks\"] > 50])\n\nprint(\"\\nRanking:\")\nprint(df.sort_values(by=\"marks\", ascending=False)[[\"name\", \"marks\", \"status\"]])\n\nprint(\"\\nAverage marks by category:\")\nprint(df.groupby(\"category\")[\"marks\"].mean())",
+            "output": "=== STUDENT ANALYZER v1 ===\n  name  hours_studied  marks category\n0    A              2   40.0      avg\n1    B              4   60.0     good\n2    C              1    NaN      avg\n3    D              5   70.0     good\n4    E              3   50.0      avg\n\nShape: (5, 4)\nColumns: ['name', 'hours_studied', 'marks', 'category']\n\nMissing values:\nname             0\nhours_studied    0\nmarks            1\ncategory         0\ndtype: int64\n\nNumPy average: 55.0\nNumPy max: 70.0\n\nTop student:\n  name  hours_studied  marks category  performance status\n3    D              5   70.0     good        140.0   Pass\n\nAverage marks: 55.0\n\nStudents who scored more than 50:\n  name  hours_studied  marks category  performance status\n1    B              4   60.0     good        120.0   Pass\n2    C              1   55.0      avg        110.0   Pass\n3    D              5   70.0     good        140.0   Pass\n\nRanking:\n  name  marks status\n3    D   70.0   Pass\n1    B   60.0   Pass\n2    C   55.0   Pass\n4    E   50.0   Fail\n0    A   40.0   Fail\n\nAverage marks by category:\ncategory\navg     48.333333\ngood    65.000000\nName: marks, dtype: float64"
+        },
+        "practice": [
+            {
+                "title": "Mini Store Inventory",
+                "level": "Easy",
+                "file": "practice1.py",
+                "description": "A shop keeps its stock in a table. Use NumPy and Pandas to analyze it.",
+                "tasks": [
+                    "Create the DataFrame and print its shape and column names",
+                    "Print the items with price above 200",
+                    "Add a total_value column (price * quantity)",
+                    "Print the top 3 items by total_value",
+                    "Use NumPy to print the average price"
+                ],
+                "hint": "Sort with sort_values(by=..., ascending=False), then use head(3). For NumPy use np.mean(df[\"price\"]).",
+                "starter": "import numpy as np\nimport pandas as pd\n\ndata = {\n    \"item\": [\"Pen\", \"Book\", \"Bag\", \"Bottle\", \"Lamp\"],\n    \"price\": [10, 160, 600, 250, 450],\n    \"quantity\": [50, 20, 5, 12, 8]\n}\n\n# TODO 1: create the DataFrame, print shape and columns\n\n# TODO 2: filter price above 200\n\n# TODO 3: add total_value column\n\n# TODO 4: top 3 items by total_value\n\n# TODO 5: average price using NumPy",
+                "solution": "import numpy as np\nimport pandas as pd\n\ndata = {\n    \"item\": [\"Pen\", \"Book\", \"Bag\", \"Bottle\", \"Lamp\"],\n    \"price\": [10, 160, 600, 250, 450],\n    \"quantity\": [50, 20, 5, 12, 8]\n}\n\ndf = pd.DataFrame(data)\nprint(\"Shape:\", df.shape)\nprint(\"Columns:\", list(df.columns))\n\nprint(\"\\nPrice above 200:\")\nprint(df[df[\"price\"] > 200])\n\ndf[\"total_value\"] = df[\"price\"] * df[\"quantity\"]\n\nprint(\"\\nTop 3 by total value:\")\nprint(df.sort_values(by=\"total_value\", ascending=False).head(3))\n\nprint(\"\\nAverage price (NumPy):\", np.mean(df[\"price\"]))",
+                "output": "Shape: (5, 3)\nColumns: ['item', 'price', 'quantity']\n\nPrice above 200:\n     item  price  quantity\n2     Bag    600         5\n3  Bottle    250        12\n4    Lamp    450         8\n\nTop 3 by total value:\n   item  price  quantity  total_value\n4  Lamp    450         8         3600\n1  Book    160        20         3200\n2   Bag    600         5         3000\n\nAverage price (NumPy): 294.0"
+            },
+            {
+                "title": "Employee Salary Cleaner",
+                "level": "Medium",
+                "file": "practice2.py",
+                "description": "An HR table has missing salaries. Clean it, add features and summarize by department.",
+                "tasks": [
+                    "Create the DataFrame and count missing values per column",
+                    "Fill missing salaries with the average salary",
+                    "Add a level column: experience of 5 or more is Senior, otherwise Junior",
+                    "Print the average salary per department",
+                    "Print employees earning more than 49000, highest salary first"
+                ],
+                "hint": "Use fillna with the mean, apply with a lambda for level, and groupby(\"department\")[\"salary\"].mean().",
+                "starter": "import pandas as pd\n\ndata = {\n    \"name\": [\"Ravi\", \"Sana\", \"Tom\", \"Priya\", \"Karan\", \"Meera\"],\n    \"department\": [\"IT\", \"HR\", \"IT\", \"HR\", \"IT\", \"HR\"],\n    \"salary\": [50000, 40000, None, 45000, 60000, None],\n    \"experience\": [3, 2, 5, 4, 8, 6]\n}\n\n# TODO 1: create the DataFrame, count missing values\n\n# TODO 2: fill missing salaries with the average\n\n# TODO 3: add level column (Senior / Junior)\n\n# TODO 4: average salary per department\n\n# TODO 5: salary above 49000, highest first",
+                "solution": "import pandas as pd\n\ndata = {\n    \"name\": [\"Ravi\", \"Sana\", \"Tom\", \"Priya\", \"Karan\", \"Meera\"],\n    \"department\": [\"IT\", \"HR\", \"IT\", \"HR\", \"IT\", \"HR\"],\n    \"salary\": [50000, 40000, None, 45000, 60000, None],\n    \"experience\": [3, 2, 5, 4, 8, 6]\n}\n\ndf = pd.DataFrame(data)\nprint(\"Missing before:\")\nprint(df.isnull().sum())\n\ndf[\"salary\"] = df[\"salary\"].fillna(df[\"salary\"].mean())\ndf[\"level\"] = df[\"experience\"].apply(lambda x: \"Senior\" if x >= 5 else \"Junior\")\nprint(\"\\n\", df, sep=\"\")\n\nprint(\"\\nAverage salary by department:\")\nprint(df.groupby(\"department\")[\"salary\"].mean())\n\nprint(\"\\nSalary above 49000:\")\nprint(df[df[\"salary\"] > 49000].sort_values(by=\"salary\", ascending=False))",
+                "output": "Missing before:\nname          0\ndepartment    0\nsalary        2\nexperience    0\ndtype: int64\n\n    name department   salary  experience   level\n0   Ravi         IT  50000.0           3  Junior\n1   Sana         HR  40000.0           2  Junior\n2    Tom         IT  48750.0           5  Senior\n3  Priya         HR  45000.0           4  Junior\n4  Karan         IT  60000.0           8  Senior\n5  Meera         HR  48750.0           6  Senior\n\nAverage salary by department:\ndepartment\nHR    44583.333333\nIT    52916.666667\nName: salary, dtype: float64\n\nSalary above 49000:\n    name department   salary  experience   level\n4  Karan         IT  60000.0           8  Senior\n0   Ravi         IT  50000.0           3  Junior",
+                "note": "Filling with one overall average ignores departments. A smarter fix is to fill each missing salary with its own department's average. You will learn better imputation later."
+            }
+        ],
+        "checklist": [
+            "Ran NumPy array operations",
+            "Loaded and explored a DataFrame",
+            "Filtered and sorted data",
+            "Created new columns (performance, status)",
+            "Handled missing data",
+            "Used groupby",
+            "Built Student Analyzer v1"
+        ],
+        "quiz": [
+            {
+                "q": "Why do ML models prefer NumPy arrays over Python lists?",
+                "options": [
+                    "They look nicer",
+                    "Vectorized operations run fast on all elements",
+                    "Lists cannot store numbers",
+                    "Arrays use less code only"
+                ],
+                "answer": 1,
+                "why": "NumPy applies math to whole arrays at once, which is much faster than looping over lists."
+            },
+            {
+                "q": "Which line keeps only students with marks above 50?",
+                "options": [
+                    "df.filter(marks > 50)",
+                    "df[df[\"marks\"] > 50]",
+                    "df.marks > 50",
+                    "df.where(50)"
+                ],
+                "answer": 1,
+                "why": "A True/False condition inside df[...] selects the matching rows."
+            },
+            {
+                "q": "What does df.groupby(\"category\")[\"marks\"].mean() return?",
+                "options": [
+                    "Average marks of every row",
+                    "Average marks for each category",
+                    "The top student",
+                    "The number of categories"
+                ],
+                "answer": 1,
+                "why": "groupby splits the rows by category and mean() is calculated per group."
+            },
+            {
+                "q": "Which creates a Pass/Fail column?",
+                "options": [
+                    "df[\"status\"] = df[\"marks\"].apply(lambda x: \"Pass\" if x > 50 else \"Fail\")",
+                    "df.status = Pass",
+                    "df.apply(status)",
+                    "df[\"marks\"] = \"Pass\""
+                ],
+                "answer": 0,
+                "why": "apply runs the lambda on each marks value and stores the result in the new column."
+            }
+        ]
     }
   ]
 };
