@@ -76,6 +76,9 @@
           '<span>' + (b.file ? '<button class="copy dl" type="button" data-file="' + esc(b.file) + '">Download</button> ' : "") + '<button class="copy" type="button">Copy</button></span></div>' +
           '<pre><code class="src">' + highlight(b.code, b.lang) + "</code></pre>" +
           (b.output ? '<div class="out"><span class="lbl">Output</span><pre>' + esc(b.output) + "</pre></div>" : "") + "</div>";
+      case "image":
+        return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || "") + '" loading="lazy">' +
+          (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "") + "</figure>";
       case "details":
         return "<details><summary>" + esc(b.summary) + "</summary>" + b.blocks.map(block).join("") + "</details>";
       default: return "";
@@ -105,7 +108,8 @@
       extra += '<article class="box final" id="s-final"><h2>🏁 Final Program: ' + esc(f.title) + "</h2>" +
         '<div class="meta">Everything from Day ' + d.day + " in one file</div><p>" + esc(f.description) + "</p>" +
         '<div class="tags">' + f.concepts.map(function (c) { return '<span class="tag">' + esc(c) + "</span>"; }).join("") + "</div>" +
-        block({ type: "code", lang: "python", title: f.file, file: f.file, code: f.code, output: f.output }) + "</article>";
+        block({ type: "code", lang: "python", title: f.file, file: f.file, code: f.code, output: f.output }) +
+        (f.images || []).map(function (im) { return block({ type: "image", src: im.src, alt: im.alt, caption: im.caption }); }).join("") + "</article>";
     }
     (d.practice || []).forEach(function (p, i) {
       var k = i + 1;
@@ -116,7 +120,7 @@
         block({ type: "code", lang: "python", title: p.file + " (starter)", file: p.file, code: p.starter }) +
         block({ type: "details", summary: "Show solution", blocks: [
           { type: "code", lang: "python", title: "Solution", code: p.solution, output: p.output }
-        ].concat(p.note ? [{ type: "callout", tone: "info", text: p.note }] : []) }) + "</article>";
+        ].concat((p.images || []).map(function (im) { return { type: "image", src: im.src, alt: im.alt, caption: im.caption }; })).concat(p.note ? [{ type: "callout", tone: "info", text: p.note }] : []) }) + "</article>";
     });
     toc = toc.replace('<button type="button" data-t="checklist">', tocExtra + '<button type="button" data-t="checklist">');
 

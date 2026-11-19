@@ -144,3 +144,7 @@ summary{cursor:pointer;padding:10px 0;font-weight:600;color:var(--accent2)}
 /* Final program + practice */
 .box.final{border-color:var(--accent);background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,var(--surface)),var(--surface))}
 .codebar .copy+.copy,.codebar .dl{margin-right:6px}
+
+.fig{margin:14px 0;text-align:center}
+.fig img{max-width:100%;height:auto;background:#fff;border:1px solid var(--border);border-radius:12px;padding:8px}
+.fig figcaption{margin-top:6px;color:var(--muted);font-size:.85rem}
