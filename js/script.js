@@ -130,7 +130,7 @@
       status.textContent = pyReady ? "⏳ Running..." : "⏳ Loading Python (first run takes 10-30 seconds)...";
       var t0 = Date.now(), res;
       var myI = +el.dataset.reg, pre = [];
-      if (r.session === "lesson") reg.forEach(function (x, idx) { if (idx < myI && x.session === "lesson") pre.push(x.code); });
+      if (r.session === "lesson") reg.forEach(function (x, idx) { if (idx < myI && x.session === "lesson" && !/\binput\s*\(/.test(x.code)) pre.push(x.code); });
       try { res = await runCode(ta.value, key, pre); }
       catch (e) { res = { text: "", figs: [], error: String(e.message || e) }; }
       var msg = res.text;

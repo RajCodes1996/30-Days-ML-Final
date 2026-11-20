@@ -2281,6 +2281,915 @@ Average used to fill: 245.0
       "why": "MAE is the average size of the mistakes, in the same unit as the output."
     }
   ]
+},
+
+// DAY 6 snippet. In course-data.js: add a comma after Day 5's closing }, then paste this object. No images for this day.
+{
+  "day": 6,
+  "title": "Classification: Pass/Fail Predictor",
+  "subtitle": "Predict categories instead of numbers: build your first classification model and learn to evaluate it fairly.",
+  "level": "Beginner",
+  "duration": "90-120 min",
+  "tags": [
+    "Classification",
+    "LogisticRegression",
+    "Accuracy",
+    "stratify",
+    "Baseline"
+  ],
+  "goals": [
+    "Understand classification vs regression",
+    "Build your first classification model",
+    "Predict categories (Pass/Fail) instead of numbers"
+  ],
+  "sections": [
+    {
+      "id": "types",
+      "icon": "🧠",
+      "title": "Step 1: Regression vs Classification",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "",
+            "Regression (Days 4 and 5)",
+            "Classification (today)"
+          ],
+          "rows": [
+            [
+              "Output",
+              "A number",
+              "A category (label)"
+            ],
+            [
+              "Example",
+              "Marks = 65",
+              "Pass or Fail"
+            ],
+            [
+              "Question",
+              "How many marks will the student get?",
+              "Will the student pass?"
+            ],
+            [
+              "Algorithm",
+              "LinearRegression",
+              "LogisticRegression"
+            ],
+            [
+              "Error measure",
+              "MAE (marks off)",
+              "Accuracy (% correct)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Despite its name, Logistic Regression is a classification algorithm. It predicts the chance of a category, then picks the most likely one."
+        }
+      ]
+    },
+    {
+      "id": "prepare",
+      "icon": "⚡",
+      "title": "Step 2: Prepare the Dataset",
+      "meta": "Convert marks into Pass/Fail",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day6_ml.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6],\n    \"marks\": [35, 40, 50, 60, 65, 70]\n}\ndf = pd.DataFrame(data)\n\n# Convert into classification: 1 = Pass (marks >= 50), 0 = Fail\ndf[\"status\"] = df[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(df)\n\nprint(\"\\nHow many of each class?\")\nprint(df[\"status\"].value_counts())",
+          "output": "   hours_studied  marks  status\n0              1     35       0\n1              2     40       0\n2              3     50       1\n3              4     60       1\n4              5     65       1\n5              6     70       1\n\nHow many of each class?\nstatus\n1    4\n0    2\nName: count, dtype: int64"
+        },
+        {
+          "type": "table",
+          "head": [
+            "status",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "1",
+              "Pass ✅"
+            ],
+            [
+              "0",
+              "Fail ❌"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Turning categories into numbers like 0 and 1 is called label encoding. Models work with numbers."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "⚡",
+      "title": "Step 3: Split Data",
+      "meta": "Careful: a tiny trap here",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Run the split exactly as before and look at the labels in each part:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split.py",
+          "code": "from sklearn.model_selection import train_test_split\n\nX = df[[\"hours_studied\"]]\ny = df[\"status\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42\n)\n\nprint(\"Train labels:\", list(y_train))\nprint(\"Test labels :\", list(y_test))",
+          "output": "Train labels: [1, 1, 1, 1]\nTest labels : [0, 0]"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Problem! The training set has only Pass (1) examples and both Fail examples landed in the test set. A classifier cannot learn what Fail looks like, and model.fit() would stop with a ValueError saying it needs at least 2 classes."
+        },
+        {
+          "type": "p",
+          "text": "Fix: use stratify=y. It keeps the same Pass/Fail mix in both train and test parts."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split_fixed.py",
+          "code": "X_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.33, random_state=42, stratify=y\n)\n\nprint(\"Train labels:\", list(y_train))\nprint(\"Test labels :\", list(y_test))\nprint(\"Test hours  :\", list(X_test[\"hours_studied\"]))",
+          "output": "Train labels: [1, 1, 0, 1]\nTest labels : [1, 0]\nTest hours  : [6, 1]"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "For classification, always check that every class appears in the training data. stratify=y is the safe habit. With 6 rows, test_size=0.33 gives 2 test rows, one Pass and one Fail."
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "icon": "⚡",
+      "title": "Step 4: Train the Classification Model",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train.py",
+          "code": "from sklearn.linear_model import LogisticRegression\n\nmodel = LogisticRegression()\nmodel.fit(X_train, y_train)\nprint(\"Model trained on\", len(X_train), \"rows\")",
+          "output": "Model trained on 4 rows"
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "⚡",
+      "title": "Step 5: Make Predictions",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict.py",
+          "code": "y_pred = model.predict(X_test)\n\nprint(\"Predicted:\", y_pred)\nprint(\"Actual:   \", y_test.values)",
+          "output": "Predicted: [1 0]\nActual:    [1 0]"
+        },
+        {
+          "type": "p",
+          "text": "The model predicts a label (0 or 1), not a number of marks. Compare each predicted label with the actual one."
+        }
+      ]
+    },
+    {
+      "id": "accuracy",
+      "icon": "📊",
+      "title": "Step 6: Check Accuracy",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "accuracy.py",
+          "code": "from sklearn.metrics import accuracy_score\n\nacc = accuracy_score(y_test, y_pred)\nprint(\"Accuracy:\", acc)\nprint(f\"That is {acc:.0%}: {int(acc * len(y_test))} correct out of {len(y_test)}\")",
+          "output": "Accuracy: 1.0\nThat is 100%: 2 correct out of 2"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Accuracy = correct predictions / total predictions. 1.0 means 100% correct."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "With only 2 test rows, accuracy can only be 0%, 50% or 100%. One score on so little data is not reliable. More test data gives a trustworthy number."
+        }
+      ]
+    },
+    {
+      "id": "proba",
+      "icon": "🔍",
+      "title": "Insight: How the Model Decides",
+      "meta": "Probabilities",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "proba.py",
+          "code": "hours = pd.DataFrame({\"hours_studied\": [1, 2, 2.5, 3, 4, 7]})\n\nresult = hours.copy()\nresult[\"chance_of_pass\"] = model.predict_proba(hours)[:, 1].round(2)\nresult[\"prediction\"] = model.predict(hours)\nprint(result)",
+          "output": "   hours_studied  chance_of_pass  prediction\n0            1.0            0.32           0\n1            2.0            0.52           1\n2            2.5            0.62           1\n3            3.0            0.71           1\n4            4.0            0.85           1\n5            7.0            0.98           1"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The model first computes the chance of Pass. If it is 0.5 or more, it predicts Pass (1), otherwise Fail (0). The point where the chance crosses 0.5 is the decision boundary, here around 2 hours."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Our data says 2 hours means 40 marks, which is a Fail, but the model says about a 50% chance. A model trained on 4 rows is only roughly right near the boundary. More data sharpens it."
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "icon": "🧠",
+      "title": "Step 7: Try Custom Input",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "custom_input.py",
+          "code": "hours = float(input(\"Enter hours studied: \"))\nresult = model.predict(pd.DataFrame({\"hours_studied\": [hours]}))\n\nif result[0] == 1:\n    print(\"Pass ✅\")\nelse:\n    print(\"Fail ❌\")"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Example: type 5 and the output is Pass ✅. We pass a DataFrame with the same column name instead of [[hours]] to avoid scikit-learn's feature-name warning. In the website workspace a pop-up asks for your input."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Pass/Fail Predictor",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Features: input hours, output Pass/Fail, and accuracy display. Wrap the logic in a function that also shows how sure the model is:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predictor.py",
+          "code": "def predict_status(hours):\n    new = pd.DataFrame({\"hours_studied\": [hours]})\n    label = model.predict(new)[0]\n    chance = model.predict_proba(new)[0][1]\n    text = \"Pass ✅\" if label == 1 else \"Fail ❌\"\n    return f\"{text} (chance of passing: {chance:.0%})\"\n\nprint(\"Model accuracy:\", f\"{acc:.0%}\")\nfor h in [1, 2.5, 5]:\n    print(f\"{h} hours -> {predict_status(h)}\")",
+          "output": "Model accuracy: 100%\n1 hours -> Fail ❌ (chance of passing: 32%)\n2.5 hours -> Pass ✅ (chance of passing: 62%)\n5 hours -> Pass ✅ (chance of passing: 93%)"
+        },
+        {
+          "type": "p",
+          "text": "The Final Program below combines everything, plus a chart of the probability curve."
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Improve the Dataset",
+      "meta": "Important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Use the bigger dataset from the task (8 students), retrain and check accuracy:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "bigger_data.py",
+          "code": "data8 = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6, 7, 8],\n    \"marks\": [35, 40, 50, 60, 65, 70, 80, 90]\n}\ndf8 = pd.DataFrame(data8)\ndf8[\"status\"] = df8[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\n\nX8 = df8[[\"hours_studied\"]]\ny8 = df8[\"status\"]\nXtr, Xte, ytr, yte = train_test_split(X8, y8, test_size=0.25, random_state=42, stratify=y8)\n\nm8 = LogisticRegression().fit(Xtr, ytr)\nprint(\"Fail / Pass counts:\", (y8 == 0).sum(), \"/\", (y8 == 1).sum())\nprint(\"Accuracy:\", accuracy_score(yte, m8.predict(Xte)))",
+          "output": "Fail / Pass counts: 2 / 6\nAccuracy: 0.5"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Accuracy went DOWN to 50%, not up! The 2 extra students both passed, so Fail examples are still only 2 out of 8. More rows is not automatically better data. The test set has just 2 rows too, so one split is a coin flip."
+        },
+        {
+          "type": "p",
+          "text": "To judge fairly, repeat with 10 different splits and compare three datasets. The third is bigger and has a balanced mix of Fail and Pass:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare_data.py",
+          "code": "import numpy as np\n\ndef evaluate(df):\n    X = df[[\"hours_studied\"]]\n    y = df[\"status\"]\n    scores = []\n    for seed in range(10):\n        Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.25, random_state=seed, stratify=y)\n        m = LogisticRegression().fit(Xtr, ytr)\n        scores.append(accuracy_score(yte, m.predict(Xte)))\n    return np.mean(scores), min(scores)\n\nbig = pd.DataFrame({\n    \"hours_studied\": [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8],\n    \"marks\": [18, 24, 30, 37, 44, 48, 53, 57, 62, 64, 69, 72, 76, 80, 85, 90]\n})\nbig[\"status\"] = big[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\n\nfor name, d in [(\"6 rows\", df), (\"8 rows (task)\", df8), (\"16 rows balanced\", big)]:\n    avg, worst = evaluate(d)\n    print(f\"{name:17} average accuracy: {avg:.0%} | worst split: {worst:.0%}\")",
+          "output": "6 rows            average accuracy: 90% | worst split: 50%\n8 rows (task)     average accuracy: 85% | worst split: 50%\n16 rows balanced  average accuracy: 92% | worst split: 75%"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The bigger balanced dataset is the most stable: its worst case is 75%, while the small datasets can drop to 50%. Better data means more rows AND a good mix of classes AND a fair test. That is the real lesson behind better data = better model."
+        }
+      ]
+    },
+    {
+      "id": "baseline",
+      "icon": "🌍",
+      "title": "Real-World Thinking: Beat the Baseline",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Imagine a lazy model that always predicts the most common class. How accurate is it?"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "baseline.py",
+          "code": "baseline = y8.value_counts(normalize=True).max()\nprint(f\"Always predict Pass: {baseline:.0%} accurate on the 8 row dataset\")",
+          "output": "Always predict Pass: 75% accurate on the 8 row dataset"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "A model must beat this baseline to be useful. Accuracy alone can fool you when one class is much more common than the other, for example 95% of emails are not spam. Later you will learn better metrics like precision and recall."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "The difference between regression (numbers) and classification (categories)",
+            "How to turn marks into Pass/Fail labels",
+            "How to train LogisticRegression and measure accuracy",
+            "Why every class must appear in the training data (stratify)",
+            "Why better data means more rows, balanced classes and a fair test"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Pass/Fail Predictor",
+    "file": "day6_final.py",
+    "description": "One program combining Day 6: Pass/Fail labels, a safe stratified split, LogisticRegression, accuracy against a baseline, a prediction function with probabilities and the probability curve.",
+    "concepts": [
+      "classification",
+      "label encoding",
+      "stratify",
+      "LogisticRegression",
+      "accuracy_score",
+      "predict_proba",
+      "baseline"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\n# 1. DATA: convert marks into Pass (1) / Fail (0)\ndata = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6],\n    \"marks\": [35, 40, 50, 60, 65, 70]\n}\ndf = pd.DataFrame(data)\ndf[\"status\"] = df[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(\"=== PASS/FAIL PREDICTOR ===\")\nprint(df)\nprint(\"\\nClass counts:\")\nprint(df[\"status\"].value_counts())\n\n# 2. SPLIT: stratify keeps both classes in train and test\nX = df[[\"hours_studied\"]]\ny = df[\"status\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.33, random_state=42, stratify=y\n)\nprint(\"\\nTrain labels:\", list(y_train), \"| Test labels:\", list(y_test))\n\n# 3. TRAIN\nmodel = LogisticRegression()\nmodel.fit(X_train, y_train)\n\n# 4. TEST\ny_pred = model.predict(X_test)\nresults = pd.DataFrame({\n    \"hours_studied\": X_test[\"hours_studied\"].values,\n    \"actual\": y_test.values,\n    \"predicted\": y_pred\n})\nprint(\"\\nTest results:\")\nprint(results)\n\n# 5. ACCURACY vs BASELINE\nacc = accuracy_score(y_test, y_pred)\nbaseline = y.value_counts(normalize=True).max()\nprint(f\"\\nModel accuracy: {acc:.0%}\")\nprint(f\"Baseline (always Pass): {baseline:.0%}\")\n\n# 6. PASS/FAIL PREDICTOR\ndef predict_status(hours):\n    new = pd.DataFrame({\"hours_studied\": [hours]})\n    label = model.predict(new)[0]\n    chance = model.predict_proba(new)[0][1]\n    text = \"Pass ✅\" if label == 1 else \"Fail ❌\"\n    return f\"{text} (chance of passing: {chance:.0%})\"\n\nprint(\"\\nPredictions:\")\nfor h in [1, 2.5, 5, 7]:\n    print(f\"  {h} hours -> {predict_status(h)}\")\n\n# 7. VISUALIZE: the probability curve\nx_line = pd.DataFrame({\"hours_studied\": np.linspace(0, 8, 100)})\nplt.scatter(X[\"hours_studied\"], y, color=\"blue\", s=70, label=\"Actual (0 = Fail, 1 = Pass)\")\nplt.plot(x_line[\"hours_studied\"], model.predict_proba(x_line)[:, 1], color=\"red\", label=\"Chance of Pass\")\nplt.axhline(0.5, color=\"gray\", linestyle=\"--\", label=\"Decision line (0.5)\")\nplt.xlabel(\"Hours Studied\")\nplt.ylabel(\"Pass (1) / Fail (0)\")\nplt.title(\"Pass/Fail Predictor\")\nplt.legend()\nplt.show()",
+    "output": "=== PASS/FAIL PREDICTOR ===\n   hours_studied  marks  status\n0              1     35       0\n1              2     40       0\n2              3     50       1\n3              4     60       1\n4              5     65       1\n5              6     70       1\n\nClass counts:\nstatus\n1    4\n0    2\nName: count, dtype: int64\n\nTrain labels: [1, 1, 0, 1] | Test labels: [1, 0]\n\nTest results:\n   hours_studied  actual  predicted\n0              6       1          1\n1              1       0          0\n\nModel accuracy: 100%\nBaseline (always Pass): 67%\n\nPredictions:\n  1 hours -> Fail ❌ (chance of passing: 32%)\n  2.5 hours -> Pass ✅ (chance of passing: 62%)\n  5 hours -> Pass ✅ (chance of passing: 93%)\n  7 hours -> Pass ✅ (chance of passing: 98%)"
+  },
+  "practice": [
+    {
+      "title": "Attendance Result Classifier",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Predict whether a student passes from their attendance percentage.",
+      "tasks": [
+        "Create the DataFrame and add a status column: marks of 50 or more is 1 (Pass), else 0 (Fail)",
+        "Print how many Pass and Fail students there are",
+        "Split with test_size=0.25, random_state=42 and stratify=y",
+        "Train a LogisticRegression model and print its accuracy",
+        "Predict Pass or Fail for 58% and 80% attendance"
+      ],
+      "hint": "Use stratify=y in train_test_split. For predictions use pd.DataFrame({\"attendance\": [58, 80]}).",
+      "starter": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\ndata = {\n    \"attendance\": [35, 42, 50, 55, 60, 65, 72, 78, 85, 90, 95, 98],\n    \"marks\": [28, 33, 38, 41, 45, 52, 58, 62, 70, 75, 82, 90]\n}\n\n# TODO 1: DataFrame + status column (1 = Pass if marks >= 50)\n\n# TODO 2: print counts of Pass and Fail\n\n# TODO 3: stratified split (test_size=0.25)\n\n# TODO 4: train LogisticRegression, print accuracy\n\n# TODO 5: predict for attendance 58 and 80",
+      "solution": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\ndata = {\n    \"attendance\": [35, 42, 50, 55, 60, 65, 72, 78, 85, 90, 95, 98],\n    \"marks\": [28, 33, 38, 41, 45, 52, 58, 62, 70, 75, 82, 90]\n}\ndf = pd.DataFrame(data)\ndf[\"status\"] = df[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\n\nprint(\"Fail / Pass counts:\", (df[\"status\"] == 0).sum(), \"/\", (df[\"status\"] == 1).sum())\n\nX = df[[\"attendance\"]]\ny = df[\"status\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)\n\nmodel = LogisticRegression()\nmodel.fit(X_train, y_train)\n\nacc = accuracy_score(y_test, model.predict(X_test))\nprint(f\"Accuracy: {acc:.0%}\")\n\nnew = pd.DataFrame({\"attendance\": [58, 80]})\nfor a, label in zip(new[\"attendance\"], model.predict(new)):\n    print(f\"{a}% attendance -> {'Pass' if label == 1 else 'Fail'}\")",
+      "output": "Fail / Pass counts: 5 / 7\nAccuracy: 100%\n58% attendance -> Fail\n80% attendance -> Pass"
+    },
+    {
+      "title": "Course Completion vs Baseline",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Predict if a learner completes an online course from videos watched, then check if the model really beats a lazy baseline.",
+      "tasks": [
+        "Create the DataFrame and print the Complete / Drop counts",
+        "Split with test_size=0.3, random_state=1 and stratify=y, then train LogisticRegression",
+        "Print the model accuracy and the baseline accuracy (always predict the most common class)",
+        "Print the chance of completing for 3, 9 and 15 videos using predict_proba",
+        "Decide: does the model beat the baseline?"
+      ],
+      "hint": "Baseline: y.value_counts(normalize=True).max(). Probability of class 1: model.predict_proba(new)[:, 1].",
+      "starter": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\ndata = {\n    \"videos\": [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22],\n    \"completed\": [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1]\n}\n\n# TODO 1: DataFrame, print Complete / Drop counts\n\n# TODO 2: stratified split (test_size=0.3, random_state=1), train model\n\n# TODO 3: print model accuracy and baseline accuracy\n\n# TODO 4: chance of completing for 3, 9 and 15 videos\n\n# TODO 5: does the model beat the baseline?",
+      "solution": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\ndata = {\n    \"videos\": [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22],\n    \"completed\": [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1]\n}\ndf = pd.DataFrame(data)\nprint(\"Drop / Complete counts:\", (df[\"completed\"] == 0).sum(), \"/\", (df[\"completed\"] == 1).sum())\n\nX = df[[\"videos\"]]\ny = df[\"completed\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1, stratify=y)\n\nmodel = LogisticRegression()\nmodel.fit(X_train, y_train)\n\nacc = accuracy_score(y_test, model.predict(X_test))\nbaseline = y.value_counts(normalize=True).max()\nprint(f\"Model accuracy: {acc:.0%}\")\nprint(f\"Baseline accuracy: {baseline:.0%}\")\n\nnew = pd.DataFrame({\"videos\": [3, 9, 15]})\nnew[\"chance_complete\"] = model.predict_proba(new)[:, 1].round(2)\nprint(new)\n\nprint(\"Beats the baseline!\" if acc > baseline else \"Does not beat the baseline yet.\")",
+      "output": "Drop / Complete counts: 8 / 6\nModel accuracy: 80%\nBaseline accuracy: 57%\n   videos  chance_complete\n0       3             0.00\n1       9             0.03\n2      15             0.87\nBeats the baseline!"
+    }
+  ],
+  "checklist": [
+    "Understood regression vs classification",
+    "Created Pass/Fail labels",
+    "Split data safely with stratify",
+    "Trained a LogisticRegression model",
+    "Measured accuracy",
+    "Tried custom input",
+    "Built the Pass/Fail Predictor"
+  ],
+  "quiz": [
+    {
+      "q": "Which problem is classification?",
+      "options": [
+        "Predicting tomorrow's temperature in degrees",
+        "Predicting a house price",
+        "Predicting whether an email is spam or not",
+        "Predicting marks out of 100"
+      ],
+      "answer": 2,
+      "why": "Spam or not spam is a category. Temperature, price and marks are numbers (regression)."
+    },
+    {
+      "q": "Why can the plain train_test_split fail on our 6 row Pass/Fail data?",
+      "options": [
+        "Logistic regression cannot use splits",
+        "The training part may contain only one class",
+        "The data has missing values",
+        "test_size must be 0.5"
+      ],
+      "answer": 1,
+      "why": "If every Fail row lands in the test set, the model has nothing to learn Fail from. stratify=y prevents this."
+    },
+    {
+      "q": "What does an accuracy of 0.75 mean?",
+      "options": [
+        "The error is 0.75 marks",
+        "75% of predictions were correct",
+        "The model is 0.75 hours off",
+        "75 rows were used"
+      ],
+      "answer": 1,
+      "why": "Accuracy is correct predictions divided by total predictions."
+    },
+    {
+      "q": "A model with 90% accuracy on data where 90% of rows are Pass is:",
+      "options": [
+        "Excellent for sure",
+        "Not better than always guessing Pass",
+        "Perfect",
+        "Impossible"
+      ],
+      "answer": 1,
+      "why": "Compare accuracy with the baseline of always predicting the most common class."
+    }
+  ]
+},
+
+// DAY 7 snippet. In course-data.js: add a comma after Day 6's closing }, then paste this object. No images for this day.
+{
+  "day": 7,
+  "title": "Mini Project: Student Performance Predictor",
+  "subtitle": "Combine everything from Days 1 to 6 into one complete ML pipeline with regression, classification and honest evaluation.",
+  "level": "Beginner",
+  "duration": "2-3 hours",
+  "tags": [
+    "Pipeline",
+    "Regression + Classification",
+    "Evaluation",
+    "Feature Engineering",
+    "Project"
+  ],
+  "goals": [
+    "Combine everything you learned",
+    "Build a complete ML pipeline",
+    "Think like a real ML developer"
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "icon": "🏗️",
+      "title": "Project Overview",
+      "meta": "Student Performance Predictor (Complete v1)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Today you combine everything from Days 1 to 6 into one complete ML system."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Part",
+            "Details"
+          ],
+          "rows": [
+            [
+              "Input",
+              "Hours studied"
+            ],
+            [
+              "Output",
+              "Predicted marks (regression) and Pass/Fail (classification)"
+            ],
+            [
+              "Skills used",
+              "Data handling, visualization, two ML models, evaluation"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "head": [
+            "Pipeline step",
+            "From day",
+            "Code you will use"
+          ],
+          "rows": [
+            [
+              "1. Data",
+              "Days 1 and 2",
+              "DataFrame, apply, status column"
+            ],
+            [
+              "2. Visualize",
+              "Day 3",
+              "plt.scatter"
+            ],
+            [
+              "3. Split",
+              "Days 5 and 6",
+              "train_test_split with stratify"
+            ],
+            [
+              "4. Train",
+              "Days 4 and 6",
+              "LinearRegression + LogisticRegression"
+            ],
+            [
+              "5. Predict",
+              "Days 4 to 6",
+              "predict, predict_proba"
+            ],
+            [
+              "6. Evaluate",
+              "Days 5 and 6",
+              "MAE + accuracy on test data"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "A pipeline is a fixed chain of steps from raw data to a prediction. Real ML projects are exactly this, just bigger."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 1: Full Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day7_project.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6, 7, 8],\n    \"marks\": [35, 40, 50, 60, 65, 70, 80, 90]\n}\ndf = pd.DataFrame(data)\n\n# Create status column: 1 = Pass, 0 = Fail\ndf[\"status\"] = df[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(df)",
+          "output": "   hours_studied  marks  status\n0              1     35       0\n1              2     40       0\n2              3     50       1\n3              4     60       1\n4              5     65       1\n5              6     70       1\n6              7     80       1\n7              8     90       1"
+        }
+      ]
+    },
+    {
+      "id": "viz",
+      "icon": "🔍",
+      "title": "Step 2: Data Visualization",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "viz.py",
+          "code": "import matplotlib.pyplot as plt\n\ncolors = df[\"status\"].map({1: \"green\", 0: \"red\"})   # green = Pass, red = Fail\nplt.scatter(df[\"hours_studied\"], df[\"marks\"], c=colors, s=80)\nplt.axhline(50, color=\"gray\", linestyle=\"--\", label=\"Pass mark (50)\")\nplt.xlabel(\"Hours Studied\")\nplt.ylabel(\"Marks\")\nplt.title(\"Study vs Marks\")\nplt.legend()\nplt.show()"
+        },
+        {
+          "type": "p",
+          "text": "What you should see: dots rising with study hours. Red dots (Fail) sit below the dashed 50 line, green dots (Pass) above it."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "⚡",
+      "title": "Step 3: Regression Model (Marks Prediction)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "One split for BOTH models. train_test_split accepts several targets and splits them with the same rows, so the regression and classification models are tested on the same students. We use stratify so Pass and Fail appear in both parts."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "regression.py",
+          "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\n\nX = df[[\"hours_studied\"]]\ny_marks = df[\"marks\"]\ny_status = df[\"status\"]\n\nX_train, X_test, marks_train, marks_test, status_train, status_test = train_test_split(\n    X, y_marks, y_status, test_size=0.25, random_state=42, stratify=y_status\n)\nprint(\"Train hours:\", list(X_train[\"hours_studied\"]))\nprint(\"Test hours :\", list(X_test[\"hours_studied\"]))\n\nreg_model = LinearRegression()\nreg_model.fit(X_train, marks_train)\nprint(\"\\nRegression model trained\")",
+          "output": "Train hours: [5, 1, 3, 6, 8, 4]\nTest hours : [2, 7]\n\nRegression model trained"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The original task trained the classifier on ALL the data and later measured its accuracy on that same data. That is the fake confidence trap from Day 5. Here every model learns from the training rows only."
+        }
+      ]
+    },
+    {
+      "id": "clf",
+      "icon": "⚡",
+      "title": "Step 4: Classification Model (Pass/Fail)",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "classification.py",
+          "code": "from sklearn.linear_model import LogisticRegression\n\nclf_model = LogisticRegression()\nclf_model.fit(X_train, status_train)     # training rows only\nprint(\"Classification model trained\")",
+          "output": "Classification model trained"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "The two models answer different questions from the same input: LinearRegression says how many marks, LogisticRegression says Pass or Fail."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "⚡",
+      "title": "Step 5: User Input System",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Put the prediction logic in one function. It returns both answers and keeps marks between 0 and 100 (Day 5):"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict_student.py",
+          "code": "def predict_student(hours):\n    new = pd.DataFrame({\"hours_studied\": [hours]})\n\n    marks = reg_model.predict(new)[0]\n    marks = round(min(max(marks, 0), 100), 2)\n\n    status = clf_model.predict(new)[0]\n    chance = clf_model.predict_proba(new)[0][1]\n    return marks, status, chance\n\nfor h in [2, 4.5, 6, 9]:\n    marks, status, chance = predict_student(h)\n    result = \"Pass ✅\" if status == 1 else \"Fail ❌\"\n    print(f\"{h} hours -> {marks} marks | {result} (chance of passing: {chance:.0%})\")",
+          "output": "2 hours -> 42.6 marks | Pass ✅ (chance of passing: 59%)\n4.5 hours -> 61.67 marks | Pass ✅ (chance of passing: 94%)\n6 hours -> 73.11 marks | Pass ✅ (chance of passing: 98%)\n9 hours -> 95.99 marks | Pass ✅ (chance of passing: 100%)"
+        },
+        {
+          "type": "p",
+          "text": "Now connect it to the user:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "user_input.py",
+          "code": "hours = float(input(\"Enter hours studied: \"))\nmarks, status, chance = predict_student(hours)\n\nprint(\"\\nPredicted Marks:\", marks)\nif status == 1:\n    print(\"Result: Pass ✅\")\nelse:\n    print(\"Result: Fail ❌\")"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Look at 2 hours: the regression model predicts 42.6 marks (a Fail), yet the classifier says Pass with a 59% chance. Two models trained separately on tiny data can disagree near the pass mark. In a real system you would pick one rule, for example: Pass if the predicted marks are 50 or more."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Example: type 6 and you get Predicted Marks: 73.11 and Result: Pass ✅. The numbers in the original task's sample output were only an illustration. Yours come from the real model."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "We pass a DataFrame with the same column name instead of [[hours]], which avoids scikit-learn's feature-name warning."
+        }
+      ]
+    },
+    {
+      "id": "eval",
+      "icon": "📊",
+      "title": "Step 6: Model Evaluation",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "evaluation.py",
+          "code": "from sklearn.metrics import mean_absolute_error, accuracy_score\n\n# Regression error on the TEST rows\npred_marks = reg_model.predict(X_test)\nerror = mean_absolute_error(marks_test, pred_marks)\nprint(\"Regression Error (MAE):\", round(error, 2), \"marks\")\n\n# Classification accuracy on the TEST rows\npred_status = clf_model.predict(X_test)\nacc = accuracy_score(status_test, pred_status)\nprint(\"Classification Accuracy (test):\", acc)\n\n# What the original task measured: accuracy on training rows\nacc_train = accuracy_score(status_train, clf_model.predict(X_train))\nprint(\"Classification Accuracy (train):\", acc_train)",
+          "output": "Regression Error (MAE): 1.67 marks\nClassification Accuracy (test): 0.5\nClassification Accuracy (train): 1.0"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Train accuracy is 100% but test accuracy is only 50%. With just 2 test rows each wrong answer costs 50 points, so this number is noisy. It still shows why we test on unseen data: the training score hides the problem."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The honest takeaway: 8 rows and 1 feature are too little for a trustworthy system. That is what the challenge fixes."
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: More Features, Better Prediction",
+      "meta": "Very important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Add Sleep hours and Attendance. Here is a larger dataset of 24 students:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "more_features.py",
+          "code": "import numpy as np\n\ndata2 = {\n    \"hours_studied\": [1.6, 7.2, 4.5, 6.8, 8.8, 5.3, 5.0, 1.6, 3.1, 5.0, 6.4, 7.4, 4.0, 1.5, 3.3, 8.3, 2.7, 4.6, 8.4, 1.2, 5.8, 8.6, 2.8, 5.4],\n    \"sleep_hours\": [8.5, 4.7, 6.6, 7.8, 7.3, 6.3, 5.0, 6.5, 5.9, 6.4, 5.8, 8.2, 7.8, 5.6, 6.9, 5.4, 6.3, 5.8, 7.3, 5.9, 6.3, 7.6, 6.1, 8.5],\n    \"attendance\": [59, 87, 71, 71, 82, 76, 71, 50, 55, 85, 76, 85, 98, 84, 53, 65, 80, 62, 98, 97, 92, 74, 92, 57],\n    \"marks\": [35, 54, 47, 66, 71, 49, 42, 25, 33, 50, 59, 69, 57, 38, 41, 59, 42, 45, 75, 34, 60, 72, 46, 51]\n}\ndf2 = pd.DataFrame(data2)\ndf2[\"status\"] = df2[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\n\nprint(df2.head())\nprint(\"\\nFail / Pass counts:\", (df2[\"status\"] == 0).sum(), \"/\", (df2[\"status\"] == 1).sum())",
+          "output": "   hours_studied  sleep_hours  attendance  marks  status\n0            1.6          8.5          59     35       0\n1            7.2          4.7          87     54       1\n2            4.5          6.6          71     47       0\n3            6.8          7.8          71     66       1\n4            8.8          7.3          82     71       1\n\nFail / Pass counts: 12 / 12"
+        },
+        {
+          "type": "p",
+          "text": "Compare hours only against all three features. Small data is noisy, so average over 10 different splits:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare_features.py",
+          "code": "def compare(features):\n    maes, accs = [], []\n    for seed in range(10):\n        Xtr, Xte, mtr, mte, str_, ste = train_test_split(\n            df2[features], df2[\"marks\"], df2[\"status\"],\n            test_size=0.25, random_state=seed, stratify=df2[\"status\"]\n        )\n        reg = LinearRegression().fit(Xtr, mtr)\n        clf = LogisticRegression(max_iter=1000).fit(Xtr, str_)\n        maes.append(mean_absolute_error(mte, reg.predict(Xte)))\n        accs.append(accuracy_score(ste, clf.predict(Xte)))\n    return np.mean(maes), np.mean(accs)\n\nfor name, feats in [(\"Hours only\", [\"hours_studied\"]),\n                    (\"Hours + Sleep + Attendance\", [\"hours_studied\", \"sleep_hours\", \"attendance\"])]:\n    mae, acc = compare(feats)\n    print(f\"{name:27} avg MAE: {mae:.2f} marks | avg accuracy: {acc:.0%}\")",
+          "output": "Hours only                  avg MAE: 5.53 marks | avg accuracy: 92%\nHours + Sleep + Attendance  avg MAE: 2.51 marks | avg accuracy: 95%"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "More relevant features cut the average error roughly in half (about 5.5 to 2.5 marks), and accuracy improves too. Better features are usually the biggest upgrade."
+        },
+        {
+          "type": "p",
+          "text": "Which feature matters most? Look at the learned slopes:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "feature_weights.py",
+          "code": "features = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nbig_model = LinearRegression().fit(df2[features], df2[\"marks\"])\n\nprint(\"Marks gained per +1 unit of each feature:\")\nprint(pd.Series(big_model.coef_, index=features).round(2))",
+          "output": "Marks gained per +1 unit of each feature:\nhours_studied    4.60\nsleep_hours      3.35\nattendance       0.28\ndtype: float64"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Read the slopes with units in mind: +1 study hour adds about 4.6 marks, +1 sleep hour about 3.4 marks, and +1 attendance point about 0.3 marks. Attendance looks small only because it is measured on a 0 to 100 scale."
+        }
+      ]
+    },
+    {
+      "id": "think",
+      "icon": "🧠",
+      "title": "Think Like an ML Developer",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Question",
+            "Answer for this project"
+          ],
+          "rows": [
+            [
+              "Did I test on unseen data?",
+              "Yes, a train/test split for both models"
+            ],
+            [
+              "Is there enough data?",
+              "No, 8 rows is tiny. 24 rows is better. Real projects use hundreds or thousands"
+            ],
+            [
+              "Did I check class balance?",
+              "Yes, stratify keeps Pass and Fail in both parts"
+            ],
+            [
+              "What would improve it next?",
+              "More students, more features, repeated splits, better metrics"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "This is your first complete ML system: data handling, visualization, regression, classification and evaluation, all in one pipeline."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Just Achieved",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Data handling with Pandas",
+            "Visualization with Matplotlib",
+            "A regression model for marks",
+            "A classification model for Pass/Fail",
+            "Honest evaluation on unseen data",
+            "A complete pipeline from data to prediction"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Performance Predictor (Complete v1)",
+    "file": "day7_final.py",
+    "description": "The complete pipeline in one file: data, visualization, one shared stratified split, regression and classification models, honest test evaluation with a baseline, a prediction function and a combined plot.",
+    "concepts": [
+      "pipeline",
+      "shared split",
+      "LinearRegression",
+      "LogisticRegression",
+      "MAE",
+      "accuracy vs baseline",
+      "predict_student()"
+    ],
+    "code": "import pandas as pd\nimport matplotlib.pyplot as plt\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression, LogisticRegression\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\n\n# 1. DATA\ndata = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6, 7, 8],\n    \"marks\": [35, 40, 50, 60, 65, 70, 80, 90]\n}\ndf = pd.DataFrame(data)\ndf[\"status\"] = df[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(\"=== STUDENT PERFORMANCE PREDICTOR (COMPLETE v1) ===\")\nprint(df)\n\n# 2. SPLIT: one split for both models, stratified on Pass/Fail\nX = df[[\"hours_studied\"]]\ny_marks = df[\"marks\"]\ny_status = df[\"status\"]\nX_train, X_test, marks_train, marks_test, status_train, status_test = train_test_split(\n    X, y_marks, y_status, test_size=0.25, random_state=42, stratify=y_status\n)\nprint(\"\\nTrain hours:\", list(X_train[\"hours_studied\"]), \"| Test hours:\", list(X_test[\"hours_studied\"]))\n\n# 3. TRAIN BOTH MODELS (training rows only)\nreg_model = LinearRegression().fit(X_train, marks_train)\nclf_model = LogisticRegression().fit(X_train, status_train)\n\n# 4. EVALUATE ON UNSEEN TEST DATA\nmae = mean_absolute_error(marks_test, reg_model.predict(X_test))\nacc = accuracy_score(status_test, clf_model.predict(X_test))\nbaseline = y_status.value_counts(normalize=True).max()\nprint(f\"\\nRegression Error (MAE): {mae:.2f} marks\")\nprint(f\"Classification Accuracy: {acc:.0%} (baseline always-Pass: {baseline:.0%})\")\n\n# 5. PREDICTION SYSTEM\ndef predict_student(hours):\n    new = pd.DataFrame({\"hours_studied\": [hours]})\n    marks = round(min(max(reg_model.predict(new)[0], 0), 100), 2)\n    status = clf_model.predict(new)[0]\n    chance = clf_model.predict_proba(new)[0][1]\n    return marks, status, chance\n\nprint(\"\\nPredictions:\")\nfor h in [2, 4.5, 6, 9]:\n    marks, status, chance = predict_student(h)\n    result = \"Pass ✅\" if status == 1 else \"Fail ❌\"\n    print(f\"  {h} hours -> {marks} marks | {result} (chance of passing: {chance:.0%})\")\n\n# 6. VISUALIZE\ncolors = df[\"status\"].map({1: \"green\", 0: \"red\"})\nplt.scatter(df[\"hours_studied\"], df[\"marks\"], c=colors, s=80, label=\"Students (green = Pass, red = Fail)\")\nx_line = pd.DataFrame({\"hours_studied\": [0, 9]})\nplt.plot(x_line, reg_model.predict(x_line), color=\"blue\", label=\"Regression line\")\nplt.axhline(50, color=\"gray\", linestyle=\"--\", label=\"Pass mark (50)\")\nplt.xlabel(\"Hours Studied\")\nplt.ylabel(\"Marks\")\nplt.title(\"Student Performance Predictor\")\nplt.legend()\nplt.show()\n\n# Interactive version (try it in your own file):\n# hours = float(input(\"Enter hours studied: \"))\n# marks, status, chance = predict_student(hours)\n# print(\"Predicted Marks:\", marks, \"|\", \"Pass\" if status == 1 else \"Fail\")",
+    "output": "=== STUDENT PERFORMANCE PREDICTOR (COMPLETE v1) ===\n   hours_studied  marks  status\n0              1     35       0\n1              2     40       0\n2              3     50       1\n3              4     60       1\n4              5     65       1\n5              6     70       1\n6              7     80       1\n7              8     90       1\n\nTrain hours: [5, 1, 3, 6, 8, 4] | Test hours: [2, 7]\n\nRegression Error (MAE): 1.67 marks\nClassification Accuracy: 50% (baseline always-Pass: 75%)\n\nPredictions:\n  2 hours -> 42.6 marks | Pass ✅ (chance of passing: 59%)\n  4.5 hours -> 61.67 marks | Pass ✅ (chance of passing: 94%)\n  6 hours -> 73.11 marks | Pass ✅ (chance of passing: 98%)\n  9 hours -> 95.99 marks | Pass ✅ (chance of passing: 100%)"
+  },
+  "practice": [
+    {
+      "title": "Salary Pipeline",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Build a complete mini pipeline for a new topic: predict salary (regression) and high earner (classification) from years of experience.",
+      "tasks": [
+        "Create the DataFrame and add a high_earner column: salary of 50000 or more is 1, else 0",
+        "Split once for both targets (test_size=0.25, random_state=42, stratify on high_earner)",
+        "Train LinearRegression for salary and LogisticRegression for high_earner on the training rows",
+        "Print the test MAE and the test accuracy",
+        "Predict salary and class for 3 and 9 years of experience"
+      ],
+      "hint": "Pass both targets to one train_test_split call. Use pd.DataFrame({\"experience\": [3, 9]}) for predictions.",
+      "starter": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression, LogisticRegression\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\n\ndata = {\n    \"experience\": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],\n    \"salary\": [28000, 31000, 36000, 41000, 46000, 52000, 56000, 63000, 67000, 74000, 79000, 86000]\n}\n\n# TODO 1: DataFrame + high_earner column\n\n# TODO 2: one split for both targets (stratify)\n\n# TODO 3: train both models\n\n# TODO 4: print test MAE and test accuracy\n\n# TODO 5: predict for 3 and 9 years",
+      "solution": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression, LogisticRegression\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\n\ndata = {\n    \"experience\": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],\n    \"salary\": [28000, 31000, 36000, 41000, 46000, 52000, 56000, 63000, 67000, 74000, 79000, 86000]\n}\ndf = pd.DataFrame(data)\ndf[\"high_earner\"] = df[\"salary\"].apply(lambda x: 1 if x >= 50000 else 0)\n\nX = df[[\"experience\"]]\nX_train, X_test, sal_train, sal_test, cls_train, cls_test = train_test_split(\n    X, df[\"salary\"], df[\"high_earner\"], test_size=0.25, random_state=42, stratify=df[\"high_earner\"]\n)\n\nreg = LinearRegression().fit(X_train, sal_train)\nclf = LogisticRegression().fit(X_train, cls_train)\n\nprint(\"Test MAE:\", round(mean_absolute_error(sal_test, reg.predict(X_test))), \"currency units\")\nprint(\"Test accuracy:\", f\"{accuracy_score(cls_test, clf.predict(X_test)):.0%}\")\n\nnew = pd.DataFrame({\"experience\": [3, 9]})\nfor years, s, c in zip(new[\"experience\"], reg.predict(new), clf.predict(new)):\n    print(f\"{years} years -> salary {round(s)} | {'High earner' if c == 1 else 'Not high earner'}\")",
+      "output": "Test MAE: 1696 currency units\nTest accuracy: 100%\n3 years -> salary 36566 | Not high earner\n9 years -> salary 67504 | High earner"
+    },
+    {
+      "title": "House Price Feature Upgrade",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Upgrade a house price model with more features and prove it helps with repeated splits.",
+      "tasks": [
+        "Create the DataFrame and print its first 3 rows",
+        "Write compare(features) that averages the test MAE over 10 splits (random_state 0 to 9)",
+        "Compare size only against size + rooms + age",
+        "Print the learned slope of every feature from a model trained on all rows",
+        "Decide which feature adds the most price per unit"
+      ],
+      "hint": "Loop for seed in range(10) with train_test_split(df[features], df[\"price\"], test_size=0.25, random_state=seed). Use pd.Series(model.coef_, index=features).",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"size_100sqft\": [7.7, 5.3, 11.9, 15.9, 11.3, 12.3, 5.2, 12.3, 19.1, 17.8, 15.9, 6.6, 18.4, 17.9, 7.5, 14.5, 5.3, 6.8, 9.7, 7.4],\n    \"rooms\": [2, 4, 1, 4, 4, 3, 2, 4, 3, 2, 4, 1, 2, 3, 4, 4, 4, 1, 1, 1],\n    \"age_years\": [27, 24, 5, 21, 7, 18, 3, 27, 1, 16, 3, 8, 23, 17, 4, 8, 18, 0, 14, 19],\n    \"price\": [39.7, 45.0, 72.4, 99.5, 88.5, 74.7, 43.3, 72.0, 118.4, 102.7, 109.7, 40.5, 96.5, 100.7, 71.1, 97.9, 47.2, 45.2, 50.2, 36.6]\n}\n\n# TODO 1: DataFrame, print first 3 rows\n\n# TODO 2: compare(features) averaging test MAE over 10 splits\n\n# TODO 3: compare size only vs all features\n\n# TODO 4: print learned slopes of every feature",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"size_100sqft\": [7.7, 5.3, 11.9, 15.9, 11.3, 12.3, 5.2, 12.3, 19.1, 17.8, 15.9, 6.6, 18.4, 17.9, 7.5, 14.5, 5.3, 6.8, 9.7, 7.4],\n    \"rooms\": [2, 4, 1, 4, 4, 3, 2, 4, 3, 2, 4, 1, 2, 3, 4, 4, 4, 1, 1, 1],\n    \"age_years\": [27, 24, 5, 21, 7, 18, 3, 27, 1, 16, 3, 8, 23, 17, 4, 8, 18, 0, 14, 19],\n    \"price\": [39.7, 45.0, 72.4, 99.5, 88.5, 74.7, 43.3, 72.0, 118.4, 102.7, 109.7, 40.5, 96.5, 100.7, 71.1, 97.9, 47.2, 45.2, 50.2, 36.6]\n}\ndf = pd.DataFrame(data)\nprint(df.head(3))\n\ndef compare(features):\n    errors = []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[features], df[\"price\"], test_size=0.25, random_state=seed)\n        model = LinearRegression().fit(X_train, y_train)\n        errors.append(mean_absolute_error(y_test, model.predict(X_test)))\n    return np.mean(errors)\n\nall_features = [\"size_100sqft\", \"rooms\", \"age_years\"]\nprint()\nprint(\"Size only: avg MAE =\", round(compare([\"size_100sqft\"]), 2), \"lakh\")\nprint(\"All features: avg MAE =\", round(compare(all_features), 2), \"lakh\")\n\nmodel = LinearRegression().fit(df[all_features], df[\"price\"])\nprint()\nprint(pd.Series(model.coef_, index=all_features).round(2))",
+      "output": "   size_100sqft  rooms  age_years  price\n0           7.7      2         27   39.7\n1           5.3      4         24   45.0\n2          11.9      1          5   72.4\n\nSize only: avg MAE = 8.12 lakh\nAll features: avg MAE = 2.39 lakh\n\nsize_100sqft    4.94\nrooms           6.72\nage_years      -0.70\ndtype: float64",
+      "note": "Read the slopes with units in mind: each extra 100 sqft adds about 4.9 lakh, each extra room about 6.7 lakh, and each year of age takes away about 0.7 lakh. Adding rooms and age cuts the error a lot, because price depends on more than size."
+    }
+  ],
+  "checklist": [
+    "Built the dataset and status column",
+    "Visualized the data",
+    "Trained a regression model",
+    "Trained a classification model",
+    "Evaluated both on unseen test data",
+    "Built the user prediction system",
+    "Tried more features in the challenge"
+  ],
+  "quiz": [
+    {
+      "q": "Why do we pass both y_marks and y_status to one train_test_split call?",
+      "options": [
+        "It makes training faster",
+        "Both models are trained and tested on the same students",
+        "It removes outliers",
+        "It is required by LinearRegression"
+      ],
+      "answer": 1,
+      "why": "One call splits all arrays with the same rows, so the two models are compared fairly on the same test students."
+    },
+    {
+      "q": "What is wrong with measuring accuracy on the same data used for training?",
+      "options": [
+        "Nothing, it is the best measure",
+        "It gives fake confidence and hides real performance",
+        "It uses too much memory",
+        "It cannot be calculated"
+      ],
+      "answer": 1,
+      "why": "The model has already seen those rows. Only unseen test data shows real performance."
+    },
+    {
+      "q": "Which model predicts the number of marks?",
+      "options": [
+        "LogisticRegression",
+        "LinearRegression",
+        "accuracy_score",
+        "train_test_split"
+      ],
+      "answer": 1,
+      "why": "LinearRegression predicts numbers. LogisticRegression predicts categories like Pass/Fail."
+    },
+    {
+      "q": "Adding relevant features (sleep, attendance) usually:",
+      "options": [
+        "Always makes the model worse",
+        "Can reduce the error a lot",
+        "Has no effect",
+        "Removes the need for a test set"
+      ],
+      "answer": 1,
+      "why": "Relevant features give the model more information, so predictions improve. Always confirm on test data."
+    }
+  ]
 }
   ]
 };
