@@ -3190,6 +3190,1473 @@ Average used to fill: 245.0
       "why": "Relevant features give the model more information, so predictions improve. Always confirm on test data."
     }
   ]
+},
+
+// DAY 8 snippet. In course-data.js: add a comma after Day 7's closing }, then paste this object. No images for this day.
+{
+  "day": 8,
+  "title": "Data Cleaning: The Most Important Skill in ML",
+  "subtitle": "Handle messy real-world data: find and fix missing values, duplicates, wrong types and impossible values.",
+  "level": "Beginner",
+  "duration": "90-120 min",
+  "tags": [
+    "Data Cleaning",
+    "Missing Values",
+    "Duplicates",
+    "to_numeric",
+    "Pipeline"
+  ],
+  "goals": [
+    "Handle messy real-world data",
+    "Fix missing values, duplicates and errors",
+    "Prepare data like a professional"
+  ],
+  "sections": [
+    {
+      "id": "reality",
+      "icon": "🧠",
+      "title": "Reality Check",
+      "meta": "The most important skill in ML",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "In real ML, data is never clean. Experienced engineers spend about 70% of their time cleaning data. Master this and you are ahead of most learners."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Problem",
+            "What it looks like",
+            "Typical fix"
+          ],
+          "rows": [
+            [
+              "Missing values",
+              "NaN or None in a column",
+              "Fill (mean or median) or drop the row"
+            ],
+            [
+              "Duplicate rows",
+              "The same record twice",
+              "drop_duplicates()"
+            ],
+            [
+              "Wrong data types",
+              "Numbers stored as text, like \"three\"",
+              "pd.to_numeric(..., errors=\"coerce\")"
+            ],
+            [
+              "Impossible values",
+              "Marks of 150 or negative hours",
+              "Treat as missing, then fill"
+            ],
+            [
+              "Messy text",
+              "\" a\" and \"A\" for the same person",
+              "str.strip() and str.upper()"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Garbage in, garbage out. Even the best model fails when the data is dirty."
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "icon": "⚡",
+      "title": "Step 1: Create a Messy Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day8_cleaning.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"name\": [\"A\", \"B\", \"C\", \"D\", \"E\", \"E\"],\n    \"hours_studied\": [2, 4, None, 5, 3, 3],\n    \"marks\": [40, 60, 30, None, 50, 50]\n}\ndf = pd.DataFrame(data)\nprint(df)",
+          "output": "  name  hours_studied  marks\n0    A            2.0   40.0\n1    B            4.0   60.0\n2    C            NaN   30.0\n3    D            5.0    NaN\n4    E            3.0   50.0\n5    E            3.0   50.0"
+        },
+        {
+          "type": "p",
+          "text": "NaN means Not a Number: Pandas' marker for a missing value. A column with NaN becomes decimal (float)."
+        }
+      ]
+    },
+    {
+      "id": "identify",
+      "icon": "🔍",
+      "title": "Step 2: Identify Problems",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "identify.py",
+          "code": "print(df.isnull())\n\nprint(\"\\nMissing values per column:\")\nprint(df.isnull().sum())\n\nprint(\"\\nDuplicate rows:\")\nprint(df[df.duplicated()])",
+          "output": "    name  hours_studied  marks\n0  False          False  False\n1  False          False  False\n2  False           True  False\n3  False          False   True\n4  False          False  False\n5  False          False  False\n\nMissing values per column:\nname             0\nhours_studied    1\nmarks            1\ndtype: int64\n\nDuplicate rows:\n  name  hours_studied  marks\n5    E            3.0   50.0"
+        },
+        {
+          "type": "p",
+          "text": "You will see two problems: missing values in hours_studied and marks, and a duplicate row (the second E). The first copy is kept, the repeat is flagged as the duplicate."
+        }
+      ]
+    },
+    {
+      "id": "dups",
+      "icon": "🔁",
+      "title": "Step 3: Remove Duplicates",
+      "meta": "Do this BEFORE filling missing values",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "duplicates.py",
+          "code": "print(\"Rows before:\", len(df))\nprint(\"Mean marks WITH the duplicate:\", df[\"marks\"].mean())\n\ndf = df.drop_duplicates()\n\nprint(\"Rows after :\", len(df))\nprint(\"Mean marks WITHOUT the duplicate:\", df[\"marks\"].mean())",
+          "output": "Rows before: 6\nMean marks WITH the duplicate: 46.0\nRows after : 5\nMean marks WITHOUT the duplicate: 45.0"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The original task filled missing values first. But a duplicate counts twice in the mean (46.0 instead of 45.0), so the filled values come out slightly wrong. Remove duplicates first, then fill."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "drop_duplicates() returns a new table. Assign it back: df = df.drop_duplicates(). The old style drop_duplicates(inplace=True) also works, but assigning is clearer and safer."
+        }
+      ]
+    },
+    {
+      "id": "missing",
+      "icon": "🧹",
+      "title": "Step 4: Handle Missing Values",
+      "meta": "Option 1: fill with the mean",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "fill_missing.py",
+          "code": "df[\"hours_studied\"] = df[\"hours_studied\"].fillna(df[\"hours_studied\"].mean())\ndf[\"marks\"] = df[\"marks\"].fillna(df[\"marks\"].mean())\nprint(df)",
+          "output": "  name  hours_studied  marks\n0    A            2.0   40.0\n1    B            4.0   60.0\n2    C            3.5   30.0\n3    D            5.0   45.0\n4    E            3.0   50.0"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Older tutorials write df[\"marks\"].fillna(..., inplace=True). In recent Pandas this shows a FutureWarning, and in Pandas 3 it silently does nothing. Assign the result back, as above."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Option",
+            "Use when",
+            "Code"
+          ],
+          "rows": [
+            [
+              "Fill with mean",
+              "Values are fairly evenly spread",
+              "fillna(df[col].mean())"
+            ],
+            [
+              "Fill with median",
+              "There are outliers (a few extreme values)",
+              "fillna(df[col].median())"
+            ],
+            [
+              "Drop the row",
+              "Few rows are missing and you have plenty of data",
+              "df.dropna()"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "types",
+      "icon": "🔎",
+      "title": "Step 5: Fix Data Types",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "dtypes.py",
+          "code": "print(df[[\"hours_studied\", \"marks\"]].dtypes)",
+          "output": "hours_studied    float64\nmarks            float64\ndtype: object"
+        },
+        {
+          "type": "p",
+          "text": "Make sure numeric columns are numeric. Here both are float64 (decimal numbers), which is fine for ML. If a number column showed object, it contains text and needs fixing. You will do exactly that in the challenge."
+        }
+      ]
+    },
+    {
+      "id": "final_df",
+      "icon": "⚡",
+      "title": "Step 6: Final Clean Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "clean_check.py",
+          "code": "print(df)\n\nprint(\"\\nMissing values left:\", df.isnull().sum().sum())\nprint(\"Duplicates left:\", df.duplicated().sum())",
+          "output": "  name  hours_studied  marks\n0    A            2.0   40.0\n1    B            4.0   60.0\n2    C            3.5   30.0\n3    D            5.0   45.0\n4    E            3.0   50.0\n\nMissing values left: 0\nDuplicates left: 0"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Always end with a quick check like this. Clean means: zero missing values, zero duplicates, correct types."
+        }
+      ]
+    },
+    {
+      "id": "extra",
+      "icon": "🔥",
+      "title": "More Real-World Problems",
+      "meta": "Text mess and impossible values",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "extra_problems.py",
+          "code": "messy = pd.DataFrame({\n    \"name\": [\" a\", \"B \", \"c\"],\n    \"marks\": [150, 60, -5]\n})\n\n# Clean text: remove spaces, make uppercase\nmessy[\"name\"] = messy[\"name\"].str.strip().str.upper()\nprint(messy)\n\n# Find impossible marks (below 0 or above 100)\nprint(\"\\nImpossible marks:\")\nprint(messy[(messy[\"marks\"] < 0) | (messy[\"marks\"] > 100)])",
+          "output": "  name  marks\n0    A    150\n1    B     60\n2    C     -5\n\nImpossible marks:\n  name  marks\n0    A    150\n2    C     -5"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Without str.strip() and str.upper(), \" a\" and \"A\" look like different people, so duplicates would go undetected. Impossible values should be treated as missing and then filled."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Data Cleaner Tool",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Features: detect missing values, fill them, remove duplicates and show the cleaned data. Wrap them in one reusable function that also returns a report:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "cleaner_tool.py",
+          "code": "import numpy as np\n\ndef clean_data(df):\n    df = df.copy()\n    report = {}\n\n    # 1. Fix text and types\n    df[\"name\"] = df[\"name\"].str.strip().str.upper()\n    for col in [\"hours_studied\", \"marks\"]:\n        df[col] = pd.to_numeric(df[col], errors=\"coerce\")\n\n    # 2. Impossible values become missing\n    df.loc[(df[\"marks\"] < 0) | (df[\"marks\"] > 100), \"marks\"] = np.nan\n    df.loc[(df[\"hours_studied\"] < 0) | (df[\"hours_studied\"] > 24), \"hours_studied\"] = np.nan\n    report[\"missing_found\"] = int(df.isnull().sum().sum())\n\n    # 3. Remove duplicates BEFORE filling\n    before = len(df)\n    df = df.drop_duplicates()\n    report[\"duplicates_removed\"] = before - len(df)\n\n    # 4. Fill missing values with the mean\n    for col in [\"hours_studied\", \"marks\"]:\n        df[col] = df[col].fillna(df[col].mean()).round(2)\n\n    return df.reset_index(drop=True), report\n\ndirty = pd.DataFrame({\n    \"name\": [\"A\", \"B\", \"C\", \"D\", \" e\", \"E\", \"F\", \"G\"],\n    \"hours_studied\": [2, 4, \"three\", 5, 3, 3, -1, 6],\n    \"marks\": [40, 60, 30, None, 50, 50, 70, 150]\n})\n\nprint(\"DIRTY DATA:\")\nprint(dirty)\n\ncleaned, report = clean_data(dirty)\nprint(\"\\nREPORT:\", report)\nprint(\"\\nCLEAN DATA:\")\nprint(cleaned)",
+          "output": "DIRTY DATA:\n  name hours_studied  marks\n0    A             2   40.0\n1    B             4   60.0\n2    C         three   30.0\n3    D             5    NaN\n4    e             3   50.0\n5    E             3   50.0\n6    F            -1   70.0\n7    G             6  150.0\n\nREPORT: {'missing_found': 4, 'duplicates_removed': 1}\n\nCLEAN DATA:\n  name  hours_studied  marks\n0    A            2.0   40.0\n1    B            4.0   60.0\n2    C            4.0   30.0\n3    D            5.0   50.0\n4    E            3.0   50.0\n5    F            4.0   70.0\n6    G            6.0   50.0"
+        },
+        {
+          "type": "p",
+          "text": "One function now does the whole job. Real projects keep a function like this and run it on every new batch of data."
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Convert Text to Numbers",
+      "meta": "Important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Add dirty data where a number was typed as a word. Build the column so it mixes numbers and text, like data from a form or a CSV file:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "to_numeric.py",
+          "code": "df2 = pd.DataFrame({\n    \"name\": [\"A\", \"B\", \"C\", \"D\", \"E\"],\n    \"hours_studied\": [2, 4, \"three\", 5, 3]\n})\nprint(\"Before:\", df2[\"hours_studied\"].dtype)\n\ndf2[\"hours_studied\"] = pd.to_numeric(df2[\"hours_studied\"], errors=\"coerce\")\nprint(\"After :\", df2[\"hours_studied\"].dtype)\nprint(df2)",
+          "output": "Before: object\nAfter : float64\n  name  hours_studied\n0    A            2.0\n1    B            4.0\n2    C            NaN\n3    D            5.0\n4    E            3.0"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "errors=\"coerce\" turns anything that cannot be a number into NaN. So \"three\" becomes a missing value, and you must fill it afterwards. Converting is only half of the job."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The original task wrote df.loc[2, \"hours_studied\"] = \"three\" on a number column. Recent Pandas refuses this (it warns or raises an error), because the column is numeric. Real dirty data arrives already mixed, so we build it that way."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "fill_after_coerce.py",
+          "code": "df2[\"hours_studied\"] = df2[\"hours_studied\"].fillna(df2[\"hours_studied\"].mean())\nprint(df2)",
+          "output": "  name  hours_studied\n0    A            2.0\n1    B            4.0\n2    C            3.5\n3    D            5.0\n4    E            3.0"
+        }
+      ]
+    },
+    {
+      "id": "payoff",
+      "icon": "🚀",
+      "title": "Why It Matters: Model Test",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "See what a model does with dirty data, then with the cleaned data from the Data Cleaner Tool:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "model_test.py",
+          "code": "from sklearn.linear_model import LinearRegression\n\n# Dirty data: one hours value is missing\ndirty_numbers = pd.DataFrame({\n    \"hours_studied\": [2, 4, None, 5],\n    \"marks\": [40, 60, 30, 45]\n})\ntry:\n    LinearRegression().fit(dirty_numbers[[\"hours_studied\"]], dirty_numbers[\"marks\"])\nexcept ValueError as e:\n    print(\"Model refused dirty data:\", str(e).split(\"\\n\")[0])\n\n# Clean data\nmodel = LinearRegression().fit(cleaned[[\"hours_studied\"]], cleaned[\"marks\"])\nprint(\"Model trained on\", len(cleaned), \"clean rows\")",
+          "output": "Model refused dirty data: Input X contains NaN.\nModel trained on 7 clean rows"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Most ML models refuse missing values outright, and wrong values quietly damage predictions. Cleaning is what makes modeling possible."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "How to find missing values, duplicates and wrong types",
+            "How to fill, drop and convert values safely",
+            "Why the order matters: duplicates first, then fill",
+            "How to build a reusable cleaning function",
+            "How to prepare a dataset for ML like a professional"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Important truth: even Google-level ML models fail if the data is dirty."
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Data Cleaner Tool",
+    "file": "day8_final.py",
+    "description": "A reusable cleaning function that fixes text, converts types, flags impossible values, removes duplicates first, fills missing values, reports what it did and proves the data is ready for ML.",
+    "concepts": [
+      "isnull",
+      "duplicated / drop_duplicates",
+      "fillna",
+      "to_numeric coerce",
+      "str.strip / upper",
+      "impossible values",
+      "cleaning function"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.linear_model import LinearRegression\n\ndef clean_data(df):\n    \"\"\"Clean a student table: text, types, impossible values, duplicates, missing values.\"\"\"\n    df = df.copy()\n    report = {}\n\n    # 1. Fix text and types\n    df[\"name\"] = df[\"name\"].str.strip().str.upper()\n    for col in [\"hours_studied\", \"marks\"]:\n        df[col] = pd.to_numeric(df[col], errors=\"coerce\")\n\n    # 2. Impossible values become missing\n    df.loc[(df[\"marks\"] < 0) | (df[\"marks\"] > 100), \"marks\"] = np.nan\n    df.loc[(df[\"hours_studied\"] < 0) | (df[\"hours_studied\"] > 24), \"hours_studied\"] = np.nan\n    report[\"missing_found\"] = int(df.isnull().sum().sum())\n\n    # 3. Remove duplicates BEFORE filling\n    before = len(df)\n    df = df.drop_duplicates()\n    report[\"duplicates_removed\"] = before - len(df)\n\n    # 4. Fill missing values with the mean\n    for col in [\"hours_studied\", \"marks\"]:\n        df[col] = df[col].fillna(df[col].mean()).round(2)\n\n    report[\"rows_left\"] = len(df)\n    return df.reset_index(drop=True), report\n\n# ---- DATA CLEANER TOOL ----\ndirty = pd.DataFrame({\n    \"name\": [\"A\", \"B\", \"C\", \"D\", \" e\", \"E\", \"F\", \"G\"],\n    \"hours_studied\": [2, 4, \"three\", 5, 3, 3, -1, 6],\n    \"marks\": [40, 60, 30, None, 50, 50, 70, 150]\n})\n\nprint(\"=== DATA CLEANER TOOL ===\")\nprint(\"\\nDIRTY DATA:\")\nprint(dirty)\n\nprint(\"\\nProblems found BEFORE cleaning:\")\nprint(\"  Missing marks      :\", dirty[\"marks\"].isnull().sum())\nprint(\"  Text in hours      :\", dirty[\"hours_studied\"].apply(lambda v: isinstance(v, str)).sum())\nprint(\"  Impossible marks   :\", ((dirty[\"marks\"] < 0) | (dirty[\"marks\"] > 100)).sum())\n\ncleaned, report = clean_data(dirty)\nprint(\"\\nCLEANING REPORT:\", report)\nprint(\"\\nCLEAN DATA:\")\nprint(cleaned)\n\n# ---- READY FOR ML? ----\nprint(\"\\nMissing values left:\", cleaned.isnull().sum().sum())\nprint(\"Duplicates left:\", cleaned.duplicated().sum())\nprint(cleaned[[\"hours_studied\", \"marks\"]].dtypes)\n\nmodel = LinearRegression().fit(cleaned[[\"hours_studied\"]], cleaned[\"marks\"])\nprint(f\"\\nModel trained on {len(cleaned)} clean rows. Slope: {model.coef_[0]:.2f} marks per hour\")",
+    "output": "=== DATA CLEANER TOOL ===\n\nDIRTY DATA:\n  name hours_studied  marks\n0    A             2   40.0\n1    B             4   60.0\n2    C         three   30.0\n3    D             5    NaN\n4    e             3   50.0\n5    E             3   50.0\n6    F            -1   70.0\n7    G             6  150.0\n\nProblems found BEFORE cleaning:\n  Missing marks      : 1\n  Text in hours      : 1\n  Impossible marks   : 1\n\nCLEANING REPORT: {'missing_found': 4, 'duplicates_removed': 1, 'rows_left': 7}\n\nCLEAN DATA:\n  name  hours_studied  marks\n0    A            2.0   40.0\n1    B            4.0   60.0\n2    C            4.0   30.0\n3    D            5.0   50.0\n4    E            3.0   50.0\n5    F            4.0   70.0\n6    G            6.0   50.0\n\nMissing values left: 0\nDuplicates left: 0\nhours_studied    float64\nmarks            float64\ndtype: object\n\nModel trained on 7 clean rows. Slope: 2.00 marks per hour"
+  },
+  "practice": [
+    {
+      "title": "Fee Table Cleaner",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Clean a small fee table: find the problems, fix them and verify the result. This time fill with the median.",
+      "tasks": [
+        "Create the DataFrame and print the missing values per column",
+        "Print how many duplicate rows there are",
+        "Remove duplicates first",
+        "Fill the missing age and fee with the median of each column",
+        "Print the clean table and confirm zero missing values"
+      ],
+      "hint": "Median: df[col].median(). Assign back: df[col] = df[col].fillna(...). Duplicates: df.duplicated().sum().",
+      "starter": "import pandas as pd\n\ndata = {\n    \"name\": [\"Ravi\", \"Sana\", \"Tom\", \"Sana\", \"Priya\", \"Karan\"],\n    \"age\": [21, None, 23, None, 22, 25],\n    \"fee\": [1200, 1500, None, 1500, 1800, 2000]\n}\n\n# TODO 1: DataFrame + missing values per column\n\n# TODO 2: count duplicate rows\n\n# TODO 3: remove duplicates\n\n# TODO 4: fill missing values with the median\n\n# TODO 5: print clean table and missing count",
+      "solution": "import pandas as pd\n\ndata = {\n    \"name\": [\"Ravi\", \"Sana\", \"Tom\", \"Sana\", \"Priya\", \"Karan\"],\n    \"age\": [21, None, 23, None, 22, 25],\n    \"fee\": [1200, 1500, None, 1500, 1800, 2000]\n}\ndf = pd.DataFrame(data)\n\nprint(\"Missing per column:\")\nprint(df.isnull().sum())\n\nprint(\"\\nDuplicate rows:\", df.duplicated().sum())\ndf = df.drop_duplicates()\n\nfor col in [\"age\", \"fee\"]:\n    df[col] = df[col].fillna(df[col].median())\n\nprint(\"\\nClean table:\")\nprint(df)\nprint(\"Missing left:\", df.isnull().sum().sum())",
+      "output": "Missing per column:\nname    0\nage     2\nfee     1\ndtype: int64\n\nDuplicate rows: 1\n\nClean table:\n    name   age     fee\n0   Ravi  21.0  1200.0\n1   Sana  22.5  1500.0\n2    Tom  23.0  1650.0\n4  Priya  22.0  1800.0\n5  Karan  25.0  2000.0\nMissing left: 0"
+    },
+    {
+      "title": "Survey Cleaner Pipeline",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Clean a messy survey with messy text, words instead of numbers, impossible values and a hidden duplicate.",
+      "tasks": [
+        "Clean the name column: strip spaces and make it uppercase",
+        "Convert age and score to numbers with errors=\"coerce\"",
+        "Mark impossible values as missing: age outside 0 to 100, score outside 0 to 100",
+        "Remove duplicates, then fill missing values with the median",
+        "Print the report (rows before, rows after, missing found) and the clean table"
+      ],
+      "hint": "Use df.loc[(df[col] < 0) | (df[col] > 100), col] = np.nan. Count missing before duplicates are removed.",
+      "starter": "import numpy as np\nimport pandas as pd\n\ndata = {\n    \"name\": [\"Anu\", \" anu\", \"Bala\", \"Chitra\", \"Dev\", \"Esha\"],\n    \"age\": [\"25\", \"25\", \"thirty\", 31, -3, 28],\n    \"score\": [70, 70, 55, None, 62, 150]\n}\ndf = pd.DataFrame(data)\n\n# TODO 1: clean the name column\n\n# TODO 2: convert age and score to numbers\n\n# TODO 3: impossible values become NaN (0 to 100 allowed)\n\n# TODO 4: remove duplicates, fill with the median\n\n# TODO 5: print the report and the clean table",
+      "solution": "import numpy as np\nimport pandas as pd\n\ndata = {\n    \"name\": [\"Anu\", \" anu\", \"Bala\", \"Chitra\", \"Dev\", \"Esha\"],\n    \"age\": [\"25\", \"25\", \"thirty\", 31, -3, 28],\n    \"score\": [70, 70, 55, None, 62, 150]\n}\ndf = pd.DataFrame(data)\nrows_before = len(df)\n\ndf[\"name\"] = df[\"name\"].str.strip().str.upper()\n\nfor col in [\"age\", \"score\"]:\n    df[col] = pd.to_numeric(df[col], errors=\"coerce\")\n    df.loc[(df[col] < 0) | (df[col] > 100), col] = np.nan\n\nmissing_found = int(df.isnull().sum().sum())\n\ndf = df.drop_duplicates()\nfor col in [\"age\", \"score\"]:\n    df[col] = df[col].fillna(df[col].median())\n\nprint(f\"Rows before: {rows_before} | Rows after: {len(df)} | Missing found: {missing_found}\")\nprint(df.reset_index(drop=True))",
+      "output": "Rows before: 6 | Rows after: 5 | Missing found: 4\n     name   age  score\n0     ANU  25.0   70.0\n1    BALA  28.0   55.0\n2  CHITRA  31.0   62.0\n3     DEV  28.0   62.0\n4    ESHA  28.0   62.0",
+      "note": "Notice that \" anu\" only became a visible duplicate after strip() and upper(). If you had removed duplicates first, it would have stayed. The order is: fix text and types, mark invalid values, remove duplicates, then fill."
+    }
+  ],
+  "checklist": [
+    "Created and inspected a messy dataset",
+    "Found missing values and duplicates",
+    "Removed duplicates before filling",
+    "Filled missing values",
+    "Converted text to numbers with to_numeric",
+    "Built the Data Cleaner Tool",
+    "Checked the data is ready for ML"
+  ],
+  "quiz": [
+    {
+      "q": "Why should you remove duplicates BEFORE filling missing values with the mean?",
+      "options": [
+        "It is faster",
+        "A duplicate counts twice and skews the mean",
+        "fillna only works on unique rows",
+        "Pandas requires this order"
+      ],
+      "answer": 1,
+      "why": "Duplicate rows are counted twice in the average, so the filled values would be slightly wrong."
+    },
+    {
+      "q": "What does pd.to_numeric(col, errors=\"coerce\") do with the word \"three\"?",
+      "options": [
+        "Converts it to 3",
+        "Raises an error",
+        "Turns it into NaN (missing)",
+        "Deletes the row"
+      ],
+      "answer": 2,
+      "why": "coerce replaces values that cannot be numbers with NaN, which you then fill or drop."
+    },
+    {
+      "q": "Which line counts missing values per column?",
+      "options": [
+        "df.isnull().sum()",
+        "df.missing()",
+        "df.dropna()",
+        "df.count_nan"
+      ],
+      "answer": 0,
+      "why": "isnull() marks missing cells and sum() counts them per column."
+    },
+    {
+      "q": "Which fill is safer when a few values are extremely large?",
+      "options": [
+        "Mean",
+        "Median",
+        "Maximum",
+        "Zero"
+      ],
+      "answer": 1,
+      "why": "The median is not pulled by extreme values, so it represents a typical value better."
+    }
+  ]
+},
+
+// DAY 9 snippet. In course-data.js: paste this object between Day 8 and Day 10 (comma after Day 8's closing }, and a comma after this object's closing }). No images for this day.
+{
+  "day": 9,
+  "title": "Feature Engineering: Making Data Powerful",
+  "subtitle": "Create new features, avoid target leakage, scale correctly and test whether a feature really helps.",
+  "level": "Beginner",
+  "duration": "2 hours",
+  "tags": [
+    "Feature Engineering",
+    "Target Leakage",
+    "StandardScaler",
+    "One-hot",
+    "Feature Importance"
+  ],
+  "goals": [
+    "Understand what features really are",
+    "Create new meaningful features",
+    "Improve model performance with better data, not better algorithms"
+  ],
+  "sections": [
+    {
+      "id": "what",
+      "icon": "🧠",
+      "title": "Step 1: What is a Feature?",
+      "meta": "Making data powerful",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A feature is an input variable the model uses to make its prediction. The thing you want to predict is the target."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Column",
+            "Role"
+          ],
+          "rows": [
+            [
+              "hours_studied",
+              "Feature (input)"
+            ],
+            [
+              "sleep_hours",
+              "Feature (input)"
+            ],
+            [
+              "attendance",
+              "Feature (input)"
+            ],
+            [
+              "marks",
+              "Target (output)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Important truth: better features give a better model, even with a simple algorithm. Feature engineering means creating new, more useful features from the raw columns."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Start with the Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day9_features.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [2, 4, 1, 5, 3],\n    \"sleep_hours\": [6, 7, 5, 8, 6],\n    \"attendance\": [60, 80, 50, 90, 70],\n    \"marks\": [40, 60, 30, 70, 50]\n}\ndf = pd.DataFrame(data)\nprint(df)",
+          "output": "   hours_studied  sleep_hours  attendance  marks\n0              2            6          60     40\n1              4            7          80     60\n2              1            5          50     30\n3              5            8          90     70\n4              3            6          70     50"
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "icon": "⚡",
+      "title": "Step 3: Create New Features",
+      "meta": "Core skill",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Three kinds of new features, all built only from the INPUT columns:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "new_features.py",
+          "code": "# 1. Total effort: combine two columns (attendance / 10 puts it on the same scale as hours)\ndf[\"total_effort\"] = df[\"hours_studied\"] + df[\"attendance\"] / 10\n\n# 2. Ratio: study hours compared with sleep hours\ndf[\"study_sleep_ratio\"] = (df[\"hours_studied\"] / df[\"sleep_hours\"]).round(2)\n\n# 3. Category: group attendance into levels\ndf[\"attendance_level\"] = pd.cut(df[\"attendance\"], bins=[0, 65, 80, 100], labels=[\"Low\", \"Medium\", \"High\"])\n\nprint(df[[\"attendance\", \"total_effort\", \"study_sleep_ratio\", \"attendance_level\"]])",
+          "output": "   attendance  total_effort  study_sleep_ratio attendance_level\n0          60           8.0               0.33              Low\n1          80          12.0               0.57           Medium\n2          50           6.0               0.20              Low\n3          90          14.0               0.62             High\n4          70          10.0               0.50           Medium"
+        },
+        {
+          "type": "table",
+          "head": [
+            "New feature",
+            "Idea"
+          ],
+          "rows": [
+            [
+              "total_effort",
+              "Study and attendance together describe effort"
+            ],
+            [
+              "study_sleep_ratio",
+              "How much a student studies relative to resting"
+            ],
+            [
+              "attendance_level",
+              "Turns a number into a group: Low, Medium, High"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "leak",
+      "icon": "🚨",
+      "title": "Danger: Target Leakage",
+      "meta": "The most common feature engineering mistake",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The original task also creates efficiency = marks / hours_studied and a performance label from marks. Look at what they use:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "leakage.py",
+          "code": "df[\"efficiency\"] = df[\"marks\"] / df[\"hours_studied\"]\ndf[\"performance\"] = df[\"marks\"].apply(lambda x: \"High\" if x > 60 else \"Low\")\nprint(df[[\"hours_studied\", \"marks\", \"efficiency\", \"performance\"]])\n\n# A brand new student: we know their inputs, but NOT their marks yet\nnew_student = pd.DataFrame({\"hours_studied\": [4.5], \"sleep_hours\": [7], \"attendance\": [75]})\ntry:\n    new_student[\"efficiency\"] = new_student[\"marks\"] / new_student[\"hours_studied\"]\nexcept KeyError:\n    print(\"\\nCannot compute efficiency: a new student has no marks yet!\")",
+          "output": "   hours_studied  marks  efficiency performance\n0              2     40   20.000000         Low\n1              4     60   15.000000         Low\n2              1     30   30.000000         Low\n3              5     70   14.000000        High\n4              3     50   16.666667         Low\n\nCannot compute efficiency: a new student has no marks yet!"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "efficiency and performance are built from marks, the very thing we want to predict. That is called target leakage: the model would be handed the answer. It looks brilliant in training and is useless in real life, because a new student has no marks yet."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Ask yourself",
+            "Safe feature",
+            "Leaky feature"
+          ],
+          "rows": [
+            [
+              "Can I compute it BEFORE the answer is known?",
+              "Yes",
+              "No"
+            ],
+            [
+              "Does the formula use the target column?",
+              "No",
+              "Yes"
+            ],
+            [
+              "Example",
+              "hours / sleep",
+              "marks / hours"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Rule: a feature may only use information you would really have when making the prediction. Use efficiency and performance as analysis columns or as targets, never as inputs for predicting marks. Today's mini project therefore swaps efficiency for a safe feature."
+        }
+      ]
+    },
+    {
+      "id": "help",
+      "icon": "🔬",
+      "title": "Does a Feature Help?",
+      "meta": "Think like an engineer: test it",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Five students cannot prove anything. Use 30 students where marks depend on how many hours a student studies AND how often they attend. Test each feature by averaging the test error over 10 splits:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "test_features.py",
+          "code": "import numpy as np\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_absolute_error\n\ndata30 = {\n    \"hours_studied\": [2.8, 8.0, 2.7, 8.3, 4.9, 5.9, 7.1, 5.1, 3.4, 2.5, 1.6, 6.9, 4.5, 2.3, 8.0, 3.2, 4.3, 3.4, 6.0, 5.6, 5.8, 3.1, 3.3, 3.0, 3.6, 2.2, 2.3, 8.7, 8.7, 2.5],\n    \"sleep_hours\": [4.1, 5.0, 7.5, 7.9, 4.1, 6.9, 4.0, 6.6, 7.2, 8.9, 5.3, 8.0, 8.4, 8.6, 4.0, 6.3, 8.9, 6.0, 8.1, 6.7, 7.9, 6.4, 4.1, 4.4, 4.6, 5.3, 8.8, 7.2, 8.1, 6.8],\n    \"attendance\": [82, 91, 96, 96, 91, 55, 68, 52, 77, 90, 53, 59, 68, 62, 90, 68, 82, 75, 79, 97, 97, 56, 92, 67, 55, 69, 76, 98, 69, 51],\n    \"marks\": [42, 76, 41, 89, 50, 55, 61, 46, 45, 45, 34, 59, 52, 42, 79, 44, 59, 47, 67, 69, 68, 39, 43, 36, 41, 35, 45, 87, 72, 39]\n}\ndf30 = pd.DataFrame(data30)\n\n# Candidate features (is_high is built from marks: a LEAK, included only for the demo)\ndf30[\"total_effort\"] = df30[\"hours_studied\"] + df30[\"attendance\"] / 10\ndf30[\"study_sleep_ratio\"] = (df30[\"hours_studied\"] / df30[\"sleep_hours\"]).round(2)\ndf30[\"effective_hours\"] = (df30[\"hours_studied\"] * df30[\"attendance\"] / 100).round(2)\ndf30[\"is_high\"] = (df30[\"marks\"] > 60).astype(int)\n\ndef avg_test_mae(features):\n    errors = []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(\n            df30[features], df30[\"marks\"], test_size=0.25, random_state=seed)\n        model = LinearRegression().fit(X_train, y_train)\n        errors.append(mean_absolute_error(y_test, model.predict(X_test)))\n    return np.mean(errors)\n\nbase = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nexperiments = [\n    (\"Raw features only\", base),\n    (\"+ total_effort\", base + [\"total_effort\"]),\n    (\"+ study_sleep_ratio\", base + [\"study_sleep_ratio\"]),\n    (\"+ effective_hours\", base + [\"effective_hours\"]),\n    (\"+ is_high (LEAK!)\", base + [\"is_high\"]),\n]\nfor name, feats in experiments:\n    print(f\"{name:22} avg test MAE: {avg_test_mae(feats):.2f}\")",
+          "output": "Raw features only      avg test MAE: 3.99\n+ total_effort         avg test MAE: 3.99\n+ study_sleep_ratio    avg test MAE: 4.46\n+ effective_hours      avg test MAE: 2.68\n+ is_high (LEAK!)      avg test MAE: 3.26"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Feature",
+            "Result",
+            "Why"
+          ],
+          "rows": [
+            [
+              "total_effort",
+              "No change",
+              "It is just hours + attendance/10, a straight-line mix the linear model can already build. No new information."
+            ],
+            [
+              "study_sleep_ratio",
+              "Slightly worse",
+              "It adds noise: sleep has little to do with how marks are earned in this data."
+            ],
+            [
+              "effective_hours",
+              "Clearly better ✅",
+              "hours x attendance captures that studying only pays off when you also attend. This is genuinely new information."
+            ],
+            [
+              "is_high",
+              "Better, but cheating ❌",
+              "It is built from marks. Never use it for prediction."
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "A new feature helps only when it adds information the model could not easily build itself, such as a product, ratio or category that reflects how the world really works."
+        }
+      ]
+    },
+    {
+      "id": "scale",
+      "icon": "⚡",
+      "title": "Step 4: Feature Scaling",
+      "meta": "Important, but not magic",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Features live on different scales: hours are 1 to 9, attendance is 50 to 100. StandardScaler rewrites each feature to mean 0 and spread (standard deviation) 1. Do it correctly: split first, learn the scaling from the TRAINING rows only, then apply the same numbers to the test rows."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "scaling.py",
+          "code": "from sklearn.preprocessing import StandardScaler\n\nraw = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\ntrain, test = train_test_split(df30, test_size=0.25, random_state=42)\n\nscaler = StandardScaler()\nX_train_s = scaler.fit_transform(train[raw])   # learn mean and spread from TRAIN only\nX_test_s = scaler.transform(test[raw])         # apply the same numbers to TEST\n\nprint(\"Scaled train means:\", X_train_s.mean(axis=0).round(2) + 0.0)\nprint(\"Scaled train spread:\", X_train_s.std(axis=0).round(2))\n\nraw_model = LinearRegression().fit(train[raw], train[\"marks\"])\nscaled_model = LinearRegression().fit(X_train_s, train[\"marks\"])\n\ndiff = np.abs(raw_model.predict(test[raw]) - scaled_model.predict(X_test_s)).max()\nprint(\"\\nLargest prediction difference, raw vs scaled:\", round(diff, 6))\n\nprint(\"\\nSlopes on scaled data (bigger = more important):\")\nprint(pd.Series(scaled_model.coef_, index=raw).round(2))",
+          "output": "Scaled train means: [0. 0. 0.]\nScaled train spread: [1. 1. 1.]\n\nLargest prediction difference, raw vs scaled: 0.0\n\nSlopes on scaled data (bigger = more important):\nhours_studied    12.57\nsleep_hours       2.80\nattendance        4.24\ndtype: float64"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The original task scaled the whole table before splitting and overwrote the original columns. Fitting the scaler on all rows lets test information leak into training. Always fit_transform on train and only transform on test."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Surprise: predictions are identical with or without scaling for Linear Regression and Decision Trees. Scaling matters for distance-based and gradient-based models (KNN, SVM, neural networks, regularized models). It also makes slopes comparable: here hours (12.6) matters far more than attendance (4.2) or sleep (2.8)."
+        }
+      ]
+    },
+    {
+      "id": "categories",
+      "icon": "🏷️",
+      "title": "Categorical Features",
+      "meta": "Turning groups into numbers",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "categories.py",
+          "code": "df30[\"attendance_level\"] = pd.cut(df30[\"attendance\"], bins=[0, 65, 80, 100], labels=[\"Low\", \"Medium\", \"High\"])\n\nprint(\"Average marks by attendance level:\")\nprint(df30.groupby(\"attendance_level\", observed=True)[\"marks\"].mean().round(1))\n\n# Models need numbers: one column per level (one-hot encoding)\nlevels = pd.get_dummies(df30[\"attendance_level\"], prefix=\"att\").astype(int)\nprint()\nprint(levels.head(4))\n\ndf30 = pd.concat([df30, levels], axis=1)\n\nprint()\nprint(\"Raw features, avg test MAE:\", round(avg_test_mae(base), 2))\nprint(\"Raw + attendance levels, avg test MAE:\", round(avg_test_mae(base + list(levels.columns)), 2))",
+          "output": "Average marks by attendance level:\nattendance_level\nLow       44.4\nMedium    50.4\nHigh      62.3\nName: marks, dtype: float64\n\n   att_Low  att_Medium  att_High\n0        0           0         1\n1        0           0         1\n2        0           0         1\n3        0           0         1\n\nRaw features, avg test MAE: 3.99\nRaw + attendance levels, avg test MAE: 4.27"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "One-hot encoding turns Low / Medium / High into three 0/1 columns. Groups are useful for explaining data, but they throw away detail: an attendance of 52 and 65 both become Low. On this data the raw number predicts better, so keep the group only if it helps on test data."
+        }
+      ]
+    },
+    {
+      "id": "select",
+      "icon": "⚡",
+      "title": "Step 5: Select Important Features",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "select.py",
+          "code": "X_cols = [\"hours_studied\", \"sleep_hours\", \"attendance\", \"effective_hours\"]\nprint(\"Correlation with marks:\")\nprint(df30[X_cols + [\"marks\"]].corr()[\"marks\"].drop(\"marks\").round(2).sort_values(ascending=False))\n\nX = df30[X_cols]\ny = df30[\"marks\"]\nprint(\"\\nX shape:\", X.shape)",
+          "output": "Correlation with marks:\neffective_hours    0.97\nhours_studied      0.93\nattendance         0.55\nsleep_hours        0.18\nName: marks, dtype: float64\n\nX shape: (30, 4)"
+        },
+        {
+          "type": "p",
+          "text": "Correlation shows which features move with marks. The best feature here is effective_hours, the one we engineered. The final decision still comes from test error (previous step), not correlation alone."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Student Analyzer v3 (Smart Version)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Build the full smart pipeline: engineered features, scaled data (fitted on train only), a model and a prediction function. Safe features only, so efficiency is replaced by effective_hours:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "analyzer_v3.py",
+          "code": "def make_features(d):\n    out = d[[\"hours_studied\", \"sleep_hours\", \"attendance\"]].copy()\n    out[\"total_effort\"] = d[\"hours_studied\"] + d[\"attendance\"] / 10\n    out[\"effective_hours\"] = (d[\"hours_studied\"] * d[\"attendance\"] / 100).round(2)\n    return out\n\ntrain, test = train_test_split(df30, test_size=0.25, random_state=42)\nX_train, X_test = make_features(train), make_features(test)\n\nscaler = StandardScaler().fit(X_train)\nsmart_model = LinearRegression().fit(scaler.transform(X_train), train[\"marks\"])\n\nbaseline = LinearRegression().fit(train[raw], train[\"marks\"])\n\nsmart_mae = mean_absolute_error(test[\"marks\"], smart_model.predict(scaler.transform(X_test)))\nbase_mae = mean_absolute_error(test[\"marks\"], baseline.predict(test[raw]))\nprint(\"Test MAE -> raw features:\", round(base_mae, 2), \"| engineered features:\", round(smart_mae, 2))\n\ndef predict_marks(hours, sleep, attendance):\n    new = pd.DataFrame({\"hours_studied\": [hours], \"sleep_hours\": [sleep], \"attendance\": [attendance]})\n    features = scaler.transform(make_features(new))      # same steps as training\n    return round(min(max(smart_model.predict(features)[0], 0), 100), 1)\n\nfor hours, sleep, attendance in [(2, 5, 55), (5, 7, 80), (8, 8, 95)]:\n    print(f\"{hours} h, {sleep} h sleep, {attendance}% attendance -> {predict_marks(hours, sleep, attendance)} marks\")",
+          "output": "Test MAE -> raw features: 2.79 | engineered features: 2.2\n2 h, 5 h sleep, 55% attendance -> 34.3 marks\n5 h, 7 h sleep, 80% attendance -> 56.9 marks\n8 h, 8 h sleep, 95% attendance -> 86.4 marks"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Keeping the feature steps in make_features() guarantees new students go through exactly the same transformation as the training data. This habit prevents many real-world bugs."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "total_effort is in the model as the task asked, but it adds nothing new (a straight-line mix of existing columns). effective_hours is the one doing the work."
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Create Your Own Feature",
+      "meta": "Very important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Examples to try: study_sleep_ratio and attendance_level (you saw both). Here are two more ideas, tested the same way: hours squared (does more study give extra returns?) and rest_gap (distance from 7 hours of sleep):"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "own_features.py",
+          "code": "df30[\"hours_squared\"] = df30[\"hours_studied\"] ** 2\ndf30[\"rest_gap\"] = (df30[\"sleep_hours\"] - 7).abs()\n\nmore = [\n    (\"Raw features only\", base),\n    (\"+ hours_squared\", base + [\"hours_squared\"]),\n    (\"+ rest_gap\", base + [\"rest_gap\"]),\n    (\"+ effective_hours + hours_squared\", base + [\"effective_hours\", \"hours_squared\"]),\n]\nfor name, feats in more:\n    print(f\"{name:34} avg test MAE: {avg_test_mae(feats):.2f}\")",
+          "output": "Raw features only                  avg test MAE: 3.99\n+ hours_squared                    avg test MAE: 4.13\n+ rest_gap                         avg test MAE: 4.21\n+ effective_hours + hours_squared  avg test MAE: 2.76"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Test every idea. Most of your own features will NOT help. Finding the few that do, usually by understanding how the real world works, is the skill."
+        }
+      ]
+    },
+    {
+      "id": "think",
+      "icon": "🧠",
+      "title": "Think Like an Engineer",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Question",
+            "Example from today"
+          ],
+          "rows": [
+            [
+              "Does this feature help prediction?",
+              "effective_hours: yes (error 3.99 to 2.68). total_effort: no."
+            ],
+            [
+              "Is it logical?",
+              "effective_hours: studying only counts when you attend. efficiency (marks / hours): not usable at all."
+            ],
+            [
+              "Does it add new information?",
+              "Only features that are not a simple mix of existing columns can improve a linear model."
+            ],
+            [
+              "Could I compute it for a new student?",
+              "If it needs the answer (marks), it is a leak."
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "This thinking is the real ML skill. Top ML engineers spend more time on features than on models."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Raw data is weak, engineered data is powerful",
+            "How to create combined, ratio and category features",
+            "Why features built from the target leak the answer",
+            "How to scale correctly: fit on train only",
+            "How to test whether a feature really helps"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Analyzer v3 (Smart Version)",
+    "file": "day9_final.py",
+    "description": "One program combining Day 9: safe engineered features in one reusable function, a fair test of whether they help, scaling fitted on train only, feature importance from scaled slopes and a prediction function for new students.",
+    "concepts": [
+      "feature engineering",
+      "target leakage",
+      "StandardScaler",
+      "fit on train only",
+      "one-hot / categories",
+      "feature importance",
+      "make_features()"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_absolute_error\n\n# 1. DATA: 30 students\ndata = {\n    \"hours_studied\": [2.8, 8.0, 2.7, 8.3, 4.9, 5.9, 7.1, 5.1, 3.4, 2.5, 1.6, 6.9, 4.5, 2.3, 8.0, 3.2, 4.3, 3.4, 6.0, 5.6, 5.8, 3.1, 3.3, 3.0, 3.6, 2.2, 2.3, 8.7, 8.7, 2.5],\n    \"sleep_hours\": [4.1, 5.0, 7.5, 7.9, 4.1, 6.9, 4.0, 6.6, 7.2, 8.9, 5.3, 8.0, 8.4, 8.6, 4.0, 6.3, 8.9, 6.0, 8.1, 6.7, 7.9, 6.4, 4.1, 4.4, 4.6, 5.3, 8.8, 7.2, 8.1, 6.8],\n    \"attendance\": [82, 91, 96, 96, 91, 55, 68, 52, 77, 90, 53, 59, 68, 62, 90, 68, 82, 75, 79, 97, 97, 56, 92, 67, 55, 69, 76, 98, 69, 51],\n    \"marks\": [42, 76, 41, 89, 50, 55, 61, 46, 45, 45, 34, 59, 52, 42, 79, 44, 59, 47, 67, 69, 68, 39, 43, 36, 41, 35, 45, 87, 72, 39]\n}\ndf = pd.DataFrame(data)\nprint(\"=== STUDENT ANALYZER v3 (SMART VERSION) ===\")\nprint(df.head(3))\n\n# 2. FEATURE ENGINEERING (inputs only: no feature may use marks!)\nRAW = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\n\ndef make_features(d):\n    out = d[RAW].copy()\n    out[\"total_effort\"] = d[\"hours_studied\"] + d[\"attendance\"] / 10\n    out[\"effective_hours\"] = (d[\"hours_studied\"] * d[\"attendance\"] / 100).round(2)\n    return out\n\n# 3. DOES FEATURE ENGINEERING HELP? average test error over 10 splits\ndef avg_test_mae(use_engineered):\n    errors = []\n    for seed in range(10):\n        train, test = train_test_split(df, test_size=0.25, random_state=seed)\n        X_train = make_features(train) if use_engineered else train[RAW]\n        X_test = make_features(test) if use_engineered else test[RAW]\n        model = LinearRegression().fit(X_train, train[\"marks\"])\n        errors.append(mean_absolute_error(test[\"marks\"], model.predict(X_test)))\n    return np.mean(errors)\n\nprint(\"\\nAverage test MAE over 10 splits:\")\nprint(\"  Raw features       :\", round(avg_test_mae(False), 2))\nprint(\"  Engineered features:\", round(avg_test_mae(True), 2))\n\n# 4. FINAL MODEL: scale using TRAIN rows only\ntrain, test = train_test_split(df, test_size=0.25, random_state=42)\nX_train, X_test = make_features(train), make_features(test)\n\nscaler = StandardScaler().fit(X_train)\nmodel = LinearRegression().fit(scaler.transform(X_train), train[\"marks\"])\n\nmae = mean_absolute_error(test[\"marks\"], model.predict(scaler.transform(X_test)))\nprint(\"\\nFinal model test MAE:\", round(mae, 2), \"marks\")\n\n# 5. WHICH FEATURES MATTER? Read slopes on the RAW features, scaled\n# (overlapping features share credit, so engineered columns are hard to read this way)\nraw_scaler = StandardScaler().fit(train[RAW])\nraw_model = LinearRegression().fit(raw_scaler.transform(train[RAW]), train[\"marks\"])\nprint(\"\\nFeature importance (scaled slopes, raw features):\")\nprint(pd.Series(raw_model.coef_, index=RAW).round(2).sort_values(ascending=False))\n\n# 6. PREDICT NEW STUDENTS: same steps as training\ndef predict_marks(hours, sleep, attendance):\n    new = pd.DataFrame({\"hours_studied\": [hours], \"sleep_hours\": [sleep], \"attendance\": [attendance]})\n    features = scaler.transform(make_features(new))\n    return round(min(max(model.predict(features)[0], 0), 100), 1)\n\nprint(\"\\nPredictions:\")\nfor hours, sleep, attendance in [(2, 5, 55), (5, 7, 80), (8, 8, 95)]:\n    print(f\"  {hours} h, {sleep} h sleep, {attendance}% attendance -> {predict_marks(hours, sleep, attendance)} marks\")",
+    "output": "=== STUDENT ANALYZER v3 (SMART VERSION) ===\n   hours_studied  sleep_hours  attendance  marks\n0            2.8          4.1          82     42\n1            8.0          5.0          91     76\n2            2.7          7.5          96     41\n\nAverage test MAE over 10 splits:\n  Raw features       : 3.99\n  Engineered features: 2.68\n\nFinal model test MAE: 2.2 marks\n\nFeature importance (scaled slopes, raw features):\nhours_studied    12.57\nattendance        4.24\nsleep_hours       2.80\ndtype: float64\n\nPredictions:\n  2 h, 5 h sleep, 55% attendance -> 34.3 marks\n  5 h, 7 h sleep, 80% attendance -> 56.9 marks\n  8 h, 8 h sleep, 95% attendance -> 86.4 marks"
+  },
+  "practice": [
+    {
+      "title": "House Feature Factory",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Create new features for a house price table and find out which ones relate most to the price.",
+      "tasks": [
+        "Create the DataFrame",
+        "Create area = length * width",
+        "Create rooms_per_100sqft = rooms / area * 100 (round to 2)",
+        "Create age_group: New if age is below 10, else Old",
+        "Print each numeric feature's correlation with price (sorted, 2 decimals) and name the best one"
+      ],
+      "hint": "Correlation: df[[...numeric columns..., \"price\"]].corr()[\"price\"].drop(\"price\"). Sort with .sort_values(ascending=False).",
+      "starter": "import pandas as pd\n\ndata = {\n    \"length\": [44, 23, 28, 20, 41, 39, 30, 30, 41, 58, 52, 40],\n    \"width\": [27, 22, 29, 39, 32, 37, 17, 17, 16, 34, 20, 23],\n    \"rooms\": [2, 3, 1, 4, 1, 4, 2, 4, 1, 5, 2, 5],\n    \"age\": [28, 23, 22, 0, 0, 9, 18, 20, 5, 24, 24, 7],\n    \"price\": [48.4, 28.8, 33.4, 52.4, 53.7, 75.5, 27.1, 36.1, 29.9, 95.1, 40.0, 58.4]\n}\n\n# TODO 1: DataFrame\n\n# TODO 2: area = length * width\n\n# TODO 3: rooms_per_100sqft\n\n# TODO 4: age_group (New if age < 10)\n\n# TODO 5: correlations with price, best feature",
+      "solution": "import pandas as pd\n\ndata = {\n    \"length\": [44, 23, 28, 20, 41, 39, 30, 30, 41, 58, 52, 40],\n    \"width\": [27, 22, 29, 39, 32, 37, 17, 17, 16, 34, 20, 23],\n    \"rooms\": [2, 3, 1, 4, 1, 4, 2, 4, 1, 5, 2, 5],\n    \"age\": [28, 23, 22, 0, 0, 9, 18, 20, 5, 24, 24, 7],\n    \"price\": [48.4, 28.8, 33.4, 52.4, 53.7, 75.5, 27.1, 36.1, 29.9, 95.1, 40.0, 58.4]\n}\ndf = pd.DataFrame(data)\n\ndf[\"area\"] = df[\"length\"] * df[\"width\"]\ndf[\"rooms_per_100sqft\"] = (df[\"rooms\"] / df[\"area\"] * 100).round(2)\ndf[\"age_group\"] = df[\"age\"].apply(lambda a: \"New\" if a < 10 else \"Old\")\n\nprint(df[[\"length\", \"width\", \"area\", \"rooms_per_100sqft\", \"age_group\"]].head(3))\n\nnumeric = [\"length\", \"width\", \"rooms\", \"age\", \"area\", \"rooms_per_100sqft\", \"price\"]\ncorr = df[numeric].corr()[\"price\"].drop(\"price\").round(2).sort_values(ascending=False)\nprint()\nprint(corr)\nprint(\"\\nBest feature:\", corr.index[0])",
+      "output": "   length  width  area  rooms_per_100sqft age_group\n0      44     27  1188               0.17       Old\n1      23     22   506               0.59       Old\n2      28     29   812               0.12       Old\n\narea                 0.91\nwidth                0.70\nrooms                0.63\nlength               0.57\nage                 -0.10\nrooms_per_100sqft   -0.16\nName: price, dtype: float64\n\nBest feature: area",
+      "note": "The engineered feature area beats length and width on their own, because price depends on total size, not on one side. rooms_per_100sqft is built only from inputs, so it is safe, but a weak correlation (-0.16) tells you it is unlikely to help."
+    },
+    {
+      "title": "Leakage Detective",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "A taxi dataset contains a suspicious column. Prove it leaks, then build a fair model with correct scaling.",
+      "tasks": [
+        "Create the DataFrame. fare_rounded is the fare rounded to the nearest 10",
+        "Write avg_mae(features) that averages the test MAE of LinearRegression over 10 splits",
+        "Compare [distance_km, minutes] against [distance_km, minutes, fare_rounded]",
+        "Say which column is leaky and why it cannot be used for a new trip",
+        "Scale [distance_km, minutes] correctly (fit on train only, random_state=42) and print the scaled train means and spreads"
+      ],
+      "hint": "The leaky column is derived from the target (fare). For scaling: scaler.fit_transform on train, scaler.transform on test.",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"distance_km\": [13.2, 14.6, 13.2, 8.4, 4.3, 1.2, 7.0, 6.6, 8.3, 7.7, 8.8, 8.6, 11.7, 11.0, 9.7, 7.0, 5.0, 14.6, 5.7, 4.1],\n    \"minutes\": [8, 44, 10, 18, 8, 14, 21, 41, 19, 44, 6, 19, 20, 36, 43, 18, 22, 16, 37, 31],\n    \"fare\": [206, 285, 226, 164, 98, 75, 155, 185, 173, 196, 142, 166, 199, 235, 234, 151, 132, 244, 193, 153],\n    \"fare_rounded\": [210, 280, 230, 160, 100, 80, 160, 180, 170, 200, 140, 170, 200, 240, 230, 150, 130, 240, 190, 150]\n}\n\n# TODO 1: DataFrame\n\n# TODO 2: avg_mae(features) over 10 splits\n\n# TODO 3: compare honest features and honest + fare_rounded\n\n# TODO 4: which column leaks?\n\n# TODO 5: scaling (fit on train only)",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"distance_km\": [13.2, 14.6, 13.2, 8.4, 4.3, 1.2, 7.0, 6.6, 8.3, 7.7, 8.8, 8.6, 11.7, 11.0, 9.7, 7.0, 5.0, 14.6, 5.7, 4.1],\n    \"minutes\": [8, 44, 10, 18, 8, 14, 21, 41, 19, 44, 6, 19, 20, 36, 43, 18, 22, 16, 37, 31],\n    \"fare\": [206, 285, 226, 164, 98, 75, 155, 185, 173, 196, 142, 166, 199, 235, 234, 151, 132, 244, 193, 153],\n    \"fare_rounded\": [210, 280, 230, 160, 100, 80, 160, 180, 170, 200, 140, 170, 200, 240, 230, 150, 130, 240, 190, 150]\n}\ndf = pd.DataFrame(data)\n\ndef avg_mae(features):\n    errors = []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[features], df[\"fare\"], test_size=0.25, random_state=seed)\n        model = LinearRegression().fit(X_train, y_train)\n        errors.append(mean_absolute_error(y_test, model.predict(X_test)))\n    return np.mean(errors)\n\nhonest = [\"distance_km\", \"minutes\"]\nprint(\"Honest features avg MAE:\", round(avg_mae(honest), 2))\nprint(\"With fare_rounded avg MAE:\", round(avg_mae(honest + [\"fare_rounded\"]), 2))\nprint(\"Leaky column: fare_rounded (it is the target rounded)\")\n\nX_train, X_test, y_train, y_test = train_test_split(df[honest], df[\"fare\"], test_size=0.25, random_state=42)\nscaler = StandardScaler()\nX_train_s = scaler.fit_transform(X_train)\nX_test_s = scaler.transform(X_test)\nprint(\"Scaled train means:\", X_train_s.mean(axis=0).round(2) + 0.0)\nprint(\"Scaled train spread:\", X_train_s.std(axis=0).round(2))",
+      "output": "Honest features avg MAE: 8.82\nWith fare_rounded avg MAE: 4.23\nLeaky column: fare_rounded (it is the target rounded)\nScaled train means: [0. 0.]\nScaled train spread: [1. 1.]",
+      "note": "fare_rounded looks like a wonderful feature (the error drops a lot) but it is just the answer with the last digit removed. A new trip has no fare until it is finished, so you could never compute it when you need the prediction. Whenever a result looks too good to be true after adding a feature, suspect leakage first."
+    }
+  ],
+  "checklist": [
+    "Understood features vs target",
+    "Created combined, ratio and category features",
+    "Spotted target leakage",
+    "Tested whether features help on test data",
+    "Scaled with fit on train only",
+    "Encoded a category with one-hot",
+    "Built Student Analyzer v3"
+  ],
+  "quiz": [
+    {
+      "q": "Why is efficiency = marks / hours_studied a bad feature for predicting marks?",
+      "options": [
+        "It is too small",
+        "It uses the target (marks), so it leaks the answer and cannot be computed for new students",
+        "Division is not allowed",
+        "It has missing values"
+      ],
+      "answer": 1,
+      "why": "A feature must only use information available at prediction time. A new student has no marks yet."
+    },
+    {
+      "q": "Where should StandardScaler learn its mean and spread from?",
+      "options": [
+        "The whole dataset",
+        "The test rows",
+        "The training rows only",
+        "The target column"
+      ],
+      "answer": 2,
+      "why": "Fitting on all rows leaks test information into training. fit on train, then transform both."
+    },
+    {
+      "q": "Which new feature adds NO new information for a linear model?",
+      "options": [
+        "hours_studied * attendance / 100",
+        "hours_studied + attendance / 10",
+        "A feature built from a real-world interaction",
+        "None of these"
+      ],
+      "answer": 1,
+      "why": "A plain sum of existing columns is a straight-line mix the linear model can already create."
+    },
+    {
+      "q": "What does pd.get_dummies do to a column with Low / Medium / High?",
+      "options": [
+        "Deletes it",
+        "Makes one 0/1 column per level",
+        "Sorts it",
+        "Scales it"
+      ],
+      "answer": 1,
+      "why": "One-hot encoding turns each category into its own 0/1 column so models can use it."
+    }
+  ]
+},
+
+// DAY 10 snippet. In course-data.js: add a comma after Day 9's closing }, then paste this object. No images for this day.
+{
+  "day": 10,
+  "title": "Decision Trees: Your First Smart Model",
+  "subtitle": "Move beyond straight lines: build a Decision Tree, read its if-else rules and learn why model complexity and overfitting matter.",
+  "level": "Beginner",
+  "duration": "2 hours",
+  "tags": [
+    "Decision Tree",
+    "Non-linear",
+    "max_depth",
+    "Overfitting",
+    "plot_tree"
+  ],
+  "goals": [
+    "Understand non-linear ML models",
+    "Build a Decision Tree model",
+    "See how ML makes if-else decisions like humans"
+  ],
+  "sections": [
+    {
+      "id": "what",
+      "icon": "🧠",
+      "title": "Step 1: What is a Decision Tree?",
+      "meta": "A model that follows if-else rules",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A Decision Tree learns a set of yes/no questions from the data, just like a person would reason:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "The idea (pseudocode)",
+          "code": "IF hours > 4:\n    predict High Marks\nELSE:\n    predict Low Marks"
+        },
+        {
+          "type": "p",
+          "text": "It builds a tree of such questions. Each question is a split, and the answers at the bottom (the leaves) are the predictions."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Linear Regression",
+            "Decision Tree"
+          ],
+          "rows": [
+            [
+              "One straight-line equation",
+              "Many if-else rules"
+            ],
+            [
+              "Can continue the line beyond the data",
+              "Never predicts outside the values it has seen"
+            ],
+            [
+              "Hard to see why it predicted something",
+              "Easy to read and explain"
+            ],
+            [
+              "Best when the pattern is a straight line",
+              "Best when the pattern has steps, bends or interactions"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Trees are easy to understand and handle complex patterns. They are not automatically better than linear models. You will see on real examples today when each one wins."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Prepare the Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day10_tree.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [2, 4, 1, 5, 3],\n    \"sleep_hours\": [6, 7, 5, 8, 6],\n    \"attendance\": [60, 80, 50, 90, 70],\n    \"marks\": [40, 60, 30, 70, 50]\n}\ndf = pd.DataFrame(data)\nprint(df)",
+          "output": "   hours_studied  sleep_hours  attendance  marks\n0              2            6          60     40\n1              4            7          80     60\n2              1            5          50     30\n3              5            8          90     70\n4              3            6          70     50"
+        }
+      ]
+    },
+    {
+      "id": "xy",
+      "icon": "⚡",
+      "title": "Step 3: Define Features and Target",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "features.py",
+          "code": "X = df[[\"hours_studied\", \"sleep_hours\", \"attendance\"]]\ny = df[\"marks\"]\n\nprint(\"X shape:\", X.shape)\nprint(\"Features:\", list(X.columns))",
+          "output": "X shape: (5, 3)\nFeatures: ['hours_studied', 'sleep_hours', 'attendance']"
+        },
+        {
+          "type": "p",
+          "text": "Three input columns (features) now, one output (target). A tree can use any of them in its questions."
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "icon": "⚡",
+      "title": "Step 4: Train a Decision Tree",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train.py",
+          "code": "from sklearn.tree import DecisionTreeRegressor\n\nmodel = DecisionTreeRegressor(random_state=42)\nmodel.fit(X, y)\n\nprint(\"Tree trained\")\nprint(\"Depth:\", model.get_depth(), \"| Leaves:\", model.get_n_leaves())",
+          "output": "Tree trained\nDepth: 3 | Leaves: 5"
+        },
+        {
+          "type": "p",
+          "text": "Why random_state=42? When several features split the data equally well, the tree picks one at random. Without a fixed seed you can get a different tree on every run:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "random_state.py",
+          "code": "from sklearn.tree import export_text\n\nfor seed in [0, 1, 2]:\n    t = DecisionTreeRegressor(random_state=seed).fit(X, y)\n    first_rule = export_text(t, feature_names=list(X.columns)).split(\"\\n\")[0]\n    print(f\"random_state={seed}: first question -> {first_rule}\")",
+          "output": "random_state=0: first question -> |--- sleep_hours <= 6.50\nrandom_state=1: first question -> |--- hours_studied <= 2.50\nrandom_state=2: first question -> |--- hours_studied <= 2.50"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Same data, different seeds, different first question. Always set random_state so your results are repeatable."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "⚡",
+      "title": "Step 5: Make a Prediction",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict.py",
+          "code": "new_student = pd.DataFrame({\n    \"hours_studied\": [4],\n    \"sleep_hours\": [7],\n    \"attendance\": [80]\n})\npred = model.predict(new_student)\nprint(\"Predicted Marks:\", pred[0])",
+          "output": "Predicted Marks: 60.0"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "This student is exactly student B from the training data (4 hours, 7 sleep, 80 attendance), so the tree returns B's marks: 60. A tree has memorized its training rows. A fair test needs students it has never seen, as in the next step."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "We pass a DataFrame with the same column names instead of [[4, 7, 80]] to avoid scikit-learn's feature-name warning."
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "icon": "🧠",
+      "title": "Step 6: Compare with Linear Regression",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare.py",
+          "code": "from sklearn.linear_model import LinearRegression\n\nlinear = LinearRegression().fit(X, y)\n\nstudents = pd.DataFrame({\n    \"hours_studied\": [4, 3.5, 6, 8],\n    \"sleep_hours\": [7, 6.5, 8, 9],\n    \"attendance\": [80, 75, 95, 100]\n})\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nstudents[\"tree\"] = model.predict(students[features])\nstudents[\"linear\"] = linear.predict(students[features]).round(2)\nprint(students)",
+          "output": "   hours_studied  sleep_hours  attendance  tree  linear\n0            4.0          7.0          80  60.0   60.00\n1            3.5          6.5          75  50.0   55.00\n2            6.0          8.0          95  70.0   75.05\n3            8.0          9.0         100  70.0   80.20"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Student",
+            "What happened"
+          ],
+          "rows": [
+            [
+              "Row 0 (4, 7, 80)",
+              "A training row: both models give 60"
+            ],
+            [
+              "Row 1 (3.5, 6.5, 75)",
+              "Between known students: the tree picks a leaf (50), the line gives 55"
+            ],
+            [
+              "Rows 2 and 3 (6 and 8 hours)",
+              "Beyond the data: the tree is stuck at 70, the highest it has seen. The line keeps rising to 75 and 80"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "A tree predicts the average of the training marks that fall in the same leaf. So it can never go above the highest mark it saw. That is a strength (no impossible values) and a weakness (it cannot extrapolate)."
+        }
+      ]
+    },
+    {
+      "id": "visualize",
+      "icon": "📊",
+      "title": "Step 7: Visualize the Tree",
+      "meta": "Important: this is how ML \"thinks\"",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First read the rules as text:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "rules.py",
+          "code": "print(export_text(model, feature_names=list(X.columns)))",
+          "output": "|--- sleep_hours <= 6.50\n|   |--- attendance <= 55.00\n|   |   |--- value: [30.00]\n|   |--- attendance >  55.00\n|   |   |--- attendance <= 65.00\n|   |   |   |--- value: [40.00]\n|   |   |--- attendance >  65.00\n|   |   |   |--- value: [50.00]\n|--- sleep_hours >  6.50\n|   |--- hours_studied <= 4.50\n|   |   |--- value: [60.00]\n|   |--- hours_studied >  4.50\n|   |   |--- value: [70.00]"
+        },
+        {
+          "type": "table",
+          "head": [
+            "In the printout",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "|--- sleep_hours <= 6.50",
+              "A question: is sleep 6.5 hours or less?"
+            ],
+            [
+              "Indented lines under it",
+              "What to ask next if the answer is yes"
+            ],
+            [
+              "|--- sleep_hours >  6.50",
+              "The branch for the answer no"
+            ],
+            [
+              "value: [30.00]",
+              "A leaf: the predicted marks"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Now draw it:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "plot_tree.py",
+          "code": "from sklearn.tree import plot_tree\nimport matplotlib.pyplot as plt\n\nplt.figure(figsize=(10, 6))\nplot_tree(model, feature_names=list(X.columns), filled=True)\nplt.show()"
+        },
+        {
+          "type": "p",
+          "text": "What you should see: boxes with a condition (like sleep_hours <= 6.5), the number of samples and the predicted value. Darker boxes mean higher predicted marks."
+        }
+      ]
+    },
+    {
+      "id": "overfit",
+      "icon": "🧠",
+      "title": "Step 8: Overfitting Insight",
+      "meta": "The big idea of the day",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A tree with no depth limit keeps splitting until every training student has their own leaf. It memorizes the data. Let us measure this on a bigger dataset, 24 students, with 10 different splits:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "overfitting.py",
+          "code": "import numpy as np\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_absolute_error\n\ndata24 = {\n    \"hours_studied\": [1.6, 7.2, 4.5, 6.8, 8.8, 5.3, 5.0, 1.6, 3.1, 5.0, 6.4, 7.4, 4.0, 1.5, 3.3, 8.3, 2.7, 4.6, 8.4, 1.2, 5.8, 8.6, 2.8, 5.4],\n    \"sleep_hours\": [8.5, 4.7, 6.6, 7.8, 7.3, 6.3, 5.0, 6.5, 5.9, 6.4, 5.8, 8.2, 7.8, 5.6, 6.9, 5.4, 6.3, 5.8, 7.3, 5.9, 6.3, 7.6, 6.1, 8.5],\n    \"attendance\": [59, 87, 71, 71, 82, 76, 71, 50, 55, 85, 76, 85, 98, 84, 53, 65, 80, 62, 98, 97, 92, 74, 92, 57],\n    \"marks\": [35, 54, 47, 66, 71, 49, 42, 25, 33, 50, 59, 69, 57, 38, 41, 59, 42, 45, 75, 34, 60, 72, 46, 51]\n}\ndf24 = pd.DataFrame(data24)\nF24 = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\n\ndef train_test_error(make_model):\n    train_errs, test_errs = [], []\n    for seed in range(10):\n        Xtr, Xte, ytr, yte = train_test_split(df24[F24], df24[\"marks\"], test_size=0.25, random_state=seed)\n        m = make_model().fit(Xtr, ytr)\n        train_errs.append(mean_absolute_error(ytr, m.predict(Xtr)))\n        test_errs.append(mean_absolute_error(yte, m.predict(Xte)))\n    return np.mean(train_errs), np.mean(test_errs)\n\nprint(\"Model                train MAE   test MAE\")\ntr, te = train_test_error(LinearRegression)\nprint(f\"{'Linear Regression':20} {tr:9.2f} {te:10.2f}\")\nfor depth in [1, 2, 3, 5, None]:\n    tr, te = train_test_error(lambda: DecisionTreeRegressor(max_depth=depth, random_state=42))\n    print(f\"{'Tree, max_depth=' + str(depth):20} {tr:9.2f} {te:10.2f}\")",
+          "output": "Model                train MAE   test MAE\nLinear Regression         2.06       2.62\nTree, max_depth=1         6.38       7.88\nTree, max_depth=2         3.40       6.23\nTree, max_depth=3         1.74       5.89\nTree, max_depth=5         0.19       6.82\nTree, max_depth=None      0.00       6.10"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Look at the unlimited tree (max_depth=None): train error 0.00, it memorized every student, yet test error is 6.10. It also does worse than a depth 3 tree (5.89). That gap between train and test error is called overfitting."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Here Linear Regression wins easily (test 2.62), because these marks really follow a straight-line rule. Model choice depends on the data. Trees do not always beat linear models."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Max depth",
+            "Model",
+            "Result"
+          ],
+          "rows": [
+            [
+              "Too small (1)",
+              "Too simple",
+              "Errors high on train AND test (underfitting)"
+            ],
+            [
+              "Medium (2 to 3)",
+              "Balanced",
+              "Test error is at its best for a tree"
+            ],
+            [
+              "Unlimited",
+              "Too complex",
+              "Train error 0, test error worse (overfitting)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Student Predictor v4 (Tree Model)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Add a Decision Tree, compare it with Linear Regression and show both predictions side by side, trained on a train split of the 24 students:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predictor_v4.py",
+          "code": "Xtr, Xte, ytr, yte = train_test_split(df24[F24], df24[\"marks\"], test_size=0.25, random_state=42)\n\nlin = LinearRegression().fit(Xtr, ytr)\ntree = DecisionTreeRegressor(max_depth=3, random_state=42).fit(Xtr, ytr)\n\nprint(\"Test MAE -> Linear:\", round(mean_absolute_error(yte, lin.predict(Xte)), 2),\n      \"| Tree:\", round(mean_absolute_error(yte, tree.predict(Xte)), 2))\n\ndef predict_both(hours, sleep, attendance):\n    new = pd.DataFrame({\"hours_studied\": [hours], \"sleep_hours\": [sleep], \"attendance\": [attendance]})\n    return round(lin.predict(new)[0], 1), round(tree.predict(new)[0], 1)\n\nprint()\nfor hours, sleep, attendance in [(2, 5, 55), (5, 7, 80), (8, 8, 95)]:\n    l, t = predict_both(hours, sleep, attendance)\n    print(f\"{hours} h, {sleep} h sleep, {attendance}% attendance -> Linear: {l} | Tree: {t}\")",
+          "output": "Test MAE -> Linear: 1.8 | Tree: 6.0\n\n2 h, 5 h sleep, 55% attendance -> Linear: 25.8 | Tree: 36.0\n5 h, 7 h sleep, 80% attendance -> Linear: 54.0 | Tree: 45.0\n8 h, 8 h sleep, 95% attendance -> Linear: 75.6 | Tree: 71.5"
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Change the Model Depth",
+      "meta": "Very important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Train trees of different depths on the original 5 students and compare their size and predictions for one unseen student (3.5 hours, 6.5 sleep, 75 attendance):"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "max_depth.py",
+          "code": "unseen = pd.DataFrame({\"hours_studied\": [3.5], \"sleep_hours\": [6.5], \"attendance\": [75]})\n\nfor depth in [1, 2, 3, None]:\n    m = DecisionTreeRegressor(max_depth=depth, random_state=42).fit(X, y)\n    print(f\"max_depth={str(depth):4} -> depth used: {m.get_depth()}, leaves: {m.get_n_leaves()}, prediction: {m.predict(unseen)[0]}\")\n\nprint()\nsmall = DecisionTreeRegressor(max_depth=2, random_state=42).fit(X, y)\nprint(export_text(small, feature_names=list(X.columns)))",
+          "output": "max_depth=1    -> depth used: 1, leaves: 2, prediction: 40.0\nmax_depth=2    -> depth used: 2, leaves: 4, prediction: 45.0\nmax_depth=3    -> depth used: 3, leaves: 5, prediction: 50.0\nmax_depth=None -> depth used: 3, leaves: 5, prediction: 50.0\n\n|--- sleep_hours <= 6.50\n|   |--- attendance <= 55.00\n|   |   |--- value: [30.00]\n|   |--- attendance >  55.00\n|   |   |--- value: [45.00]\n|--- sleep_hours >  6.50\n|   |--- sleep_hours <= 7.50\n|   |   |--- value: [60.00]\n|   |--- sleep_hours >  7.50\n|   |   |--- value: [70.00]"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Less depth means a simpler model with fewer rules (depth 1 has just 2 leaves and 1 question). More depth means more rules, until the tree has a leaf for every student (5 leaves, a perfect memory of the training data)."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "In real projects you pick max_depth by comparing test error across depths, exactly like the table in Step 8."
+        }
+      ]
+    },
+    {
+      "id": "wins",
+      "icon": "🌳",
+      "title": "When Do Trees Beat Linear Models?",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "When the pattern has jumps, such as grade bands: marks stay low, then jump, then jump again as hours increase."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "trees_win.py",
+          "code": "step = pd.DataFrame({\n    \"hours\": list(range(1, 16)),\n    \"marks\": [20, 22, 21, 24, 23, 55, 57, 56, 58, 59, 88, 90, 89, 91, 92]\n})\n\ndef avg_test_mae(make_model):\n    errs = []\n    for seed in range(10):\n        Xtr, Xte, ytr, yte = train_test_split(step[[\"hours\"]], step[\"marks\"], test_size=0.25, random_state=seed)\n        m = make_model().fit(Xtr, ytr)\n        errs.append(mean_absolute_error(yte, m.predict(Xte)))\n    return np.mean(errs)\n\nprint(\"Linear Regression test MAE:\", round(avg_test_mae(LinearRegression), 2))\nprint(\"Tree (max_depth=2) test MAE:\", round(avg_test_mae(lambda: DecisionTreeRegressor(max_depth=2, random_state=42)), 2))",
+          "output": "Linear Regression test MAE: 6.62\nTree (max_depth=2) test MAE: 4.92"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "A straight line cannot follow the jumps, but a tree makes one rule per band. Smooth straight-line data favours linear models. Step-like or bendy data favours trees. Always compare on test data."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "ML models can follow rules, not only equations",
+            "Decision Trees handle non-linear patterns and are easy to read",
+            "Trees cannot extrapolate beyond the values they have seen",
+            "Model complexity matters: max_depth controls it",
+            "Overfitting: train error near 0 with a worse test error"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Predictor v4 (Tree Model)",
+    "file": "day10_final.py",
+    "description": "One program combining Day 10: a Decision Tree and Linear Regression trained on the same split, test errors, the tree's rules, side-by-side predictions, an overfitting check across depths and the tree drawing.",
+    "concepts": [
+      "DecisionTreeRegressor",
+      "max_depth",
+      "random_state",
+      "export_text",
+      "plot_tree",
+      "overfitting",
+      "linear vs tree"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor, export_text, plot_tree\nfrom sklearn.metrics import mean_absolute_error\n\n# 1. DATA: 24 students\ndata = {\n    \"hours_studied\": [1.6, 7.2, 4.5, 6.8, 8.8, 5.3, 5.0, 1.6, 3.1, 5.0, 6.4, 7.4, 4.0, 1.5, 3.3, 8.3, 2.7, 4.6, 8.4, 1.2, 5.8, 8.6, 2.8, 5.4],\n    \"sleep_hours\": [8.5, 4.7, 6.6, 7.8, 7.3, 6.3, 5.0, 6.5, 5.9, 6.4, 5.8, 8.2, 7.8, 5.6, 6.9, 5.4, 6.3, 5.8, 7.3, 5.9, 6.3, 7.6, 6.1, 8.5],\n    \"attendance\": [59, 87, 71, 71, 82, 76, 71, 50, 55, 85, 76, 85, 98, 84, 53, 65, 80, 62, 98, 97, 92, 74, 92, 57],\n    \"marks\": [35, 54, 47, 66, 71, 49, 42, 25, 33, 50, 59, 69, 57, 38, 41, 59, 42, 45, 75, 34, 60, 72, 46, 51]\n}\ndf = pd.DataFrame(data)\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nX = df[features]\ny = df[\"marks\"]\n\n# 2. SPLIT\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)\nprint(\"=== STUDENT PREDICTOR v4 (TREE MODEL) ===\")\nprint(\"Train rows:\", len(X_train), \"| Test rows:\", len(X_test))\n\n# 3. TRAIN BOTH MODELS\nlinear = LinearRegression().fit(X_train, y_train)\ntree = DecisionTreeRegressor(max_depth=3, random_state=42).fit(X_train, y_train)\nprint(\"Tree depth:\", tree.get_depth(), \"| Leaves:\", tree.get_n_leaves())\n\n# 4. COMPARE ON UNSEEN TEST DATA\nprint(\"\\nTest MAE -> Linear:\", round(mean_absolute_error(y_test, linear.predict(X_test)), 2),\n      \"| Tree:\", round(mean_absolute_error(y_test, tree.predict(X_test)), 2))\n\n# 5. THE TREE'S RULES\nprint(\"\\nTree rules:\")\nprint(export_text(tree, feature_names=features))\n\n# 6. PREDICTIONS FROM BOTH MODELS\nnew_students = pd.DataFrame({\n    \"hours_studied\": [2, 5, 8],\n    \"sleep_hours\": [5, 7, 8],\n    \"attendance\": [55, 80, 95]\n})\nnew_students[\"linear\"] = linear.predict(new_students[features]).round(1)\nnew_students[\"tree\"] = tree.predict(new_students[features]).round(1)\nprint(\"Predictions:\")\nprint(new_students)\n\n# 7. OVERFITTING CHECK: train vs test error by depth (10 splits)\ndef train_test_error(depth):\n    tr, te = [], []\n    for seed in range(10):\n        a, b, c, d = train_test_split(X, y, test_size=0.25, random_state=seed)\n        m = DecisionTreeRegressor(max_depth=depth, random_state=42).fit(a, c)\n        tr.append(mean_absolute_error(c, m.predict(a)))\n        te.append(mean_absolute_error(d, m.predict(b)))\n    return np.mean(tr), np.mean(te)\n\nprint(\"\\nDepth    train MAE   test MAE\")\nfor depth in [1, 2, 3, 5, None]:\n    tr, te = train_test_error(depth)\n    print(f\"{str(depth):5} {tr:10.2f} {te:10.2f}\")\n\n# 8. DRAW THE TREE\nplt.figure(figsize=(12, 6))\nplot_tree(tree, feature_names=features, filled=True)\nplt.title(\"Student Predictor v4: Decision Tree (max_depth=3)\")\nplt.show()",
+    "output": "=== STUDENT PREDICTOR v4 (TREE MODEL) ===\nTrain rows: 18 | Test rows: 6\nTree depth: 3 | Leaves: 8\n\nTest MAE -> Linear: 1.8 | Tree: 6.0\n\nTree rules:\n|--- hours_studied <= 5.60\n|   |--- hours_studied <= 2.20\n|   |   |--- sleep_hours <= 6.20\n|   |   |   |--- value: [36.00]\n|   |   |--- sleep_hours >  6.20\n|   |   |   |--- value: [25.00]\n|   |--- hours_studied >  2.20\n|   |   |--- sleep_hours <= 7.35\n|   |   |   |--- value: [45.00]\n|   |   |--- sleep_hours >  7.35\n|   |   |   |--- value: [54.00]\n|--- hours_studied >  5.60\n|   |--- sleep_hours <= 6.80\n|   |   |--- sleep_hours <= 5.05\n|   |   |   |--- value: [54.00]\n|   |   |--- sleep_hours >  5.05\n|   |   |   |--- value: [59.33]\n|   |--- sleep_hours >  6.80\n|   |   |--- attendance <= 72.50\n|   |   |   |--- value: [66.00]\n|   |   |--- attendance >  72.50\n|   |   |   |--- value: [71.50]\n\nPredictions:\n   hours_studied  sleep_hours  attendance  linear  tree\n0              2            5          55    25.8  36.0\n1              5            7          80    54.0  45.0\n2              8            8          95    75.6  71.5\n\nDepth    train MAE   test MAE\n1           6.38       7.88\n2           3.40       6.23\n3           1.74       5.89\n5           0.19       6.82\nNone        0.00       6.10"
+  },
+  "practice": [
+    {
+      "title": "Ice Cream Rules",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Train a small tree, read its rules, and compare it with a straight line when sales jump with temperature.",
+      "tasks": [
+        "Create the DataFrame and train DecisionTreeRegressor(max_depth=2, random_state=42)",
+        "Print the tree's rules with export_text",
+        "Predict sales for 22 and 40 degrees",
+        "Train a LinearRegression model and predict the same two temperatures",
+        "Which model can predict above the highest sales seen (330)?"
+      ],
+      "hint": "Use pd.DataFrame({\"temperature\": [22, 40]}) for predictions. export_text(model, feature_names=[\"temperature\"]).",
+      "starter": "import pandas as pd\nfrom sklearn.tree import DecisionTreeRegressor, export_text\nfrom sklearn.linear_model import LinearRegression\n\ndata = {\n    \"temperature\": [15, 18, 21, 24, 27, 30, 33, 36],\n    \"sales\": [100, 105, 110, 200, 210, 215, 320, 330]\n}\n\n# TODO 1: DataFrame, X and y, train the tree (max_depth=2)\n\n# TODO 2: print the rules\n\n# TODO 3: predict for 22 and 40 degrees\n\n# TODO 4: train LinearRegression and predict the same values",
+      "solution": "import pandas as pd\nfrom sklearn.tree import DecisionTreeRegressor, export_text\nfrom sklearn.linear_model import LinearRegression\n\ndata = {\n    \"temperature\": [15, 18, 21, 24, 27, 30, 33, 36],\n    \"sales\": [100, 105, 110, 200, 210, 215, 320, 330]\n}\ndf = pd.DataFrame(data)\nX = df[[\"temperature\"]]\ny = df[\"sales\"]\n\ntree = DecisionTreeRegressor(max_depth=2, random_state=42).fit(X, y)\nprint(export_text(tree, feature_names=[\"temperature\"]))\n\nnew = pd.DataFrame({\"temperature\": [22, 40]})\nlinear = LinearRegression().fit(X, y)\n\nnew[\"tree\"] = tree.predict(new).round(1)\nnew[\"linear\"] = linear.predict(new[[\"temperature\"]]).round(1)\nprint(new)",
+      "output": "|--- temperature <= 31.50\n|   |--- temperature <= 22.50\n|   |   |--- value: [105.00]\n|   |--- temperature >  22.50\n|   |   |--- value: [208.33]\n|--- temperature >  31.50\n|   |--- temperature <= 34.50\n|   |   |--- value: [320.00]\n|   |--- temperature >  34.50\n|   |   |--- value: [330.00]\n\n   temperature   tree  linear\n0           22  105.0   156.9\n1           40  330.0   371.9",
+      "note": "The linear model predicts about 372 sales at 40 degrees, above anything it has seen. The tree stays at 330, the sales of its hottest group. Neither is guaranteed to be right out there. A tree cannot go beyond its training range, a line can, but extrapolation is a guess for both."
+    },
+    {
+      "title": "Depth Detective",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Find the best tree depth for a saturating pattern: marks rise fast, then level off.",
+      "tasks": [
+        "Create the DataFrame from the data",
+        "Write avg_errors(make_model) that returns the average train and test MAE over 10 splits (random_state 0 to 9, test_size=0.25)",
+        "Print a table for Linear Regression and trees with max_depth 1, 2, 3, 4, 6 and None",
+        "Find the depth with the lowest test error",
+        "Explain why train error keeps falling but test error does not"
+      ],
+      "hint": "Reuse the Step 8 function. Compare the test column, not the train column.",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"hours\": [0.5, 1.1, 1.8, 2.4, 3.0, 3.7, 4.3, 4.9, 5.5, 6.2, 6.8, 7.4, 8.1, 8.7, 9.3, 10.0, 10.6, 11.2, 11.8, 12.5, 13.1, 13.7, 14.4, 15.0],\n    \"marks\": [33, 38, 54, 51, 57, 66, 62, 66, 71, 73, 72, 77, 78, 82, 77, 81, 87, 90, 81, 88, 84, 84, 85, 86]\n}\n\n# TODO 1: DataFrame\n\n# TODO 2: avg_errors(make_model) -> (train MAE, test MAE) averaged over 10 splits\n\n# TODO 3: print the table for linear and trees of depth 1, 2, 3, 4, 6, None\n\n# TODO 4: print the best depth",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"hours\": [0.5, 1.1, 1.8, 2.4, 3.0, 3.7, 4.3, 4.9, 5.5, 6.2, 6.8, 7.4, 8.1, 8.7, 9.3, 10.0, 10.6, 11.2, 11.8, 12.5, 13.1, 13.7, 14.4, 15.0],\n    \"marks\": [33, 38, 54, 51, 57, 66, 62, 66, 71, 73, 72, 77, 78, 82, 77, 81, 87, 90, 81, 88, 84, 84, 85, 86]\n}\ndf = pd.DataFrame(data)\n\ndef avg_errors(make_model):\n    train_errs, test_errs = [], []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[[\"hours\"]], df[\"marks\"], test_size=0.25, random_state=seed)\n        m = make_model().fit(X_train, y_train)\n        train_errs.append(mean_absolute_error(y_train, m.predict(X_train)))\n        test_errs.append(mean_absolute_error(y_test, m.predict(X_test)))\n    return np.mean(train_errs), np.mean(test_errs)\n\nprint(\"Model              train MAE   test MAE\")\ntr, te = avg_errors(LinearRegression)\nprint(f\"{'Linear':16} {tr:10.2f} {te:10.2f}\")\n\nresults = {}\nfor depth in [1, 2, 3, 4, 6, None]:\n    tr, te = avg_errors(lambda: DecisionTreeRegressor(max_depth=depth, random_state=42))\n    results[depth] = te\n    print(f\"{'Tree depth ' + str(depth):16} {tr:10.2f} {te:10.2f}\")\n\nbest = min(results, key=results.get)\nprint(\"\\nBest depth by test error:\", best)",
+      "output": "Model              train MAE   test MAE\nLinear                 5.29       5.77\nTree depth 1           6.45       8.49\nTree depth 2           2.98       4.56\nTree depth 3           1.33       3.54\nTree depth 4           0.70       3.71\nTree depth 6           0.06       3.70\nTree depth None        0.00       3.68\n\nBest depth by test error: 3",
+      "note": "Deeper trees fit the training noise, so train error keeps shrinking toward 0, but that extra detail does not help on new students, so test error stops improving after about depth 3. Pick the depth where test error is lowest, not train error."
+    }
+  ],
+  "checklist": [
+    "Understood what a Decision Tree is",
+    "Trained DecisionTreeRegressor with random_state",
+    "Compared tree and linear predictions",
+    "Read the tree rules and plot",
+    "Changed max_depth and saw the effect",
+    "Measured overfitting with train vs test error",
+    "Built Student Predictor v4"
+  ],
+  "quiz": [
+    {
+      "q": "What does a Decision Tree learn?",
+      "options": [
+        "One straight-line equation",
+        "A set of if-else questions that lead to predictions",
+        "The average of all rows",
+        "A random guess"
+      ],
+      "answer": 1,
+      "why": "A tree learns splits (questions) and predicts the average of the training values in each leaf."
+    },
+    {
+      "q": "Why can a Decision Tree not predict marks above the highest marks it was trained on?",
+      "options": [
+        "It has a bug",
+        "Each leaf predicts an average of training values",
+        "Marks are capped at 100",
+        "Trees ignore new data"
+      ],
+      "answer": 1,
+      "why": "A leaf's prediction is the mean of its training samples, so predictions stay inside the range of seen values."
+    },
+    {
+      "q": "What does a smaller max_depth do?",
+      "options": [
+        "Makes the tree simpler with fewer rules",
+        "Makes the tree memorize the data",
+        "Removes features",
+        "Speeds up the internet"
+      ],
+      "answer": 0,
+      "why": "A shallow tree asks fewer questions, which gives a simpler model that is less likely to overfit."
+    },
+    {
+      "q": "Train error 0.00 but a much higher test error means:",
+      "options": [
+        "The model is perfect",
+        "The model is overfitting",
+        "The data is clean",
+        "The test set is wrong"
+      ],
+      "answer": 1,
+      "why": "The model memorized the training data but does not generalize to new data."
+    }
+  ]
 }
   ]
 };
