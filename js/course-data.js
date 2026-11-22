@@ -4657,6 +4657,1492 @@ Average used to fill: 245.0
       "why": "The model memorized the training data but does not generalize to new data."
     }
   ]
+},
+
+// DAY 11 snippet. In course-data.js: add a comma after Day 10's closing }, then paste this object. No images for this day.
+{
+  "day": 11,
+  "title": "K-Nearest Neighbors (KNN)",
+  "subtitle": "Learn by distance: build a KNN model, see why scaling is essential and compare it with Linear Regression and Decision Trees.",
+  "level": "Beginner",
+  "duration": "2 hours",
+  "tags": [
+    "KNN",
+    "Distance",
+    "Scaling",
+    "Choosing K",
+    "Model Comparison"
+  ],
+  "goals": [
+    "Understand distance-based learning",
+    "Build a KNN model",
+    "Compare it with Decision Tree and Linear Regression"
+  ],
+  "sections": [
+    {
+      "id": "what",
+      "icon": "🧠",
+      "title": "Step 1: What is KNN?",
+      "meta": "K-Nearest Neighbors: look at the closest data points",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "KNN predicts by asking: which known students are most similar to this new student? Then it uses their marks."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Step",
+            "What KNN does"
+          ],
+          "rows": [
+            [
+              "1",
+              "Measure the distance from the new student to every known student"
+            ],
+            [
+              "2",
+              "Pick the K closest ones (the neighbors)"
+            ],
+            [
+              "3",
+              "Predict the average of their marks"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "No formula and no tree, just distance. It works best when the data is properly scaled and the features are meaningful."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Prepare the Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day11_knn.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [2, 4, 1, 5, 3],\n    \"sleep_hours\": [6, 7, 5, 8, 6],\n    \"attendance\": [60, 80, 50, 90, 70],\n    \"marks\": [40, 60, 30, 70, 50]\n}\ndf = pd.DataFrame(data)\nprint(df)",
+          "output": "   hours_studied  sleep_hours  attendance  marks\n0              2            6          60     40\n1              4            7          80     60\n2              1            5          50     30\n3              5            8          90     70\n4              3            6          70     50"
+        }
+      ]
+    },
+    {
+      "id": "scale",
+      "icon": "⚡",
+      "title": "Step 3: Feature Scaling",
+      "meta": "Very important for KNN",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Distance adds up differences across all features. If one feature has big numbers, it dominates. See how much each feature contributes to the total variation:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "why_scale.py",
+          "code": "features = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nX = df[features]\ny = df[\"marks\"]\n\nvariance = X.var()\nprint(\"Share of total variation per feature:\")\nprint((variance / variance.sum()).round(3))",
+          "output": "Share of total variation per feature:\nhours_studied    0.010\nsleep_hours      0.005\nattendance       0.985\ndtype: float64"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Attendance (50 to 90) makes up 98% of the variation, so without scaling KNN would mostly ignore hours and sleep. Scaling puts every feature on the same footing."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "scaling.py",
+          "code": "from sklearn.preprocessing import StandardScaler\n\nscaler = StandardScaler()\nX_scaled = scaler.fit_transform(X)\n\nprint(pd.DataFrame(X_scaled, columns=features).round(2))",
+          "output": "   hours_studied  sleep_hours  attendance\n0          -0.71        -0.39       -0.71\n1           0.71         0.59        0.71\n2          -1.41        -1.37       -1.41\n3           1.41         1.57        1.41\n4           0.00        -0.39        0.00"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "For this tiny demo we scale all 5 rows. When you test a model, always fit the scaler on the training rows only (you will do that from Step 8)."
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "icon": "⚡",
+      "title": "Step 4: Train the KNN Model",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train.py",
+          "code": "from sklearn.neighbors import KNeighborsRegressor\n\nmodel = KNeighborsRegressor(n_neighbors=3)\nmodel.fit(X_scaled, y)\nprint(\"KNN ready. Stored students:\", model.n_samples_fit_)",
+          "output": "KNN ready. Stored students: 5"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "fit() does no learning. It only stores the data. That is why KNN is called a lazy learner."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "⚡",
+      "title": "Step 5: Make a Prediction",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict.py",
+          "code": "# A student from the table (4 h, 7 h sleep, 80%) and a new unseen student\nnew_data = pd.DataFrame({\n    \"hours_studied\": [4, 3.5],\n    \"sleep_hours\": [7, 6.5],\n    \"attendance\": [80, 75]\n})\npred = model.predict(scaler.transform(new_data))\nprint(\"Predicted Marks:\", pred)\n\n# Who are the neighbors of the unseen student?\ndistances, indexes = model.kneighbors(scaler.transform(new_data.iloc[[1]]))\nprint(\"\\nNeighbor distances:\", distances[0].round(2))\nprint(\"Neighbor marks    :\", list(y.iloc[indexes[0]]))\nprint(\"Average           :\", y.iloc[indexes[0]].mean())",
+          "output": "Predicted Marks: [60. 50.]\n\nNeighbor distances: [0.7  0.7  1.58]\nNeighbor marks    : [60, 50, 40]\nAverage           : 50.0"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The original task passed a plain list to scaler.transform. That triggers a feature-names warning because the scaler was fitted on a DataFrame. Pass a DataFrame with the same column names."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The first student is already in the table, so he is his own nearest neighbor. For the unseen student, the 3 closest students have marks 60, 50 and 40, and KNN predicts their average: 50."
+        }
+      ]
+    },
+    {
+      "id": "k",
+      "icon": "🧠",
+      "title": "Step 6: Understand K",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "k_values.py",
+          "code": "unseen = scaler.transform(new_data.iloc[[1]])\n\nfor k in [1, 3, 5]:\n    m = KNeighborsRegressor(n_neighbors=k).fit(X_scaled, y)\n    print(f\"K={k}: predicted marks = {m.predict(unseen)[0]}\")",
+          "output": "K=1: predicted marks = 60.0\nK=3: predicted marks = 50.0\nK=5: predicted marks = 50.0"
+        },
+        {
+          "type": "table",
+          "head": [
+            "K",
+            "Behavior"
+          ],
+          "rows": [
+            [
+              "K = 1",
+              "Copies the single closest student. Very sensitive, can be noisy"
+            ],
+            [
+              "K = 3",
+              "Balanced"
+            ],
+            [
+              "K = 5",
+              "Averages more students, smoother"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "With only 5 students, K=5 averages EVERY student, so it predicts the overall average (50) for everyone. K must be much smaller than your number of rows."
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "icon": "📊",
+      "title": "Step 7: Compare Three Models",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare.py",
+          "code": "from sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\n\nlinear = LinearRegression().fit(X, y)\ntree = DecisionTreeRegressor(random_state=42).fit(X, y)\nknn = KNeighborsRegressor(n_neighbors=3).fit(X_scaled, y)\n\nstudents = pd.DataFrame({\n    \"hours_studied\": [4, 3.5, 8],\n    \"sleep_hours\": [7, 6.5, 9],\n    \"attendance\": [80, 75, 100]\n})\nresult = students.copy()\nresult[\"linear\"] = linear.predict(students[features]).round(1)\nresult[\"tree\"] = tree.predict(students[features])\nresult[\"knn\"] = knn.predict(scaler.transform(students[features]))\nprint(result)",
+          "output": "   hours_studied  sleep_hours  attendance  linear  tree   knn\n0            4.0          7.0          80    60.0  60.0  60.0\n1            3.5          6.5          75    55.0  50.0  50.0\n2            8.0          9.0         100    80.2  70.0  60.0"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Student",
+            "Observation"
+          ],
+          "rows": [
+            [
+              "(4, 7, 80)",
+              "In the table, so all models agree on 60"
+            ],
+            [
+              "(3.5, 6.5, 75)",
+              "Between known students: the line says 55, tree and KNN say 50"
+            ],
+            [
+              "(8, 9, 100)",
+              "Beyond the data: the line keeps climbing to 80.2, but tree and KNN stay near the marks they have seen (70 and 60)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Like the tree, KNN cannot go beyond the marks of its neighbors. Only the straight line can extrapolate."
+        }
+      ]
+    },
+    {
+      "id": "fair",
+      "icon": "🔬",
+      "title": "Fair Comparison on 30 Students",
+      "meta": "Test it properly",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Five students prove nothing. Compare the models on 30 students, averaging the test error over 10 splits. The scaler is fitted on the training rows only, inside each split:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "fair_test.py",
+          "code": "import numpy as np\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_absolute_error\n\ndata30 = {\n    \"hours_studied\": [2.8, 8.0, 2.7, 8.3, 4.9, 5.9, 7.1, 5.1, 3.4, 2.5, 1.6, 6.9, 4.5, 2.3, 8.0, 3.2, 4.3, 3.4, 6.0, 5.6, 5.8, 3.1, 3.3, 3.0, 3.6, 2.2, 2.3, 8.7, 8.7, 2.5],\n    \"sleep_hours\": [4.1, 5.0, 7.5, 7.9, 4.1, 6.9, 4.0, 6.6, 7.2, 8.9, 5.3, 8.0, 8.4, 8.6, 4.0, 6.3, 8.9, 6.0, 8.1, 6.7, 7.9, 6.4, 4.1, 4.4, 4.6, 5.3, 8.8, 7.2, 8.1, 6.8],\n    \"attendance\": [82, 91, 96, 96, 91, 55, 68, 52, 77, 90, 53, 59, 68, 62, 90, 68, 82, 75, 79, 97, 97, 56, 92, 67, 55, 69, 76, 98, 69, 51],\n    \"marks\": [42, 76, 41, 89, 50, 55, 61, 46, 45, 45, 34, 59, 52, 42, 79, 44, 59, 47, 67, 69, 68, 39, 43, 36, 41, 35, 45, 87, 72, 39]\n}\ndf30 = pd.DataFrame(data30)\n\ndef evaluate(make_model, scale=False):\n    errors = []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(\n            df30[features], df30[\"marks\"], test_size=0.25, random_state=seed)\n        if scale:\n            sc = StandardScaler().fit(X_train)          # learn scaling from TRAIN only\n            X_train, X_test = sc.transform(X_train), sc.transform(X_test)\n        model = make_model().fit(X_train, y_train)\n        errors.append(mean_absolute_error(y_test, model.predict(X_test)))\n    return np.mean(errors)\n\nprint(\"Average test MAE over 10 splits:\")\nprint(\"  Linear Regression      :\", round(evaluate(LinearRegression), 2))\nprint(\"  Decision Tree (depth 3):\", round(evaluate(lambda: DecisionTreeRegressor(max_depth=3, random_state=42)), 2))\nprint(\"  KNN (K=3), scaled      :\", round(evaluate(lambda: KNeighborsRegressor(n_neighbors=3), scale=True), 2))\nprint(\"  KNN (K=3), NOT scaled  :\", round(evaluate(lambda: KNeighborsRegressor(n_neighbors=3)), 2))",
+          "output": "Average test MAE over 10 splits:\n  Linear Regression      : 3.99\n  Decision Tree (depth 3): 4.47\n  KNN (K=3), scaled      : 5.68\n  KNN (K=3), NOT scaled  : 11.28"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Scaling more than halves the KNN error (11.28 down to 5.68). Skipping it is the number one KNN mistake."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "KNN still loses to the linear model here. The marks follow a smooth rule, so a formula suits them better, and 22 training students are few for a distance-based model. No model wins everywhere, so always test."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Student Predictor v5 (KNN Model)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Scaling plus all three models, side by side, on one split of the 30 students:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predictor_v5.py",
+          "code": "X_train, X_test, y_train, y_test = train_test_split(\n    df30[features], df30[\"marks\"], test_size=0.25, random_state=42)\n\nscaler = StandardScaler().fit(X_train)\nX_train_s, X_test_s = scaler.transform(X_train), scaler.transform(X_test)\n\nlinear = LinearRegression().fit(X_train, y_train)\ntree = DecisionTreeRegressor(max_depth=3, random_state=42).fit(X_train, y_train)\nknn = KNeighborsRegressor(n_neighbors=3).fit(X_train_s, y_train)\n\nprint(\"Test MAE\")\nprint(\"  Linear:\", round(mean_absolute_error(y_test, linear.predict(X_test)), 2))\nprint(\"  Tree  :\", round(mean_absolute_error(y_test, tree.predict(X_test)), 2))\nprint(\"  KNN   :\", round(mean_absolute_error(y_test, knn.predict(X_test_s)), 2))\n\ndef predict_all(hours, sleep, attendance):\n    new = pd.DataFrame({\"hours_studied\": [hours], \"sleep_hours\": [sleep], \"attendance\": [attendance]})\n    return (round(linear.predict(new)[0], 1), round(tree.predict(new)[0], 1),\n            round(knn.predict(scaler.transform(new))[0], 1))\n\nprint()\nfor hours, sleep, attendance in [(2, 5, 55), (5, 7, 80), (8, 8, 95)]:\n    l, t, k = predict_all(hours, sleep, attendance)\n    print(f\"{hours} h, {sleep} h sleep, {attendance}% -> Linear: {l} | Tree: {t} | KNN: {k}\")",
+          "output": "Test MAE\n  Linear: 2.79\n  Tree  : 3.54\n  KNN   : 5.08\n\n2 h, 5 h sleep, 55% -> Linear: 30.0 | Tree: 34.5 | KNN: 36.0\n5 h, 7 h sleep, 80% -> Linear: 57.9 | Tree: 49.3 | KNN: 62.7\n8 h, 8 h sleep, 95% -> Linear: 81.5 | Tree: 89.0 | KNN: 74.7"
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Change the K Value",
+      "meta": "Important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Test K=1 and K=5 on the 5-student table (you saw them in Step 6), then sweep K properly on the 30 students:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "k_sweep.py",
+          "code": "print(\"Average test MAE by K (scaled, 10 splits):\")\nfor k in [1, 2, 3, 5, 7, 10, 15]:\n    err = evaluate(lambda: KNeighborsRegressor(n_neighbors=k), scale=True)\n    print(f\"  K={k:2}: {err:.2f}\")",
+          "output": "Average test MAE by K (scaled, 10 splits):\n  K= 1: 5.08\n  K= 2: 6.76\n  K= 3: 5.68\n  K= 5: 6.37\n  K= 7: 6.51\n  K=10: 7.64\n  K=15: 9.63"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Observation",
+            "Why"
+          ],
+          "rows": [
+            [
+              "Prediction changes with K",
+              "Different K means a different set of neighbors to average"
+            ],
+            [
+              "K=1 is least stable",
+              "It copies one student, so one unusual student changes the answer"
+            ],
+            [
+              "Large K is smoother",
+              "But it drifts toward the overall average (K=15 is worst here, with only 22 training students)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Pick K by comparing test error, like any other setting. Rule of thumb: start small (3 to 7) and never let K approach the number of training rows."
+        }
+      ]
+    },
+    {
+      "id": "insight",
+      "icon": "🧠",
+      "title": "Deep Insight and Limitations",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "KNN is",
+            "Limitation"
+          ],
+          "rows": [
+            [
+              "A lazy learner: no training phase, it stores the data",
+              "Slow on large datasets: every prediction compares against ALL stored rows"
+            ],
+            [
+              "Based only on distance",
+              "Needs good scaling and meaningful features"
+            ],
+            [
+              "Easy to explain: here are the similar students",
+              "Many irrelevant features make distances meaningless"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Linear models and trees learn a compact rule, so predicting is fast. KNN keeps everything and does the work at prediction time."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "ML can work using distance alone",
+            "Scaling is essential for distance-based models",
+            "K controls how many neighbors vote: small is noisy, large is too smooth",
+            "Different models behave differently, so always compare them on test data"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Predictor v5 (KNN Model)",
+    "file": "day11_final.py",
+    "description": "One program combining Day 11: scaling fitted on train only, Linear, Tree and KNN compared on the same split, the effect of scaling across 10 splits, side-by-side predictions and the neighbors behind a KNN answer.",
+    "concepts": [
+      "KNeighborsRegressor",
+      "distance",
+      "StandardScaler",
+      "K",
+      "kneighbors",
+      "model comparison",
+      "lazy learner"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.neighbors import KNeighborsRegressor\nfrom sklearn.metrics import mean_absolute_error\n\n# 1. DATA: 30 students\ndata = {\n    \"hours_studied\": [2.8, 8.0, 2.7, 8.3, 4.9, 5.9, 7.1, 5.1, 3.4, 2.5, 1.6, 6.9, 4.5, 2.3, 8.0, 3.2, 4.3, 3.4, 6.0, 5.6, 5.8, 3.1, 3.3, 3.0, 3.6, 2.2, 2.3, 8.7, 8.7, 2.5],\n    \"sleep_hours\": [4.1, 5.0, 7.5, 7.9, 4.1, 6.9, 4.0, 6.6, 7.2, 8.9, 5.3, 8.0, 8.4, 8.6, 4.0, 6.3, 8.9, 6.0, 8.1, 6.7, 7.9, 6.4, 4.1, 4.4, 4.6, 5.3, 8.8, 7.2, 8.1, 6.8],\n    \"attendance\": [82, 91, 96, 96, 91, 55, 68, 52, 77, 90, 53, 59, 68, 62, 90, 68, 82, 75, 79, 97, 97, 56, 92, 67, 55, 69, 76, 98, 69, 51],\n    \"marks\": [42, 76, 41, 89, 50, 55, 61, 46, 45, 45, 34, 59, 52, 42, 79, 44, 59, 47, 67, 69, 68, 39, 43, 36, 41, 35, 45, 87, 72, 39]\n}\ndf = pd.DataFrame(data)\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nprint(\"=== STUDENT PREDICTOR v5 (KNN MODEL) ===\")\nprint(df.head(3))\n\n# 2. SPLIT AND SCALE (scaler learns from the training rows only)\nX_train, X_test, y_train, y_test = train_test_split(df[features], df[\"marks\"], test_size=0.25, random_state=42)\nscaler = StandardScaler().fit(X_train)\nX_train_s, X_test_s = scaler.transform(X_train), scaler.transform(X_test)\n\n# 3. TRAIN THREE MODELS\nlinear = LinearRegression().fit(X_train, y_train)\ntree = DecisionTreeRegressor(max_depth=3, random_state=42).fit(X_train, y_train)\nknn = KNeighborsRegressor(n_neighbors=3).fit(X_train_s, y_train)\n\n# 4. COMPARE ON UNSEEN TEST DATA\nprint(\"\\nTest MAE:\")\nprint(\"  Linear:\", round(mean_absolute_error(y_test, linear.predict(X_test)), 2))\nprint(\"  Tree  :\", round(mean_absolute_error(y_test, tree.predict(X_test)), 2))\nprint(\"  KNN   :\", round(mean_absolute_error(y_test, knn.predict(X_test_s)), 2))\n\n# 5. DOES SCALING MATTER? average over 10 splits\ndef avg_knn_mae(scale):\n    errors = []\n    for seed in range(10):\n        a, b, c, d = train_test_split(df[features], df[\"marks\"], test_size=0.25, random_state=seed)\n        if scale:\n            sc = StandardScaler().fit(a)\n            a, b = sc.transform(a), sc.transform(b)\n        errors.append(mean_absolute_error(d, KNeighborsRegressor(n_neighbors=3).fit(a, c).predict(b)))\n    return np.mean(errors)\n\nprint(\"\\nKNN average MAE, scaled:\", round(avg_knn_mae(True), 2), \"| not scaled:\", round(avg_knn_mae(False), 2))\n\n# 6. PREDICTIONS FROM ALL THREE MODELS\nnew_students = pd.DataFrame({\n    \"hours_studied\": [2, 5, 8],\n    \"sleep_hours\": [5, 7, 8],\n    \"attendance\": [55, 80, 95]\n})\nnew_students[\"linear\"] = linear.predict(new_students[features]).round(1)\nnew_students[\"tree\"] = tree.predict(new_students[features]).round(1)\nnew_students[\"knn\"] = knn.predict(scaler.transform(new_students[features])).round(1)\nprint(\"\\nPredictions:\")\nprint(new_students)\n\n# 7. WHY DID KNN PREDICT THAT? look at the neighbors of the first new student\ndist, idx = knn.kneighbors(scaler.transform(new_students[features].iloc[[0]]))\nprint(\"\\nNeighbor marks for the first student:\", list(y_train.iloc[idx[0]]))",
+    "output": "=== STUDENT PREDICTOR v5 (KNN MODEL) ===\n   hours_studied  sleep_hours  attendance  marks\n0            2.8          4.1          82     42\n1            8.0          5.0          91     76\n2            2.7          7.5          96     41\n\nTest MAE:\n  Linear: 2.79\n  Tree  : 3.54\n  KNN   : 5.08\n\nKNN average MAE, scaled: 5.68 | not scaled: 11.28\n\nPredictions:\n   hours_studied  sleep_hours  attendance  linear  tree   knn\n0              2            5          55    30.0  34.5  36.0\n1              5            7          80    57.9  49.3  62.7\n2              8            8          95    81.5  89.0  74.7\n\nNeighbor marks for the first student: [34, 35, 39]"
+  },
+  "practice": [
+    {
+      "title": "Delivery Time Neighbors",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Predict delivery time from distance and traffic with KNN, and see exactly which past deliveries it used.",
+      "tasks": [
+        "Create the DataFrame and scale distance_km and traffic with StandardScaler",
+        "Train KNeighborsRegressor(n_neighbors=3)",
+        "Predict the time for a 5 km trip with traffic level 3",
+        "Print the minutes of the 3 neighbors it used",
+        "Print the prediction for K=1, K=3 and K=5"
+      ],
+      "hint": "Use model.kneighbors(scaler.transform(new)) to get the neighbor positions, then y.iloc[idx[0]].",
+      "starter": "import pandas as pd\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsRegressor\n\ndata = {\n    \"distance_km\": [1.2, 2.5, 3.1, 4.0, 5.5, 6.2, 7.8, 8.5, 9.9, 11.0],\n    \"traffic\": [2, 4, 1, 3, 5, 2, 4, 1, 3, 5],\n    \"minutes\": [8, 17, 9, 18, 30, 20, 32, 20, 30, 45]\n}\n\n# TODO 1: DataFrame, X, y, scale the features\n\n# TODO 2: train KNN with K=3\n\n# TODO 3: predict for a 5 km trip with traffic 3\n\n# TODO 4: print the neighbors' minutes\n\n# TODO 5: predictions for K=1, 3, 5",
+      "solution": "import pandas as pd\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsRegressor\n\ndata = {\n    \"distance_km\": [1.2, 2.5, 3.1, 4.0, 5.5, 6.2, 7.8, 8.5, 9.9, 11.0],\n    \"traffic\": [2, 4, 1, 3, 5, 2, 4, 1, 3, 5],\n    \"minutes\": [8, 17, 9, 18, 30, 20, 32, 20, 30, 45]\n}\ndf = pd.DataFrame(data)\nfeatures = [\"distance_km\", \"traffic\"]\nX = df[features]\ny = df[\"minutes\"]\n\nscaler = StandardScaler()\nX_scaled = scaler.fit_transform(X)\n\nmodel = KNeighborsRegressor(n_neighbors=3).fit(X_scaled, y)\n\ntrip = pd.DataFrame({\"distance_km\": [5], \"traffic\": [3]})\ntrip_scaled = scaler.transform(trip)\nprint(\"Predicted minutes:\", round(model.predict(trip_scaled)[0], 1))\n\ndist, idx = model.kneighbors(trip_scaled)\nprint(\"Neighbor minutes:\", list(y.iloc[idx[0]]))\n\nfor k in [1, 3, 5]:\n    m = KNeighborsRegressor(n_neighbors=k).fit(X_scaled, y)\n    print(f\"K={k}: {round(m.predict(trip_scaled)[0], 1)} minutes\")",
+      "output": "Predicted minutes: 18.3\nNeighbor minutes: [18, 20, 17]\nK=1: 18.0 minutes\nK=3: 18.3 minutes\nK=5: 19.0 minutes"
+    },
+    {
+      "title": "Scaling Matters",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Prove why KNN needs scaling using house data where size is in the thousands and rooms are 1 to 5.",
+      "tasks": [
+        "Create the DataFrame",
+        "Write evaluate(make_model, scale) averaging the test MAE over 10 splits (test_size=0.25, scaler fitted on train only)",
+        "Compare Linear Regression, KNN (K=3) not scaled and KNN (K=3) scaled",
+        "Print the three averages",
+        "Explain why unscaled KNN does badly and why linear still wins"
+      ],
+      "hint": "Reuse the evaluate function from the lesson. Fit StandardScaler on X_train only, then transform both parts.",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.neighbors import KNeighborsRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"size_sqft\": [1646, 674, 939, 1209, 2421, 860, 2123, 956, 1318, 893, 1582, 2288, 2395, 609, 2130, 1323, 1451, 1837, 2396, 2200, 1446, 1568, 1818, 1650],\n    \"rooms\": [3, 5, 4, 1, 2, 1, 3, 1, 2, 3, 3, 1, 1, 4, 3, 2, 1, 5, 4, 3, 4, 3, 2, 3],\n    \"price\": [81.4, 80.4, 76.8, 43.4, 105.5, 39.4, 106.5, 36.2, 70.1, 57.3, 80.9, 82.8, 84.0, 56.8, 95.5, 67.0, 63.9, 118.8, 118.8, 105.2, 86.8, 85.1, 73.2, 85.5]\n}\n\n# TODO 1: DataFrame\n\n# TODO 2: evaluate(make_model, scale=False) over 10 splits\n\n# TODO 3: compare Linear, KNN not scaled, KNN scaled",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.neighbors import KNeighborsRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"size_sqft\": [1646, 674, 939, 1209, 2421, 860, 2123, 956, 1318, 893, 1582, 2288, 2395, 609, 2130, 1323, 1451, 1837, 2396, 2200, 1446, 1568, 1818, 1650],\n    \"rooms\": [3, 5, 4, 1, 2, 1, 3, 1, 2, 3, 3, 1, 1, 4, 3, 2, 1, 5, 4, 3, 4, 3, 2, 3],\n    \"price\": [81.4, 80.4, 76.8, 43.4, 105.5, 39.4, 106.5, 36.2, 70.1, 57.3, 80.9, 82.8, 84.0, 56.8, 95.5, 67.0, 63.9, 118.8, 118.8, 105.2, 86.8, 85.1, 73.2, 85.5]\n}\ndf = pd.DataFrame(data)\nfeatures = [\"size_sqft\", \"rooms\"]\n\ndef evaluate(make_model, scale=False):\n    errors = []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[features], df[\"price\"], test_size=0.25, random_state=seed)\n        if scale:\n            sc = StandardScaler().fit(X_train)\n            X_train, X_test = sc.transform(X_train), sc.transform(X_test)\n        model = make_model().fit(X_train, y_train)\n        errors.append(mean_absolute_error(y_test, model.predict(X_test)))\n    return np.mean(errors)\n\nprint(\"Linear Regression      :\", round(evaluate(LinearRegression), 2))\nprint(\"KNN (K=3), not scaled  :\", round(evaluate(lambda: KNeighborsRegressor(n_neighbors=3)), 2))\nprint(\"KNN (K=3), scaled      :\", round(evaluate(lambda: KNeighborsRegressor(n_neighbors=3), scale=True), 2))",
+      "output": "Linear Regression      : 4.69\nKNN (K=3), not scaled  : 16.45\nKNN (K=3), scaled      : 9.96",
+      "note": "Unscaled, size (500 to 2500) dwarfs rooms (1 to 5) in every distance, so KNN effectively ignores rooms even though they matter a lot for price. Scaling lets both features count. Linear still wins because price is an exact straight-line mix of size and rooms plus noise, and 18 training rows are few for KNN."
+    }
+  ],
+  "checklist": [
+    "Understood how KNN predicts",
+    "Scaled features before KNN",
+    "Trained KNeighborsRegressor",
+    "Looked at the neighbors behind a prediction",
+    "Changed K and observed the effect",
+    "Compared Linear, Tree and KNN on test data",
+    "Built Student Predictor v5"
+  ],
+  "quiz": [
+    {
+      "q": "How does KNN make a prediction?",
+      "options": [
+        "It applies a learned formula",
+        "It averages the targets of the K closest known points",
+        "It builds a tree of questions",
+        "It picks a random row"
+      ],
+      "answer": 1,
+      "why": "KNN finds the K nearest neighbors by distance and averages their target values."
+    },
+    {
+      "q": "Why must features be scaled for KNN?",
+      "options": [
+        "To make training faster",
+        "So a feature with big numbers does not dominate the distance",
+        "Because KNN needs integers",
+        "To remove duplicates"
+      ],
+      "answer": 1,
+      "why": "Distance adds up feature differences. Big-number features would swamp small-number ones."
+    },
+    {
+      "q": "What happens if K equals the number of training rows?",
+      "options": [
+        "Perfect accuracy",
+        "Every prediction becomes the overall average",
+        "The model crashes",
+        "It becomes a decision tree"
+      ],
+      "answer": 1,
+      "why": "All rows are neighbors, so the average of all targets is predicted for everyone."
+    },
+    {
+      "q": "Why is KNN called a lazy learner?",
+      "options": [
+        "It is slow to install",
+        "fit() just stores the data and the work happens at prediction time",
+        "It ignores half the data",
+        "It needs no data"
+      ],
+      "answer": 1,
+      "why": "There is no training phase beyond storing the data, so every prediction searches all stored rows."
+    }
+  ]
+},
+
+// DAY 12 snippet. In course-data.js: add a comma after Day 11's closing }, then paste this object. No images for this day.
+{
+  "day": 12,
+  "title": "Model Evaluation: Real Understanding",
+  "subtitle": "Go beyond accuracy: read confusion matrices, use precision and recall and see why imbalance fools accuracy.",
+  "level": "Intermediate",
+  "duration": "2 hours",
+  "tags": [
+    "Confusion Matrix",
+    "Precision",
+    "Recall",
+    "F1",
+    "Imbalance"
+  ],
+  "goals": [
+    "Go beyond accuracy",
+    "Understand precision and recall",
+    "Use the confusion matrix like a pro"
+  ],
+  "sections": [
+    {
+      "id": "trap",
+      "icon": "⚠️",
+      "title": "Step 1: Why Accuracy is NOT Enough",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "100 students: 90 pass, 10 fail. A lazy model predicts Pass for everyone:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day12_eval.py",
+          "code": "import numpy as np\nfrom sklearn.metrics import accuracy_score\n\ny_true = np.array([1] * 90 + [0] * 10)     # 90 Pass (1), 10 Fail (0)\ny_lazy = np.ones(100, dtype=int)            # lazy model: Pass for everyone\n\nprint(\"Accuracy:\", accuracy_score(y_true, y_lazy))\nprint(\"Fails detected:\", int(((y_true == 0) & (y_lazy == 0)).sum()), \"out of\", int((y_true == 0).sum()))",
+          "output": "Accuracy: 0.9\nFails detected: 0 out of 10"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "90% accuracy, yet the model never finds a single failing student. When one class is much bigger than the other, accuracy hides the truth. We need better tools."
+        }
+      ]
+    },
+    {
+      "id": "cm",
+      "icon": "🧠",
+      "title": "Step 2: Confusion Matrix",
+      "meta": "Core concept: actual vs predicted",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "",
+            "Predicted Pass",
+            "Predicted Fail"
+          ],
+          "rows": [
+            [
+              "Actual Pass",
+              "TP: correct pass ✅",
+              "FN: missed pass ❌"
+            ],
+            [
+              "Actual Fail",
+              "FP: wrong pass ❌",
+              "TN: correct fail ✅"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "head": [
+            "Term",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "TP",
+              "Pass predicted, really passed"
+            ],
+            [
+              "TN",
+              "Fail predicted, really failed"
+            ],
+            [
+              "FP",
+              "Pass predicted, but really failed (false alarm)"
+            ],
+            [
+              "FN",
+              "Fail predicted, but really passed (missed pass)"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Here is the lazy model from Step 1 in a confusion matrix:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "confusion.py",
+          "code": "import pandas as pd\nfrom sklearn.metrics import confusion_matrix\n\ncm = confusion_matrix(y_true, y_lazy)\nprint(cm)\nprint()\nprint(pd.DataFrame(cm, index=[\"Actual Fail\", \"Actual Pass\"], columns=[\"Predicted Fail\", \"Predicted Pass\"]))\n\ntn, fp, fn, tp = cm.ravel()\nprint(f\"\\nTN={tn} FP={fp} FN={fn} TP={tp}\")\n\n# Pass first, exactly like the table above\nprint()\nprint(confusion_matrix(y_true, y_lazy, labels=[1, 0]))",
+          "output": "[[ 0 10]\n [ 0 90]]\n\n             Predicted Fail  Predicted Pass\nActual Fail               0              10\nActual Pass               0              90\n\nTN=0 FP=10 FN=0 TP=90\n\n[[90  0]\n [10  0]]"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Careful: scikit-learn orders classes from smallest to largest, so by default the first row is Fail (0) and the matrix reads [[TN, FP], [FN, TP]]. That is upside down compared with the table above. Add labels=[1, 0] to get the Pass-first layout, or use ravel() to read the four numbers safely."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The lazy model has FP=10: all ten failing students were wrongly called Pass."
+        }
+      ]
+    },
+    {
+      "id": "real",
+      "icon": "⚡",
+      "title": "Step 3: Code It on a Real Model",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Train a Pass/Fail model on 40 students (20 Fail, 20 Pass), scaled on the training rows only, then look at its confusion matrix on unseen test students:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "real_model.py",
+          "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\ndata40 = {\n    \"hours_studied\": [5.4, 6.7, 3.3, 5.1, 8.1, 8.2, 2.0, 2.7, 1.4, 4.5, 1.2, 4.7, 6.2, 3.2, 6.4, 5.7, 1.2, 5.5, 3.1, 4.3, 3.3, 6.5, 4.5, 2.3, 5.4, 7.2, 3.5, 2.8, 4.1, 8.5, 8.8, 6.4, 8.2, 7.8, 4.0, 1.7, 6.2, 5.5, 3.9, 2.8],\n    \"sleep_hours\": [6.0, 6.3, 5.3, 5.5, 6.3, 8.3, 6.9, 5.4, 5.4, 6.3, 5.0, 5.0, 6.6, 4.4, 6.4, 5.8, 7.5, 7.7, 7.5, 7.4, 5.9, 7.3, 5.7, 6.9, 5.6, 6.2, 4.3, 5.2, 8.9, 5.2, 7.5, 7.3, 7.6, 6.4, 7.0, 4.3, 4.4, 5.0, 4.8, 4.5],\n    \"attendance\": [56, 78, 59, 98, 84, 77, 85, 63, 96, 92, 86, 74, 92, 87, 83, 96, 82, 68, 78, 60, 60, 86, 89, 99, 93, 77, 54, 74, 96, 89, 74, 73, 61, 59, 54, 95, 82, 57, 71, 52],\n    \"marks\": [47, 56, 34, 61, 69, 67, 41, 35, 41, 53, 31, 42, 63, 41, 57, 57, 37, 56, 44, 47, 39, 64, 48, 51, 53, 61, 29, 31, 61, 67, 70, 59, 62, 56, 41, 41, 54, 41, 41, 26]\n}\ndf40 = pd.DataFrame(data40)\ndf40[\"status\"] = df40[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\n\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    df40[features], df40[\"status\"], test_size=0.3, random_state=42, stratify=df40[\"status\"])\n\nscaler = StandardScaler().fit(X_train)\nmodel = LogisticRegression().fit(scaler.transform(X_train), y_train)\ny_pred = model.predict(scaler.transform(X_test))\n\ncm = confusion_matrix(y_test, y_pred)\nprint(pd.DataFrame(cm, index=[\"Actual Fail\", \"Actual Pass\"], columns=[\"Predicted Fail\", \"Predicted Pass\"]))",
+          "output": "             Predicted Fail  Predicted Pass\nActual Fail               5               1\nActual Pass               0               6"
+        },
+        {
+          "type": "p",
+          "text": "Read it: 5 failing students were correctly found (TN=5), 1 failing student was wrongly called Pass (FP=1), no passing student was missed (FN=0) and 6 passing students were correct (TP=6)."
+        }
+      ]
+    },
+    {
+      "id": "pr",
+      "icon": "🧠",
+      "title": "Step 4: Precision and Recall",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Metric",
+            "Question it answers",
+            "Formula"
+          ],
+          "rows": [
+            [
+              "Precision",
+              "Of the students I predicted Pass, how many really passed?",
+              "TP / (TP + FP)"
+            ],
+            [
+              "Recall",
+              "Of the students who really passed, how many did I find?",
+              "TP / (TP + FN)"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "precision_recall.py",
+          "code": "from sklearn.metrics import precision_score, recall_score\n\nprint(\"Pass as the positive class:\")\nprint(\"  Precision:\", round(precision_score(y_test, y_pred), 3))\nprint(\"  Recall   :\", round(recall_score(y_test, y_pred), 3))\n\nprint(\"Fail as the positive class:\")\nprint(\"  Precision:\", round(precision_score(y_test, y_pred, pos_label=0), 3))\nprint(\"  Recall   :\", round(recall_score(y_test, y_pred, pos_label=0), 3))\n\ntn, fp, fn, tp = cm.ravel()\nprint(\"\\nBy hand -> Pass precision:\", round(tp / (tp + fp), 3), \"| Pass recall:\", round(tp / (tp + fn), 3))",
+          "output": "Pass as the positive class:\n  Precision: 0.857\n  Recall   : 1.0\nFail as the positive class:\n  Precision: 1.0\n  Recall   : 0.833\n\nBy hand -> Pass precision: 0.857 | Pass recall: 1.0"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Precision and recall depend on which class you call positive (pos_label). Pass recall is 1.0 here, but Fail recall is 0.833 because one failing student slipped through. For a tool meant to spot struggling students, Fail recall is the number to watch."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Remember the lazy model: looked at as Pass-positive it has precision 0.9 and recall 1.0, which looks great. Looked at as Fail-positive it finds nothing. Always check the class you care about."
+        }
+      ]
+    },
+    {
+      "id": "when",
+      "icon": "🧠",
+      "title": "Step 5: When to Use What?",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Situation",
+            "Important metric",
+            "Why"
+          ],
+          "rows": [
+            [
+              "Spam detection",
+              "Precision",
+              "A good email sent to spam (FP) is costly"
+            ],
+            [
+              "Disease detection",
+              "Recall",
+              "Missing a sick patient (FN) is dangerous"
+            ],
+            [
+              "Find students who need help",
+              "Recall on Fail",
+              "Missing a struggling student (FN) is costly"
+            ],
+            [
+              "General case",
+              "Balanced: F1 score",
+              "F1 combines precision and recall into one number"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "f1.py",
+          "code": "from sklearn.metrics import f1_score\n\nprint(\"F1 for Pass:\", round(f1_score(y_test, y_pred), 3))\nprint(\"F1 for Fail:\", round(f1_score(y_test, y_pred, pos_label=0), 3))",
+          "output": "F1 for Pass: 0.923\nF1 for Fail: 0.909"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "There is usually a trade-off: making the model catch more positives (higher recall) tends to create more false alarms (lower precision)."
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "icon": "⚡",
+      "title": "Step 6: The Full Report",
+      "meta": "Best way",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "report.py",
+          "code": "from sklearn.metrics import classification_report\n\nprint(classification_report(y_test, y_pred, target_names=[\"Fail\", \"Pass\"], zero_division=0))",
+          "output": "              precision    recall  f1-score   support\n\n        Fail       1.00      0.83      0.91         6\n        Pass       0.86      1.00      0.92         6\n\n    accuracy                           0.92        12\n   macro avg       0.93      0.92      0.92        12\nweighted avg       0.93      0.92      0.92        12"
+        },
+        {
+          "type": "p",
+          "text": "One table with precision, recall, F1 and support (how many real students are in each class) for both classes. Add zero_division=0 so a class with no predictions shows 0 instead of a warning."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Pass/Fail Predictor v2 (Smart Evaluation)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Wrap the evaluation in one reusable function showing the confusion matrix, accuracy, precision and recall for both classes, then compare the model with the lazy baseline:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "smart_report.py",
+          "code": "from sklearn.metrics import accuracy_score\n\ndef smart_report(name, y_true, y_pred):\n    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])\n    print(f\"--- {name} ---\")\n    print(pd.DataFrame(cm, index=[\"Actual Fail\", \"Actual Pass\"], columns=[\"Predicted Fail\", \"Predicted Pass\"]))\n    print(\"Accuracy      :\", round(accuracy_score(y_true, y_pred), 2))\n    print(\"Pass precision:\", round(precision_score(y_true, y_pred, zero_division=0), 2),\n          \"| Pass recall:\", round(recall_score(y_true, y_pred, zero_division=0), 2))\n    print(\"Fail precision:\", round(precision_score(y_true, y_pred, pos_label=0, zero_division=0), 2),\n          \"| Fail recall:\", round(recall_score(y_true, y_pred, pos_label=0, zero_division=0), 2))\n\nsmart_report(\"Lazy baseline (everyone passes)\", y_test, np.ones(len(y_test), dtype=int))\nprint()\nsmart_report(\"Logistic Regression\", y_test, y_pred)",
+          "output": "--- Lazy baseline (everyone passes) ---\n             Predicted Fail  Predicted Pass\nActual Fail               0               6\nActual Pass               0               6\nAccuracy      : 0.5\nPass precision: 0.5 | Pass recall: 1.0\nFail precision: 0.0 | Fail recall: 0.0\n\n--- Logistic Regression ---\n             Predicted Fail  Predicted Pass\nActual Fail               5               1\nActual Pass               0               6\nAccuracy      : 0.92\nPass precision: 0.86 | Pass recall: 1.0\nFail precision: 1.0 | Fail recall: 0.83"
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Add Imbalance",
+      "meta": "Very important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Now 60 students with many more Pass (51) than Fail (9). Compare the default model with one that gives extra weight to the rare class (class_weight=\"balanced\"):"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "imbalance.py",
+          "code": "data60 = {\n    \"hours_studied\": [8.7, 5.4, 8.8, 6.7, 6.6, 2.7, 8.8, 1.0, 3.0, 4.5, 7.2, 2.6, 7.9, 8.9, 2.3, 5.8, 1.1, 4.1, 1.4, 8.7, 4.5, 8.6, 7.3, 7.9, 2.4, 1.6, 5.8, 2.3, 6.9, 4.3, 5.2, 8.5, 5.2, 1.9, 2.3, 5.4, 5.2, 6.1, 4.2, 6.2, 4.2, 6.0, 7.1, 2.4, 4.0, 5.0, 6.5, 3.0, 5.4, 6.0, 8.2, 3.9, 6.1, 2.5, 5.0, 2.5, 8.3, 4.5, 7.6, 4.3],\n    \"sleep_hours\": [8.5, 6.0, 5.7, 6.9, 8.2, 8.3, 7.0, 4.4, 7.0, 5.2, 7.7, 8.5, 6.6, 7.0, 4.3, 6.7, 4.6, 7.1, 5.8, 7.8, 4.2, 4.5, 7.4, 6.6, 6.9, 8.2, 6.4, 8.1, 6.6, 8.6, 7.3, 4.7, 5.8, 8.3, 5.8, 4.9, 6.4, 6.0, 7.1, 6.2, 5.3, 6.1, 6.1, 8.5, 8.9, 7.1, 4.4, 7.7, 7.4, 8.1, 5.7, 4.3, 7.1, 4.6, 7.8, 8.0, 6.0, 8.7, 4.9, 8.7],\n    \"attendance\": [73, 88, 88, 99, 99, 52, 51, 77, 52, 83, 77, 83, 72, 64, 97, 86, 50, 55, 82, 64, 70, 89, 68, 96, 86, 78, 59, 70, 88, 100, 54, 57, 87, 92, 54, 91, 89, 84, 67, 72, 68, 92, 66, 66, 97, 96, 98, 90, 54, 55, 78, 93, 94, 82, 98, 58, 61, 67, 63, 66],\n    \"marks\": [84, 64, 81, 77, 82, 53, 78, 43, 48, 59, 75, 63, 80, 76, 53, 69, 31, 55, 45, 82, 47, 75, 73, 79, 56, 49, 61, 49, 75, 75, 66, 71, 70, 59, 48, 64, 67, 65, 59, 69, 51, 70, 67, 53, 70, 67, 74, 56, 58, 67, 78, 56, 74, 48, 73, 53, 70, 61, 64, 64]\n}\ndf60 = pd.DataFrame(data60)\ndf60[\"status\"] = df60[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(\"Fail / Pass counts:\", (df60[\"status\"] == 0).sum(), \"/\", (df60[\"status\"] == 1).sum())\n\nX_train, X_test, y_train, y_test = train_test_split(\n    df60[features], df60[\"status\"], test_size=0.3, random_state=42, stratify=df60[\"status\"])\nscaler60 = StandardScaler().fit(X_train)\nX_train_s, X_test_s = scaler60.transform(X_train), scaler60.transform(X_test)\n\nprint(\"Lazy 'everyone passes' accuracy:\", round((y_test == 1).mean(), 2))\nprint()\n\ndefault = LogisticRegression().fit(X_train_s, y_train)\nweighted = LogisticRegression(class_weight=\"balanced\").fit(X_train_s, y_train)\n\nsmart_report(\"Default model\", y_test, default.predict(X_test_s))\nprint()\nsmart_report(\"class_weight=balanced\", y_test, weighted.predict(X_test_s))",
+          "output": "Fail / Pass counts: 9 / 51\nLazy 'everyone passes' accuracy: 0.83\n\n--- Default model ---\n             Predicted Fail  Predicted Pass\nActual Fail               1               2\nActual Pass               0              15\nAccuracy      : 0.89\nPass precision: 0.88 | Pass recall: 1.0\nFail precision: 1.0 | Fail recall: 0.33\n\n--- class_weight=balanced ---\n             Predicted Fail  Predicted Pass\nActual Fail               3               0\nActual Pass               2              13\nAccuracy      : 0.89\nPass precision: 1.0 | Pass recall: 0.87\nFail precision: 0.6 | Fail recall: 1.0"
+        },
+        {
+          "type": "table",
+          "head": [
+            "",
+            "Default model",
+            "class_weight=balanced"
+          ],
+          "rows": [
+            [
+              "Accuracy",
+              "0.89",
+              "0.89 (the same!)"
+            ],
+            [
+              "Fail recall",
+              "0.33: found 1 of 3 failing students",
+              "1.0: found all 3"
+            ],
+            [
+              "Pass recall",
+              "1.0",
+              "0.87: now wrongly flags 2 passing students"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Same accuracy, completely different behavior. Accuracy cannot tell these two models apart, while recall can. The lazy baseline already scores 0.83, so the default model's 0.89 is not much better."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Which model is better depends on the cost of each mistake. If missing a failing student is worse than a false alarm, choose the weighted one."
+        }
+      ]
+    },
+    {
+      "id": "truth",
+      "icon": "🏭",
+      "title": "Deep Insight and Industry Truth",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Accuracy is the surface. Precision and recall are real understanding. Companies care about the cost of each type of mistake:"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Problem",
+            "False positive (FP)",
+            "False negative (FN)",
+            "Costlier error"
+          ],
+          "rows": [
+            [
+              "Spam filter",
+              "Good email lost",
+              "Spam in inbox",
+              "FP"
+            ],
+            [
+              "Disease test",
+              "Healthy person worried",
+              "Sick person sent home",
+              "FN"
+            ],
+            [
+              "Fraud detection",
+              "Real purchase blocked",
+              "Fraud goes through",
+              "Depends on the amounts"
+            ],
+            [
+              "Pass/Fail helper",
+              "Struggling student not helped",
+              "Good student gets extra attention",
+              "FP"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The cost table decides the metric. Without it, accuracy is just a number."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Why accuracy can hide a useless model",
+            "How to read a confusion matrix (and sklearn's row order)",
+            "Precision and recall, and how they depend on the positive class",
+            "How to read a full classification report",
+            "How class imbalance changes the picture, and one way to handle it"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Pass/Fail Predictor v2 (Smart Evaluation)",
+    "file": "day12_final.py",
+    "description": "One program combining Day 12: a reusable evaluation function (confusion matrix, accuracy, precision and recall for both classes), a full classification report, and the effect of imbalance with and without class weights.",
+    "concepts": [
+      "confusion_matrix",
+      "precision",
+      "recall",
+      "classification_report",
+      "pos_label",
+      "imbalance",
+      "class_weight"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import (confusion_matrix, accuracy_score, precision_score,\n                             recall_score, classification_report)\n\ndef smart_report(name, y_true, y_pred):\n    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])\n    print(f\"--- {name} ---\")\n    print(pd.DataFrame(cm, index=[\"Actual Fail\", \"Actual Pass\"], columns=[\"Predicted Fail\", \"Predicted Pass\"]))\n    print(\"Accuracy      :\", round(accuracy_score(y_true, y_pred), 2))\n    print(\"Pass precision:\", round(precision_score(y_true, y_pred, zero_division=0), 2),\n          \"| Pass recall:\", round(recall_score(y_true, y_pred, zero_division=0), 2))\n    print(\"Fail precision:\", round(precision_score(y_true, y_pred, pos_label=0, zero_division=0), 2),\n          \"| Fail recall:\", round(recall_score(y_true, y_pred, pos_label=0, zero_division=0), 2))\n\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\n\ndef train_and_predict(df, class_weight=None):\n    X_train, X_test, y_train, y_test = train_test_split(\n        df[features], df[\"status\"], test_size=0.3, random_state=42, stratify=df[\"status\"])\n    scaler = StandardScaler().fit(X_train)\n    model = LogisticRegression(class_weight=class_weight).fit(scaler.transform(X_train), y_train)\n    return y_test, model.predict(scaler.transform(X_test))\n\nprint(\"=== PASS/FAIL PREDICTOR v2 (SMART EVALUATION) ===\")\n\n# 1. BALANCED DATA: 40 students\ndata40 = {\n    \"hours_studied\": [5.4, 6.7, 3.3, 5.1, 8.1, 8.2, 2.0, 2.7, 1.4, 4.5, 1.2, 4.7, 6.2, 3.2, 6.4, 5.7, 1.2, 5.5, 3.1, 4.3, 3.3, 6.5, 4.5, 2.3, 5.4, 7.2, 3.5, 2.8, 4.1, 8.5, 8.8, 6.4, 8.2, 7.8, 4.0, 1.7, 6.2, 5.5, 3.9, 2.8],\n    \"sleep_hours\": [6.0, 6.3, 5.3, 5.5, 6.3, 8.3, 6.9, 5.4, 5.4, 6.3, 5.0, 5.0, 6.6, 4.4, 6.4, 5.8, 7.5, 7.7, 7.5, 7.4, 5.9, 7.3, 5.7, 6.9, 5.6, 6.2, 4.3, 5.2, 8.9, 5.2, 7.5, 7.3, 7.6, 6.4, 7.0, 4.3, 4.4, 5.0, 4.8, 4.5],\n    \"attendance\": [56, 78, 59, 98, 84, 77, 85, 63, 96, 92, 86, 74, 92, 87, 83, 96, 82, 68, 78, 60, 60, 86, 89, 99, 93, 77, 54, 74, 96, 89, 74, 73, 61, 59, 54, 95, 82, 57, 71, 52],\n    \"marks\": [47, 56, 34, 61, 69, 67, 41, 35, 41, 53, 31, 42, 63, 41, 57, 57, 37, 56, 44, 47, 39, 64, 48, 51, 53, 61, 29, 31, 61, 67, 70, 59, 62, 56, 41, 41, 54, 41, 41, 26]\n}\nbalanced = pd.DataFrame(data40)\nbalanced[\"status\"] = balanced[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(\"\\nBalanced data, Fail / Pass:\", (balanced[\"status\"] == 0).sum(), \"/\", (balanced[\"status\"] == 1).sum())\n\ny_test, y_pred = train_and_predict(balanced)\nsmart_report(\"Balanced data, Logistic Regression\", y_test, y_pred)\nprint()\nprint(classification_report(y_test, y_pred, target_names=[\"Fail\", \"Pass\"], zero_division=0))\n\n# 2. IMBALANCED DATA: 60 students, mostly Pass\ndata60 = {\n    \"hours_studied\": [8.7, 5.4, 8.8, 6.7, 6.6, 2.7, 8.8, 1.0, 3.0, 4.5, 7.2, 2.6, 7.9, 8.9, 2.3, 5.8, 1.1, 4.1, 1.4, 8.7, 4.5, 8.6, 7.3, 7.9, 2.4, 1.6, 5.8, 2.3, 6.9, 4.3, 5.2, 8.5, 5.2, 1.9, 2.3, 5.4, 5.2, 6.1, 4.2, 6.2, 4.2, 6.0, 7.1, 2.4, 4.0, 5.0, 6.5, 3.0, 5.4, 6.0, 8.2, 3.9, 6.1, 2.5, 5.0, 2.5, 8.3, 4.5, 7.6, 4.3],\n    \"sleep_hours\": [8.5, 6.0, 5.7, 6.9, 8.2, 8.3, 7.0, 4.4, 7.0, 5.2, 7.7, 8.5, 6.6, 7.0, 4.3, 6.7, 4.6, 7.1, 5.8, 7.8, 4.2, 4.5, 7.4, 6.6, 6.9, 8.2, 6.4, 8.1, 6.6, 8.6, 7.3, 4.7, 5.8, 8.3, 5.8, 4.9, 6.4, 6.0, 7.1, 6.2, 5.3, 6.1, 6.1, 8.5, 8.9, 7.1, 4.4, 7.7, 7.4, 8.1, 5.7, 4.3, 7.1, 4.6, 7.8, 8.0, 6.0, 8.7, 4.9, 8.7],\n    \"attendance\": [73, 88, 88, 99, 99, 52, 51, 77, 52, 83, 77, 83, 72, 64, 97, 86, 50, 55, 82, 64, 70, 89, 68, 96, 86, 78, 59, 70, 88, 100, 54, 57, 87, 92, 54, 91, 89, 84, 67, 72, 68, 92, 66, 66, 97, 96, 98, 90, 54, 55, 78, 93, 94, 82, 98, 58, 61, 67, 63, 66],\n    \"marks\": [84, 64, 81, 77, 82, 53, 78, 43, 48, 59, 75, 63, 80, 76, 53, 69, 31, 55, 45, 82, 47, 75, 73, 79, 56, 49, 61, 49, 75, 75, 66, 71, 70, 59, 48, 64, 67, 65, 59, 69, 51, 70, 67, 53, 70, 67, 74, 56, 58, 67, 78, 56, 74, 48, 73, 53, 70, 61, 64, 64]\n}\nimbalanced = pd.DataFrame(data60)\nimbalanced[\"status\"] = imbalanced[\"marks\"].apply(lambda x: 1 if x >= 50 else 0)\nprint(\"Imbalanced data, Fail / Pass:\", (imbalanced[\"status\"] == 0).sum(), \"/\", (imbalanced[\"status\"] == 1).sum())\n\ny_test, y_default = train_and_predict(imbalanced)\n_, y_weighted = train_and_predict(imbalanced, class_weight=\"balanced\")\nprint(\"Lazy 'everyone passes' accuracy:\", round((y_test == 1).mean(), 2))\nprint()\nsmart_report(\"Imbalanced, default\", y_test, y_default)\nprint()\nsmart_report(\"Imbalanced, class_weight=balanced\", y_test, y_weighted)\n\n# 3. THE LESSON\nprint(\"\\nSame accuracy, very different Fail recall. Always look beyond accuracy.\")",
+    "output": "=== PASS/FAIL PREDICTOR v2 (SMART EVALUATION) ===\n\nBalanced data, Fail / Pass: 20 / 20\n--- Balanced data, Logistic Regression ---\n             Predicted Fail  Predicted Pass\nActual Fail               5               1\nActual Pass               0               6\nAccuracy      : 0.92\nPass precision: 0.86 | Pass recall: 1.0\nFail precision: 1.0 | Fail recall: 0.83\n\n              precision    recall  f1-score   support\n\n        Fail       1.00      0.83      0.91         6\n        Pass       0.86      1.00      0.92         6\n\n    accuracy                           0.92        12\n   macro avg       0.93      0.92      0.92        12\nweighted avg       0.93      0.92      0.92        12\n\nImbalanced data, Fail / Pass: 9 / 51\nLazy 'everyone passes' accuracy: 0.83\n\n--- Imbalanced, default ---\n             Predicted Fail  Predicted Pass\nActual Fail               1               2\nActual Pass               0              15\nAccuracy      : 0.89\nPass precision: 0.88 | Pass recall: 1.0\nFail precision: 1.0 | Fail recall: 0.33\n\n--- Imbalanced, class_weight=balanced ---\n             Predicted Fail  Predicted Pass\nActual Fail               3               0\nActual Pass               2              13\nAccuracy      : 0.89\nPass precision: 1.0 | Pass recall: 0.87\nFail precision: 0.6 | Fail recall: 1.0\n\nSame accuracy, very different Fail recall. Always look beyond accuracy."
+  },
+  "practice": [
+    {
+      "title": "Spam Filter Scorecard",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "A spam filter checked 20 emails (1 = spam). Score it by hand and with scikit-learn.",
+      "tasks": [
+        "Print the confusion matrix and read TN, FP, FN, TP with ravel()",
+        "Calculate precision and recall by hand from those four numbers",
+        "Confirm them with precision_score and recall_score",
+        "Print the accuracy",
+        "Which error hurts more for a spam filter, FP or FN?"
+      ],
+      "hint": "tn, fp, fn, tp = cm.ravel(). Precision = tp / (tp + fp), recall = tp / (tp + fn).",
+      "starter": "import numpy as np\nfrom sklearn.metrics import confusion_matrix, precision_score, recall_score, accuracy_score\n\ny_true = np.array([1] * 6 + [0] * 14)\ny_pred = np.array([1, 1, 1, 1, 0, 0] + [1, 1, 1] + [0] * 11)\n\n# TODO 1: confusion matrix and ravel()\n\n# TODO 2: precision and recall by hand\n\n# TODO 3: confirm with scikit-learn\n\n# TODO 4: accuracy",
+      "solution": "import numpy as np\nfrom sklearn.metrics import confusion_matrix, precision_score, recall_score, accuracy_score\n\ny_true = np.array([1] * 6 + [0] * 14)\ny_pred = np.array([1, 1, 1, 1, 0, 0] + [1, 1, 1] + [0] * 11)\n\ncm = confusion_matrix(y_true, y_pred)\nprint(cm)\ntn, fp, fn, tp = cm.ravel()\nprint(f\"TN={tn} FP={fp} FN={fn} TP={tp}\")\n\nprint(\"\\nPrecision by hand:\", round(tp / (tp + fp), 3))\nprint(\"Recall by hand   :\", round(tp / (tp + fn), 3))\n\nprint(\"\\nPrecision (sklearn):\", round(precision_score(y_true, y_pred), 3))\nprint(\"Recall (sklearn)   :\", round(recall_score(y_true, y_pred), 3))\nprint(\"Accuracy:\", accuracy_score(y_true, y_pred))",
+      "output": "[[11  3]\n [ 2  4]]\nTN=11 FP=3 FN=2 TP=4\n\nPrecision by hand: 0.571\nRecall by hand   : 0.667\n\nPrecision (sklearn): 0.571\nRecall (sklearn)   : 0.667\nAccuracy: 0.75",
+      "note": "For a spam filter a false positive (a real email sent to spam) usually hurts more than a false negative (one spam in the inbox), so precision is the key metric. Here precision is only 0.571: 3 of the 7 emails flagged as spam were real."
+    },
+    {
+      "title": "Disease Screening",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Screen 80 patients where only 12 are sick. Decide between the default model and a recall-focused one.",
+      "tasks": [
+        "Create the DataFrame and print the Healthy / Sick counts",
+        "Split (test_size=0.3, random_state=42, stratify) and scale on the training rows only",
+        "Train the default LogisticRegression and one with class_weight=\"balanced\"",
+        "Print recall and precision for the sick class for both",
+        "Print the classification report of the model you would choose and say why"
+      ],
+      "hint": "Sick is class 1, so the default positive class works. For a disease test choose the model with the higher recall.",
+      "starter": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score, classification_report\n\ndata = {\n    \"temperature\": [37.2, 37.6, 37.6, 36.8, 36.8, 36.5, 36.5, 37.0, 36.6, 37.1, 37.6, 37.4, 37.3, 37.5, 37.2, 37.3, 37.0, 37.1, 37.0, 38.1, 36.1, 37.0, 36.8, 38.0, 37.0, 37.7, 37.3, 36.6, 36.7, 36.0, 37.8, 38.2, 37.8, 38.2, 37.6, 36.4, 36.8, 35.9, 36.9, 37.6, 36.5, 38.2, 37.2, 36.9, 37.3, 37.7, 37.8, 37.5, 38.4, 37.6, 37.7, 37.2, 38.0, 36.8, 37.4, 37.6, 36.5, 37.4, 37.9, 36.8, 37.0, 36.9, 38.1, 37.5, 38.5, 37.0, 37.6, 36.7, 37.9, 37.1, 37.0, 38.4, 36.9, 36.4, 37.2, 38.1, 36.8, 36.8, 37.2, 37.3],\n    \"cough_score\": [7, 5, 5, 5, 3, 3, 4, 2, 3, 1, 4, 1, 2, 3, 1, 2, 2, 1, 3, 6, 7, 6, 1, 4, 0, 4, 3, 3, 2, 4, 0, 4, 8, 8, 5, 2, 2, 5, 2, 4, 4, 4, 6, 0, 3, 1, 6, 0, 6, 8, 3, 1, 3, 2, 8, 5, 1, 5, 4, 2, 3, 4, 4, 4, 5, 3, 3, 3, 4, 1, 6, 5, 4, 3, 4, 7, 3, 6, 4, 4],\n    \"sick\": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0]\n}\n\n# TODO 1: DataFrame, Healthy / Sick counts\n\n# TODO 2: stratified split, scale on train only\n\n# TODO 3: default model and class_weight=\"balanced\" model\n\n# TODO 4: recall and precision for the sick class\n\n# TODO 5: classification report of your choice",
+      "solution": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score, classification_report\n\ndata = {\n    \"temperature\": [37.2, 37.6, 37.6, 36.8, 36.8, 36.5, 36.5, 37.0, 36.6, 37.1, 37.6, 37.4, 37.3, 37.5, 37.2, 37.3, 37.0, 37.1, 37.0, 38.1, 36.1, 37.0, 36.8, 38.0, 37.0, 37.7, 37.3, 36.6, 36.7, 36.0, 37.8, 38.2, 37.8, 38.2, 37.6, 36.4, 36.8, 35.9, 36.9, 37.6, 36.5, 38.2, 37.2, 36.9, 37.3, 37.7, 37.8, 37.5, 38.4, 37.6, 37.7, 37.2, 38.0, 36.8, 37.4, 37.6, 36.5, 37.4, 37.9, 36.8, 37.0, 36.9, 38.1, 37.5, 38.5, 37.0, 37.6, 36.7, 37.9, 37.1, 37.0, 38.4, 36.9, 36.4, 37.2, 38.1, 36.8, 36.8, 37.2, 37.3],\n    \"cough_score\": [7, 5, 5, 5, 3, 3, 4, 2, 3, 1, 4, 1, 2, 3, 1, 2, 2, 1, 3, 6, 7, 6, 1, 4, 0, 4, 3, 3, 2, 4, 0, 4, 8, 8, 5, 2, 2, 5, 2, 4, 4, 4, 6, 0, 3, 1, 6, 0, 6, 8, 3, 1, 3, 2, 8, 5, 1, 5, 4, 2, 3, 4, 4, 4, 5, 3, 3, 3, 4, 1, 6, 5, 4, 3, 4, 7, 3, 6, 4, 4],\n    \"sick\": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0]\n}\ndf = pd.DataFrame(data)\nprint(\"Healthy / Sick:\", (df[\"sick\"] == 0).sum(), \"/\", (df[\"sick\"] == 1).sum())\n\nX_train, X_test, y_train, y_test = train_test_split(\n    df[[\"temperature\", \"cough_score\"]], df[\"sick\"], test_size=0.3, random_state=42, stratify=df[\"sick\"])\nscaler = StandardScaler().fit(X_train)\nX_train_s, X_test_s = scaler.transform(X_train), scaler.transform(X_test)\n\nmodels = {\n    \"Default\": LogisticRegression().fit(X_train_s, y_train),\n    \"Balanced weights\": LogisticRegression(class_weight=\"balanced\").fit(X_train_s, y_train),\n}\nfor name, model in models.items():\n    pred = model.predict(X_test_s)\n    print(f\"{name}: sick recall = {recall_score(y_test, pred):.2f}, sick precision = {precision_score(y_test, pred):.2f}\")\n\nprint()\nchosen = models[\"Balanced weights\"].predict(X_test_s)\nprint(classification_report(y_test, chosen, target_names=[\"Healthy\", \"Sick\"], zero_division=0))",
+      "output": "Healthy / Sick: 68 / 12\nDefault: sick recall = 0.75, sick precision = 1.00\nBalanced weights: sick recall = 1.00, sick precision = 0.57\n\n              precision    recall  f1-score   support\n\n     Healthy       1.00      0.85      0.92        20\n        Sick       0.57      1.00      0.73         4\n\n    accuracy                           0.88        24\n   macro avg       0.79      0.93      0.82        24\nweighted avg       0.93      0.88      0.89        24",
+      "note": "For a disease screening test, missing a sick patient (a false negative) is far worse than a false alarm, so we choose the balanced model: recall for the sick class rises from 0.75 to 1.0. The price is lower precision (0.57), which means more healthy people get a follow-up test. That trade-off is exactly what precision and recall expose and accuracy hides."
+    }
+  ],
+  "checklist": [
+    "Saw why accuracy can be misleading",
+    "Built and read a confusion matrix",
+    "Calculated precision and recall",
+    "Chose a metric for a situation",
+    "Read a full classification report",
+    "Tested an imbalanced dataset",
+    "Built Pass/Fail Predictor v2"
+  ],
+  "quiz": [
+    {
+      "q": "A model predicts Pass for all 100 students (90 pass, 10 fail). What is true?",
+      "options": [
+        "Accuracy 90%, but it finds none of the failing students",
+        "Accuracy 10%",
+        "It is a perfect model",
+        "Recall for Fail is 100%"
+      ],
+      "answer": 0,
+      "why": "Accuracy looks great, but Fail recall is 0, so the model is useless for detecting failures."
+    },
+    {
+      "q": "What does recall answer?",
+      "options": [
+        "Of everything predicted positive, how much was right?",
+        "Of all real positives, how many did we find?",
+        "How many rows were used",
+        "How fast the model is"
+      ],
+      "answer": 1,
+      "why": "Recall = TP / (TP + FN): the share of real positives that were found."
+    },
+    {
+      "q": "Which metric matters most for a disease screening test?",
+      "options": [
+        "Precision",
+        "Recall",
+        "Row count",
+        "Training time"
+      ],
+      "answer": 1,
+      "why": "Missing a sick patient (a false negative) is dangerous, so you want high recall."
+    },
+    {
+      "q": "Why is confusion_matrix(y_true, y_pred) upside down compared with a Pass-first table?",
+      "options": [
+        "It is a bug",
+        "scikit-learn orders classes smallest to largest, so Fail (0) comes first",
+        "It only works for spam",
+        "It sorts by accuracy"
+      ],
+      "answer": 1,
+      "why": "Rows and columns follow label order 0 then 1. Use labels=[1, 0] for Pass first, or ravel() to read the four numbers."
+    }
+  ]
+},
+
+// DAY 13 snippet. In course-data.js: add a comma after Day 12's closing }, then paste this object. No images for this day.
+{
+  "day": 13,
+  "title": "Overfitting vs Underfitting",
+  "subtitle": "Understand why models fail, detect underfitting and overfitting with train vs test scores and balance model complexity.",
+  "level": "Intermediate",
+  "duration": "2 hours",
+  "tags": [
+    "Overfitting",
+    "Underfitting",
+    "Bias-Variance",
+    "R²",
+    "max_depth",
+    "Polynomial"
+  ],
+  "goals": [
+    "Understand why ML models fail",
+    "Detect overfitting and underfitting",
+    "Learn how to balance models properly"
+  ],
+  "sections": [
+    {
+      "id": "core",
+      "icon": "🧠",
+      "title": "Step 1: The Core Idea",
+      "meta": "A model should learn patterns, not memorize data",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "",
+            "Underfitting",
+            "Good fit",
+            "Overfitting"
+          ],
+          "rows": [
+            [
+              "The model is",
+              "Too simple",
+              "Just right",
+              "Too complex"
+            ],
+            [
+              "Train performance",
+              "Poor ❌",
+              "Good ✅",
+              "Excellent ✅"
+            ],
+            [
+              "Test performance",
+              "Poor ❌",
+              "Good ✅",
+              "Poor ❌"
+            ],
+            [
+              "Example",
+              "A straight line on curved data",
+              "A tree of sensible depth",
+              "A tree that memorizes every point"
+            ],
+            [
+              "Bias / variance",
+              "High bias",
+              "Balanced",
+              "High variance"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Overfitting means learning the noise in the training data. Underfitting means missing the real pattern. The goal is the balance in the middle."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Create an Example Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day13_fitting.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6, 7, 8],\n    \"marks\": [35, 40, 50, 60, 65, 70, 80, 90]\n}\ndf = pd.DataFrame(data)\nX = df[[\"hours_studied\"]]\ny = df[\"marks\"]\nprint(df)",
+          "output": "   hours_studied  marks\n0              1     35\n1              2     40\n2              3     50\n3              4     60\n4              5     65\n5              6     70\n6              7     80\n7              8     90"
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "⚡",
+      "title": "Step 3: Split the Data",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split.py",
+          "code": "from sklearn.model_selection import train_test_split\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n\nprint(\"Train hours:\", list(X_train[\"hours_studied\"]))\nprint(\"Test hours :\", list(X_test[\"hours_studied\"]))",
+          "output": "Train hours: [1, 8, 3, 5, 4, 7]\nTest hours : [2, 6]"
+        }
+      ]
+    },
+    {
+      "id": "deep",
+      "icon": "⚡",
+      "title": "Step 4: Create the Overfitting Tree",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "deep_tree.py",
+          "code": "from sklearn.tree import DecisionTreeRegressor\n\nmodel = DecisionTreeRegressor(max_depth=None, random_state=42)\nmodel.fit(X_train, y_train)\n\nprint(\"Depth:\", model.get_depth(), \"| Leaves:\", model.get_n_leaves())",
+          "output": "Depth: 4 | Leaves: 6"
+        },
+        {
+          "type": "p",
+          "text": "max_depth=None lets the tree keep splitting until it has a leaf for (almost) every training row. That is the memorizing machine."
+        }
+      ]
+    },
+    {
+      "id": "scores",
+      "icon": "⚡",
+      "title": "Step 5: Check Train vs Test Score",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "scores.py",
+          "code": "train_score = model.score(X_train, y_train)\ntest_score = model.score(X_test, y_test)\n\nprint(\"Train Score:\", round(train_score, 3))\nprint(\"Test Score :\", round(test_score, 3))",
+          "output": "Train Score: 1.0\nTest Score : 0.889"
+        },
+        {
+          "type": "table",
+          "head": [
+            "R² score",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "1.0",
+              "Perfect predictions"
+            ],
+            [
+              "0.0",
+              "No better than always predicting the average"
+            ],
+            [
+              "Below 0",
+              "Worse than predicting the average"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "For regression models, score() is R² (not accuracy). The 99% accuracy and 60% accuracy in the task's industry story describe classifiers. The idea is identical: compare the training number with the testing number."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Train 1.0 but test 0.889: a small gap, and the test score is still high. This is NOT real overfitting. The data has no noise (marks rise in a perfect pattern), so memorizing it costs nothing. Overfitting hurts when there is noise to memorize."
+        }
+      ]
+    },
+    {
+      "id": "shallow",
+      "icon": "⚡",
+      "title": "Step 6: Reduce Complexity",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "depths.py",
+          "code": "for depth in [1, 2, 3, 5, None]:\n    m = DecisionTreeRegressor(max_depth=depth, random_state=42).fit(X_train, y_train)\n    print(f\"max_depth={str(depth):4} leaves={m.get_n_leaves()}  train={m.score(X_train, y_train):.3f}  test={m.score(X_test, y_test):.3f}\")",
+          "output": "max_depth=1    leaves=2  train=0.710  test=-0.028\nmax_depth=2    leaves=4  train=0.941  test=0.642\nmax_depth=3    leaves=5  train=0.994  test=0.819\nmax_depth=5    leaves=6  train=1.000  test=0.889\nmax_depth=None leaves=6  train=1.000  test=0.889"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The task expects the shallow tree (max_depth=2) to generalize better. On this clean data it is actually WORSE (test 0.642 vs 0.889), because it is too simple for a pattern with no noise. Depth 1 is clearly underfitting: train 0.71 and a test score below zero."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Two test rows (hours 2 and 6) also make every score shaky. To see real overfitting we need noisy data and more rows, coming next."
+        }
+      ]
+    },
+    {
+      "id": "noisy",
+      "icon": "🔬",
+      "title": "A Better Playground: Noisy, Curved Data",
+      "meta": "Where overfitting really shows up",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Real data is noisy and often curved. Here marks rise quickly with study hours, then level off, with some random noise (30 students). Average over 10 splits, with 30% of the data for testing:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "curve_data.py",
+          "code": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\n\ndata_curve = {\n    \"hours\": [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0],\n    \"marks\": [33, 37, 51, 48, 53, 61, 57, 62, 67, 68, 67, 72, 74, 78, 73, 77, 84, 87, 78, 85, 81, 82, 82, 84, 89, 89, 87, 86, 87, 87]\n}\ndf_curve = pd.DataFrame(data_curve)\n\ndef scores(make_model):\n    train_scores, test_scores = [], []\n    for seed in range(10):\n        X_tr, X_te, y_tr, y_te = train_test_split(df_curve[[\"hours\"]], df_curve[\"marks\"], test_size=0.3, random_state=seed)\n        model = make_model().fit(X_tr, y_tr)\n        train_scores.append(model.score(X_tr, y_tr))\n        test_scores.append(model.score(X_te, y_te))\n    return np.mean(train_scores), np.mean(test_scores)\n\ndef verdict(train, test):\n    if train < 0.9:\n        return \"underfit\"\n    if train - test > 0.2:\n        return \"OVERFIT\"\n    return \"good fit\"\n\ndef show(name, make_model):\n    tr, te = scores(make_model)\n    print(f\"{name:20} train {tr:.2f}  test {te:.2f}  gap {tr - te:.2f}  {verdict(tr, te)}\")\n\nshow(\"Straight line\", LinearRegression)\nfor depth in [1, 2, 3, 4, 5, None]:\n    show(f\"Tree depth {depth}\", lambda: DecisionTreeRegressor(max_depth=depth, random_state=42))",
+          "output": "Straight line        train 0.85  test 0.64  gap 0.20  underfit\nTree depth 1         train 0.74  test 0.45  gap 0.29  underfit\nTree depth 2         train 0.94  test 0.76  gap 0.18  good fit\nTree depth 3         train 0.99  test 0.83  gap 0.16  good fit\nTree depth 4         train 1.00  test 0.82  gap 0.18  good fit\nTree depth 5         train 1.00  test 0.79  gap 0.21  OVERFIT\nTree depth None      train 1.00  test 0.79  gap 0.21  OVERFIT"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Now the textbook picture appears. The line and depth 1 underfit (low train score). Depth 3 has the best test score (0.83). From depth 5 the tree reaches train 1.00 while the test score drops, so the gap grows: overfitting."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "The verdict() thresholds (train below 0.9, gap above 0.2) are rules of thumb for this lesson, not laws. Always look at the numbers too."
+        }
+      ]
+    },
+    {
+      "id": "poly",
+      "icon": "📈",
+      "title": "Underfitting vs Overfitting with Curves",
+      "meta": "Complexity you can dial",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A polynomial model fits a curve. Degree 1 is a straight line, higher degrees bend more and more. A pipeline chains the steps (make powers of hours, scale them, fit a line):"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "polynomial.py",
+          "code": "from sklearn.preprocessing import PolynomialFeatures, StandardScaler\nfrom sklearn.pipeline import make_pipeline\n\ndef poly_model(degree):\n    return make_pipeline(PolynomialFeatures(degree), StandardScaler(), LinearRegression())\n\nfor degree in [1, 2, 3, 5, 8, 10]:\n    show(f\"Polynomial degree {degree}\", lambda: poly_model(degree))",
+          "output": "Polynomial degree 1  train 0.85  test 0.64  gap 0.20  underfit\nPolynomial degree 2  train 0.96  test 0.89  gap 0.07  good fit\nPolynomial degree 3  train 0.97  test 0.89  gap 0.08  good fit\nPolynomial degree 5  train 0.97  test 0.89  gap 0.09  good fit\nPolynomial degree 8  train 0.98  test 0.54  gap 0.43  OVERFIT\nPolynomial degree 10 train 0.98  test 0.58  gap 0.40  OVERFIT"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Degree 2 and 3 fit well (test 0.89). Degree 8 and 10 have a better train score but the test score collapses to about 0.55: they are wiggling through the noise. More complexity helped training and hurt reality."
+        }
+      ]
+    },
+    {
+      "id": "bias",
+      "icon": "🔥",
+      "title": "Step 7: Bias-Variance Intuition",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Problem",
+            "Meaning",
+            "Symptom"
+          ],
+          "rows": [
+            [
+              "Underfitting",
+              "High bias: the model is too rigid, so it is consistently off in the same direction",
+              "Poor train and test scores"
+            ],
+            [
+              "Overfitting",
+              "High variance: the model changes a lot depending on which training data it saw",
+              "Great train score, poor test score"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Let us measure both. Train each model on 30 different random 70% subsets and predict marks for a student who studies 7 hours. The true curve value there is 76.3:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "bias_variance.py",
+          "code": "x0 = pd.DataFrame({\"hours\": [7.0]})\ntruth = 25 + 65 * (1 - np.exp(-7 / 4.5))\nprint(\"True value at 7 hours:\", round(truth, 1))\n\nmodels = {\n    \"Straight line\": LinearRegression,\n    \"Tree depth 3\": lambda: DecisionTreeRegressor(max_depth=3, random_state=42),\n    \"Tree depth None\": lambda: DecisionTreeRegressor(random_state=42),\n}\nprint()\nfor name, make_model in models.items():\n    predictions = []\n    for seed in range(30):\n        X_tr, _, y_tr, _ = train_test_split(df_curve[[\"hours\"]], df_curve[\"marks\"], test_size=0.3, random_state=seed)\n        predictions.append(make_model().fit(X_tr, y_tr).predict(x0)[0])\n    print(f\"{name:16} average prediction {np.mean(predictions):5.1f} (off by {np.mean(predictions) - truth:+.1f}) | spread {np.std(predictions):.2f}\")",
+          "output": "True value at 7 hours: 76.3\n\nStraight line    average prediction  70.0 (off by -6.3) | spread 0.86\nTree depth 3     average prediction  75.2 (off by -1.1) | spread 1.35\nTree depth None  average prediction  76.7 (off by +0.4) | spread 2.00"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The straight line is stubbornly off (high bias, about 6 marks low) but steady (spread 0.86). The unlimited tree is right on average but its answer jumps around the most (spread 2.0): high variance. Depth 3 sits in between. Balancing the two is the whole game."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Smart Student Predictor",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Compare a deep tree and a shallow tree with train and test scores, and let the program judge each one:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "smart_predictor.py",
+          "code": "X_train, X_test, y_train, y_test = train_test_split(\n    df_curve[[\"hours\"]], df_curve[\"marks\"], test_size=0.3, random_state=42)\n\ndef fit_report(name, model):\n    model.fit(X_train, y_train)\n    train, test = model.score(X_train, y_train), model.score(X_test, y_test)\n    print(f\"{name:14} train {train:.2f} | test {test:.2f} | gap {train - test:.2f} -> {verdict(train, test)}\")\n\nfit_report(\"Deep tree\", DecisionTreeRegressor(max_depth=None, random_state=42))\nfit_report(\"Shallow tree\", DecisionTreeRegressor(max_depth=2, random_state=42))\nfit_report(\"Medium tree\", DecisionTreeRegressor(max_depth=3, random_state=42))",
+          "output": "Deep tree      train 1.00 | test 0.90 | gap 0.10 -> good fit\nShallow tree   train 0.94 | test 0.61 | gap 0.33 -> OVERFIT\nMedium tree    train 0.99 | test 0.85 | gap 0.14 -> good fit"
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "icon": "💡",
+      "title": "Challenge: Try Different Depths",
+      "meta": "Very important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Test max_depth 1, 3 and 5 on the noisy data and find the best balance. The best depth is the one with the highest TEST score, not the highest train score:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "best_depth.py",
+          "code": "results = {}\nfor depth in [1, 3, 5]:\n    tr, te = scores(lambda: DecisionTreeRegressor(max_depth=depth, random_state=42))\n    results[depth] = te\n    print(f\"max_depth={depth}: train {tr:.2f} | test {te:.2f}\")\n\nbest = max(results, key=results.get)\nprint(\"\\nBest balance: max_depth =\", best)",
+          "output": "max_depth=1: train 0.74 | test 0.45\nmax_depth=3: train 0.99 | test 0.83\nmax_depth=5: train 1.00 | test 0.79\n\nBest balance: max_depth = 3"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Depth 1 underfits, depth 5 starts to overfit, depth 3 balances. In real projects you pick the setting with the best test (or cross-validation) score."
+        }
+      ]
+    },
+    {
+      "id": "truth",
+      "icon": "🏭",
+      "title": "Real-World Insight and Industry Truth",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Most ML engineering is not choosing fancy models. It is controlling overfitting. A model with 99% train performance and 60% test performance is bad. Here is the toolbox:"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Remedy",
+            "How"
+          ],
+          "rows": [
+            [
+              "Simplify the model",
+              "Lower max_depth, lower polynomial degree"
+            ],
+            [
+              "Get more data",
+              "More rows make memorizing harder"
+            ],
+            [
+              "Limit the leaves",
+              "min_samples_leaf stops tiny leaves"
+            ],
+            [
+              "Validate properly",
+              "Always judge by test data, and later by cross-validation"
+            ],
+            [
+              "Remove noisy or useless features",
+              "Fewer distractions to memorize"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Never judge a model by its training score alone."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Underfitting is too simple, overfitting is too complex",
+            "How to detect both by comparing train and test scores",
+            "Overfitting needs noise: clean data can hide it",
+            "The bias-variance trade-off in numbers",
+            "Choose complexity by the best test score"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Smart Student Predictor: Fit Check",
+    "file": "day13_final.py",
+    "description": "One program combining Day 13: models of rising complexity compared on train and test scores (averaged over 10 splits), an automatic underfit / good fit / overfit verdict, the best model by test score and a plot of three fits.",
+    "concepts": [
+      "underfitting",
+      "overfitting",
+      "train vs test score",
+      "R²",
+      "max_depth",
+      "polynomial degree",
+      "pipeline"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.preprocessing import PolynomialFeatures, StandardScaler\nfrom sklearn.pipeline import make_pipeline\n\n# 1. DATA: noisy, curved (marks rise then level off)\ndata_curve = {\n    \"hours\": [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0],\n    \"marks\": [33, 37, 51, 48, 53, 61, 57, 62, 67, 68, 67, 72, 74, 78, 73, 77, 84, 87, 78, 85, 81, 82, 82, 84, 89, 89, 87, 86, 87, 87]\n}\ndf = pd.DataFrame(data_curve)\nprint(\"=== SMART STUDENT PREDICTOR: FIT CHECK ===\")\nprint(df.head(3))\n\n# 2. HELPERS\ndef scores(make_model):\n    train_scores, test_scores = [], []\n    for seed in range(10):\n        X_tr, X_te, y_tr, y_te = train_test_split(df[[\"hours\"]], df[\"marks\"], test_size=0.3, random_state=seed)\n        model = make_model().fit(X_tr, y_tr)\n        train_scores.append(model.score(X_tr, y_tr))\n        test_scores.append(model.score(X_te, y_te))\n    return np.mean(train_scores), np.mean(test_scores)\n\ndef verdict(train, test):\n    if train < 0.9:\n        return \"underfit\"\n    if train - test > 0.2:\n        return \"OVERFIT\"\n    return \"good fit\"\n\ndef poly_model(degree):\n    return make_pipeline(PolynomialFeatures(degree), StandardScaler(), LinearRegression())\n\n# 3. COMPARE MODELS OF INCREASING COMPLEXITY (average of 10 splits)\ncandidates = [\n    (\"Straight line\", LinearRegression),\n    (\"Tree depth 1\", lambda: DecisionTreeRegressor(max_depth=1, random_state=42)),\n    (\"Tree depth 3\", lambda: DecisionTreeRegressor(max_depth=3, random_state=42)),\n    (\"Tree depth None\", lambda: DecisionTreeRegressor(random_state=42)),\n    (\"Polynomial deg 2\", lambda: poly_model(2)),\n    (\"Polynomial deg 10\", lambda: poly_model(10)),\n]\nprint(\"\\nModel                train  test   gap   verdict\")\nbest_name, best_test = None, -1\nfor name, make_model in candidates:\n    tr, te = scores(make_model)\n    print(f\"{name:18} {tr:6.2f} {te:5.2f} {tr - te:5.2f}   {verdict(tr, te)}\")\n    if te > best_test:\n        best_name, best_test = name, te\nprint(\"\\nBest model by TEST score:\", best_name, f\"({best_test:.2f})\")\n\n# 4. DRAW THREE FITS ON ONE SPLIT\nX_train, X_test, y_train, y_test = train_test_split(df[[\"hours\"]], df[\"marks\"], test_size=0.3, random_state=42)\ngrid = pd.DataFrame({\"hours\": np.linspace(0.5, 15, 200)})\nplt.scatter(X_train, y_train, color=\"blue\", label=\"Train data\")\nplt.scatter(X_test, y_test, color=\"orange\", s=90, label=\"Test data\")\nfor name, make_model, color in [(\"Straight line (underfit)\", LinearRegression, \"gray\"),\n                                (\"Tree depth 3 (good)\", lambda: DecisionTreeRegressor(max_depth=3, random_state=42), \"green\"),\n                                (\"Polynomial deg 10 (overfit)\", lambda: poly_model(10), \"red\")]:\n    plt.plot(grid[\"hours\"], make_model().fit(X_train, y_train).predict(grid), color=color, label=name)\nplt.xlabel(\"Hours Studied\")\nplt.ylabel(\"Marks\")\nplt.title(\"Underfit, good fit and overfit\")\nplt.legend()\nplt.show()",
+    "output": "=== SMART STUDENT PREDICTOR: FIT CHECK ===\n   hours  marks\n0    0.5     33\n1    1.0     37\n2    1.5     51\n\nModel                train  test   gap   verdict\nStraight line        0.85  0.64  0.20   underfit\nTree depth 1         0.74  0.45  0.29   underfit\nTree depth 3         0.99  0.83  0.16   good fit\nTree depth None      1.00  0.79  0.21   OVERFIT\nPolynomial deg 2     0.96  0.89  0.07   good fit\nPolynomial deg 10    0.98  0.58  0.40   OVERFIT\n\nBest model by TEST score: Polynomial deg 2 (0.89)"
+  },
+  "practice": [
+    {
+      "title": "Ad Spend Depth Detector",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Sales grow with advertising spend, then level off. Find the tree depth that balances the fit.",
+      "tasks": [
+        "Create the DataFrame",
+        "Write scores(depth) returning the average train and test R² over 10 splits (test_size=0.3, random_state 0 to 9)",
+        "Print train, test and the verdict for depths 1, 2, 3, 5 and None",
+        "Find the depth with the best test score",
+        "Say which depths underfit and which overfit"
+      ],
+      "hint": "Use DecisionTreeRegressor(max_depth=depth, random_state=42) and model.score(...). Pick the best with max(results, key=results.get).",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeRegressor\n\ndata = {\n    \"ad_spend\": [1.0, 2.0, 2.9, 3.9, 4.8, 5.8, 6.8, 7.7, 8.7, 9.6, 10.6, 11.6, 12.5, 13.5, 14.4, 15.4, 16.4, 17.3, 18.3, 19.2, 20.2, 21.2, 22.1, 23.1, 24.0, 25.0],\n    \"sales\": [63, 69, 91, 86, 119, 109, 132, 138, 139, 178, 152, 167, 176, 159, 186, 176, 189, 173, 174, 196, 192, 190, 196, 196, 182, 173]\n}\n\ndef verdict(train, test):\n    if train < 0.9:\n        return \"underfit\"\n    if train - test > 0.2:\n        return \"OVERFIT\"\n    return \"good fit\"\n\n# TODO 1: DataFrame\n\n# TODO 2: scores(depth)\n\n# TODO 3: print the table for depths 1, 2, 3, 5, None\n\n# TODO 4: best depth by test score",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeRegressor\n\ndata = {\n    \"ad_spend\": [1.0, 2.0, 2.9, 3.9, 4.8, 5.8, 6.8, 7.7, 8.7, 9.6, 10.6, 11.6, 12.5, 13.5, 14.4, 15.4, 16.4, 17.3, 18.3, 19.2, 20.2, 21.2, 22.1, 23.1, 24.0, 25.0],\n    \"sales\": [63, 69, 91, 86, 119, 109, 132, 138, 139, 178, 152, 167, 176, 159, 186, 176, 189, 173, 174, 196, 192, 190, 196, 196, 182, 173]\n}\ndf = pd.DataFrame(data)\n\ndef verdict(train, test):\n    if train < 0.9:\n        return \"underfit\"\n    if train - test > 0.2:\n        return \"OVERFIT\"\n    return \"good fit\"\n\ndef scores(depth):\n    train_scores, test_scores = [], []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[[\"ad_spend\"]], df[\"sales\"], test_size=0.3, random_state=seed)\n        model = DecisionTreeRegressor(max_depth=depth, random_state=42).fit(X_train, y_train)\n        train_scores.append(model.score(X_train, y_train))\n        test_scores.append(model.score(X_test, y_test))\n    return np.mean(train_scores), np.mean(test_scores)\n\nresults = {}\nfor depth in [1, 2, 3, 5, None]:\n    train, test = scores(depth)\n    results[depth] = test\n    print(f\"depth {str(depth):4} train {train:.2f} | test {test:.2f} | {verdict(train, test)}\")\n\nprint(\"\\nBest depth by test score:\", max(results, key=results.get))",
+      "output": "depth 1    train 0.77 | test 0.65 | underfit\ndepth 2    train 0.94 | test 0.76 | good fit\ndepth 3    train 0.98 | test 0.79 | good fit\ndepth 5    train 1.00 | test 0.79 | OVERFIT\ndepth None train 1.00 | test 0.78 | OVERFIT\n\nBest depth by test score: 5"
+    },
+    {
+      "title": "Sleep and Performance Curves",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Performance rises with sleep up to about 7.5 hours, then falls (an upside-down U). A straight line cannot capture that.",
+      "tasks": [
+        "Create the DataFrame",
+        "Build poly_model(degree) as a pipeline: PolynomialFeatures, StandardScaler, LinearRegression",
+        "Print train, test and the verdict (averaged over 10 splits, test_size=0.3) for degrees 1, 2, 4 and 9",
+        "Find the best degree by test score",
+        "Explain why degree 1 underfits and degree 9 overfits"
+      ],
+      "hint": "Pipeline: make_pipeline(PolynomialFeatures(degree), StandardScaler(), LinearRegression()). The score() of a pipeline is R².",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.preprocessing import PolynomialFeatures, StandardScaler\nfrom sklearn.pipeline import make_pipeline\n\ndata = {\n    \"sleep_hours\": [3.0, 3.4, 3.8, 4.1, 4.5, 4.9, 5.2, 5.6, 6.0, 6.4, 6.8, 7.1, 7.5, 7.9, 8.2, 8.6, 9.0, 9.4, 9.8, 10.1, 10.5, 10.9, 11.2, 11.6, 12.0],\n    \"performance\": [27, 38, 53, 49, 67, 62, 74, 79, 90, 88, 87, 98, 100, 88, 94, 86, 86, 82, 69, 71, 58, 50, 46, 28, 20]\n}\n\ndef verdict(train, test):\n    if train < 0.9:\n        return \"underfit\"\n    if train - test > 0.2:\n        return \"OVERFIT\"\n    return \"good fit\"\n\n# TODO 1: DataFrame\n\n# TODO 2: poly_model(degree) pipeline\n\n# TODO 3: table for degrees 1, 2, 4, 9 over 10 splits\n\n# TODO 4: best degree",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.preprocessing import PolynomialFeatures, StandardScaler\nfrom sklearn.pipeline import make_pipeline\n\ndata = {\n    \"sleep_hours\": [3.0, 3.4, 3.8, 4.1, 4.5, 4.9, 5.2, 5.6, 6.0, 6.4, 6.8, 7.1, 7.5, 7.9, 8.2, 8.6, 9.0, 9.4, 9.8, 10.1, 10.5, 10.9, 11.2, 11.6, 12.0],\n    \"performance\": [27, 38, 53, 49, 67, 62, 74, 79, 90, 88, 87, 98, 100, 88, 94, 86, 86, 82, 69, 71, 58, 50, 46, 28, 20]\n}\ndf = pd.DataFrame(data)\n\ndef verdict(train, test):\n    if train < 0.9:\n        return \"underfit\"\n    if train - test > 0.2:\n        return \"OVERFIT\"\n    return \"good fit\"\n\ndef poly_model(degree):\n    return make_pipeline(PolynomialFeatures(degree), StandardScaler(), LinearRegression())\n\nresults = {}\nfor degree in [1, 2, 4, 9]:\n    train_scores, test_scores = [], []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[[\"sleep_hours\"]], df[\"performance\"], test_size=0.3, random_state=seed)\n        model = poly_model(degree).fit(X_train, y_train)\n        train_scores.append(model.score(X_train, y_train))\n        test_scores.append(model.score(X_test, y_test))\n    train, test = np.mean(train_scores), np.mean(test_scores)\n    results[degree] = test\n    print(f\"degree {degree}: train {train:.2f} | test {test:.2f} | {verdict(train, test)}\")\n\nprint(\"\\nBest degree by test score:\", max(results, key=results.get))",
+      "output": "degree 1: train 0.03 | test -0.21 | underfit\ndegree 2: train 0.97 | test 0.94 | good fit\ndegree 4: train 0.98 | test 0.93 | good fit\ndegree 9: train 0.98 | test 0.88 | good fit\n\nBest degree by test score: 2"
+    }
+  ],
+  "checklist": [
+    "Understood underfitting vs overfitting",
+    "Compared train and test scores",
+    "Saw complexity change with max_depth",
+    "Used noisy data to see real overfitting",
+    "Understood bias and variance",
+    "Compared deep and shallow trees",
+    "Picked the best depth by test score"
+  ],
+  "quiz": [
+    {
+      "q": "Train score 0.99 and test score 0.60 most likely means:",
+      "options": [
+        "Underfitting",
+        "Overfitting",
+        "A perfect model",
+        "Bad scaling"
+      ],
+      "answer": 1,
+      "why": "A large gap between a great train score and a poor test score means the model memorized the training data."
+    },
+    {
+      "q": "A straight line fitted to clearly curved data is:",
+      "options": [
+        "Overfitting",
+        "Underfitting (high bias)",
+        "A perfect fit",
+        "High variance"
+      ],
+      "answer": 1,
+      "why": "The model is too simple, so it misses the pattern and scores poorly on both train and test."
+    },
+    {
+      "q": "Which max_depth should you choose?",
+      "options": [
+        "The highest train score",
+        "The one with the best test score",
+        "Always 1",
+        "Always None"
+      ],
+      "answer": 1,
+      "why": "Complexity is chosen by performance on unseen data, not by training performance."
+    },
+    {
+      "q": "Why did the unlimited tree NOT overfit on the perfectly clean 8 row dataset?",
+      "options": [
+        "Trees never overfit",
+        "There was no noise to memorize",
+        "The test set was larger",
+        "Because scaling was used"
+      ],
+      "answer": 1,
+      "why": "Overfitting means learning noise. With perfectly regular data, memorizing and learning the pattern are the same thing."
+    }
+  ]
 }
   ]
 };
