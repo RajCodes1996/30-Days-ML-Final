@@ -6657,5 +6657,558 @@ Average used to fill: 245.0
     }
   ]
 },
+
+// DAY 15 snippet. In course-data.js: add a comma after Day 14's closing }, then paste this object. Also unzip day15-images.zip into your images/ folder (images/day15/).
+{
+  "day": 15,
+  "title": "Random Forest: Ensemble Learning",
+  "subtitle": "Combine many decision trees into a Random Forest, see why it generalizes better than one tree and compare models honestly on unseen data.",
+  "level": "Intermediate",
+  "duration": "2 hours",
+  "tags": [
+    "Random Forest",
+    "Ensemble Learning",
+    "n_estimators",
+    "Feature Importance",
+    "Model Comparison"
+  ],
+  "goals": [
+    "Understand what ensemble learning is",
+    "See how Random Forest combines many decision trees",
+    "Understand why it often generalizes better than a single tree",
+    "Compare models using unseen test data"
+  ],
+  "sections": [
+    {
+      "id": "concept",
+      "icon": "🧠",
+      "title": "Step 1: Understand the Concept",
+      "meta": "Ensemble learning",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A single Decision Tree is one set of rules, and one unusual training row can change them a lot. A Random Forest builds many different trees and combines them. For regression it averages their predictions."
+        },
+        {
+          "type": "image",
+          "src": "images/day15/concept.png",
+          "alt": "One tree gives one prediction while a forest of trees averages many",
+          "caption": "Many trees each give an answer, and the forest averages them"
+        },
+        {
+          "type": "table",
+          "head": [
+            "",
+            "Decision Tree",
+            "Random Forest"
+          ],
+          "rows": [
+            [
+              "Number of trees",
+              "1",
+              "Many (n_estimators)"
+            ],
+            [
+              "Prediction",
+              "The leaf's average",
+              "The average of all trees' predictions"
+            ],
+            [
+              "Overfits easily?",
+              "Yes, if deep",
+              "Much less, because averaging cancels individual mistakes"
+            ],
+            [
+              "Easy to read?",
+              "Yes",
+              "No, 100 trees are hard to read"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "head": [
+            "Why trees differ inside a forest",
+            "How"
+          ],
+          "rows": [
+            [
+              "Different rows",
+              "Each tree trains on a random sample of the rows (a bootstrap sample)"
+            ],
+            [
+              "Different features",
+              "At each split a tree only considers a random subset of the features"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Ensemble learning means many weak or unstable models voting together. The errors of individual trees point in different directions, so the average is steadier."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Prepare the Dataset",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day15_forest.py",
+          "code": "import pandas as pd\n\ndata = {\n    \"hours_studied\": [1, 2, 3, 4, 5, 6, 7, 8, 2, 6, 4, 7],\n    \"sleep_hours\":   [5, 6, 6, 7, 7, 8, 8, 9, 5, 7, 8, 6],\n    \"attendance\":    [45, 55, 60, 70, 75, 85, 90, 98, 50, 80, 65, 92],\n    \"marks\":         [25, 35, 42, 55, 65, 75, 85, 95, 30, 72, 58, 88]\n}\ndf = pd.DataFrame(data)\nX = df[[\"hours_studied\", \"sleep_hours\", \"attendance\"]]\ny = df[\"marks\"]\nprint(df.head())",
+          "output": "   hours_studied  sleep_hours  attendance  marks\n0              1            5          45     25\n1              2            6          55     35\n2              3            6          60     42\n3              4            7          70     55\n4              5            7          75     65"
+        },
+        {
+          "type": "p",
+          "text": "Your task: use the three input features to predict marks."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "⚡",
+      "title": "Step 3: Split the Data",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split.py",
+          "code": "from sklearn.model_selection import train_test_split\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)\n\nprint(\"Train rows:\", len(X_train), \"| Test rows:\", len(X_test))\nprint(\"Test students' marks:\", list(y_test))",
+          "output": "Train rows: 9 | Test rows: 3\nTest students' marks: [58, 72, 25]"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Only 3 test students. Every number in this lesson that comes from this split is shaky, so we will also repeat the comparison on many splits and on a bigger dataset."
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "icon": "⚡",
+      "title": "Step 4: Train Both Models",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train.py",
+          "code": "from sklearn.tree import DecisionTreeRegressor\nfrom sklearn.ensemble import RandomForestRegressor\n\ntree = DecisionTreeRegressor(max_depth=3, random_state=42)\nforest = RandomForestRegressor(n_estimators=100, max_depth=3, random_state=42)\n\ntree.fit(X_train, y_train)\nforest.fit(X_train, y_train)\nprint(\"Both models trained successfully!\")\nprint(\"Trees inside the forest:\", len(forest.estimators_))",
+          "output": "Both models trained successfully!\nTrees inside the forest: 100"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Parameter",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "n_estimators=100",
+              "Build 100 trees in the forest"
+            ],
+            [
+              "max_depth=3",
+              "Limit each tree's depth"
+            ],
+            [
+              "random_state=42",
+              "Make the experiment repeatable (the random samples are fixed)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "evaluate",
+      "icon": "📊",
+      "title": "Step 5: Evaluate the Models",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "evaluate.py",
+          "code": "from sklearn.metrics import mean_absolute_error, r2_score\n\nmodels = {\"Decision Tree\": tree, \"Random Forest\": forest}\n\nfor name, model in models.items():\n    train_pred = model.predict(X_train)\n    test_pred = model.predict(X_test)\n    print(f\"\\n{name}\")\n    print(\"Train MAE:\", round(mean_absolute_error(y_train, train_pred), 2))\n    print(\"Test MAE:\", round(mean_absolute_error(y_test, test_pred), 2))\n    print(\"Test R²:\", round(r2_score(y_test, test_pred), 3))",
+          "output": "\nDecision Tree\nTrain MAE: 0.89\nTest MAE: 10.17\nTest R²: 0.69\n\nRandom Forest\nTrain MAE: 2.54\nTest MAE: 5.01\nTest R²: 0.913"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Metric",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "Train MAE",
+              "Average error on training data"
+            ],
+            [
+              "Test MAE",
+              "Average error on unseen test data (lower is better)"
+            ],
+            [
+              "Test R²",
+              "How much of the variation in test marks is explained (can be negative)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "On this split the forest wins clearly (test error 5.01 against 10.17). Notice the single tree has the tiny train error (0.89) but the bigger test error: it fits the training rows tightly and travels worse. With 3 test students, treat this as a first look, not proof."
+        }
+      ]
+    },
+    {
+      "id": "inside",
+      "icon": "🔍",
+      "title": "Inside the Forest",
+      "meta": "How the forest decides",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "inside_forest.py",
+          "code": "import numpy as np\n\nstudent = pd.DataFrame([{\"hours_studied\": 5, \"sleep_hours\": 7, \"attendance\": 80}])\n\n# Each tree inside the forest votes\nvotes = np.array([t.predict(student.to_numpy())[0] for t in forest.estimators_])\n\nprint(\"Lowest vote :\", round(votes.min(), 1))\nprint(\"Highest vote:\", round(votes.max(), 1))\nprint(\"Average of the 100 trees:\", round(votes.mean(), 2))\nprint(\"forest.predict gives    :\", round(forest.predict(student)[0], 2))\nprint(\"Single tree gives       :\", round(tree.predict(student)[0], 2))",
+          "output": "Lowest vote : 42.0\nHighest vote: 88.0\nAverage of the 100 trees: 64.4\nforest.predict gives    : 64.4\nSingle tree gives       : 65.0"
+        },
+        {
+          "type": "image",
+          "src": "images/day15/tree_votes.png",
+          "alt": "Histogram of the predictions of 100 trees with the forest average and the single tree",
+          "caption": "Individual trees disagree widely, yet their average is close to the single tree here"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The forest's prediction is exactly the average of its trees' votes. Individual trees can be far off (42 to 88 here), but the mistakes cancel out. Averaging is the whole trick."
+        }
+      ]
+    },
+    {
+      "id": "fair",
+      "icon": "🔬",
+      "title": "A Fair Comparison",
+      "meta": "Many splits, bigger data",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First the 12-student dataset over 10 different splits, then a bigger and noisier dataset of 60 students. Linear Regression joins as a baseline:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "fair_test.py",
+          "code": "from sklearn.linear_model import LinearRegression\n\ndef avg_test_mae(make_model, X_all, y_all, test_size=0.25):\n    errors = []\n    for seed in range(10):\n        X_tr, X_te, y_tr, y_te = train_test_split(X_all, y_all, test_size=test_size, random_state=seed)\n        model = make_model().fit(X_tr, y_tr)\n        errors.append(mean_absolute_error(y_te, model.predict(X_te)))\n    return np.mean(errors), np.std(errors)\n\ndata60 = {\n    \"hours_studied\": [3.3, 8.7, 7.2, 8.9, 2.7, 2.1, 8.3, 1.5, 1.6, 5.3, 1.7, 4.1, 6.3, 4.4, 1.4, 2.6, 4.6, 1.5, 3.4, 8.5, 3.3, 3.1, 4.3, 7.6, 5.1, 3.2, 3.7, 8.8, 2.5, 2.9, 6.5, 4.1, 4.7, 6.4, 1.7, 2.9, 5.2, 1.6, 1.7, 1.7, 3.6, 8.3, 7.7, 7.0, 4.8, 7.9, 3.2, 1.7, 2.2, 5.0, 3.4, 3.4, 1.1, 5.6, 6.7, 4.3, 2.3, 2.7, 7.1, 3.9],\n    \"sleep_hours\": [5.9, 7.8, 8.3, 7.7, 6.0, 6.1, 6.8, 6.3, 8.3, 8.1, 4.4, 5.6, 6.1, 7.3, 7.2, 6.6, 5.8, 4.2, 4.2, 7.9, 4.9, 6.0, 8.1, 6.2, 6.7, 4.1, 6.2, 6.3, 5.6, 7.1, 5.2, 4.8, 5.9, 7.2, 5.8, 6.8, 7.9, 7.4, 8.5, 7.9, 5.8, 8.9, 8.5, 6.8, 6.9, 6.4, 5.7, 4.4, 5.5, 4.3, 5.5, 4.8, 8.1, 8.5, 8.5, 8.8, 6.3, 6.3, 8.9, 5.6],\n    \"attendance\": [76, 62, 70, 79, 66, 98, 99, 57, 63, 73, 52, 58, 61, 91, 52, 85, 74, 77, 70, 92, 93, 61, 83, 62, 89, 60, 87, 98, 50, 57, 100, 62, 68, 77, 73, 53, 86, 57, 97, 52, 56, 90, 73, 97, 90, 63, 95, 69, 62, 60, 97, 54, 75, 52, 76, 66, 57, 61, 63, 51],\n    \"marks\": [37, 68, 67, 83, 38, 44, 88, 31, 39, 49, 23, 44, 55, 56, 34, 50, 44, 33, 30, 82, 48, 40, 50, 69, 54, 29, 50, 83, 39, 40, 72, 44, 54, 64, 33, 36, 61, 39, 46, 31, 42, 81, 69, 88, 56, 70, 44, 37, 35, 45, 59, 40, 35, 49, 64, 60, 41, 36, 65, 49]\n}\ndf60 = pd.DataFrame(data60)\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\n\ncandidates = [\n    (\"Linear Regression\", LinearRegression),\n    (\"Decision Tree (depth 3)\", lambda: DecisionTreeRegressor(max_depth=3, random_state=42)),\n    (\"Decision Tree (no limit)\", lambda: DecisionTreeRegressor(random_state=42)),\n    (\"Random Forest (depth 3)\", lambda: RandomForestRegressor(n_estimators=100, max_depth=3, random_state=42)),\n    (\"Random Forest (no limit)\", lambda: RandomForestRegressor(n_estimators=100, random_state=42)),\n]\n\nfor title, X_all, y_all in [(\"12 students\", X, y), (\"60 students\", df60[features], df60[\"marks\"])]:\n    print(title, \"(average test MAE, spread)\")\n    for name, make_model in candidates:\n        mae, spread = avg_test_mae(make_model, X_all, y_all)\n        print(f\"  {name:26} {mae:5.2f}  ({spread:.2f})\")",
+          "output": "12 students (average test MAE, spread)\n  Linear Regression           2.46  (1.40)\n  Decision Tree (depth 3)     8.75  (4.96)\n  Decision Tree (no limit)    8.40  (4.98)\n  Random Forest (depth 3)     5.76  (2.69)\n  Random Forest (no limit)    5.78  (2.77)\n60 students (average test MAE, spread)\n  Linear Regression           3.85  (0.76)\n  Decision Tree (depth 3)     4.81  (1.11)\n  Decision Tree (no limit)    6.02  (0.89)\n  Random Forest (depth 3)     4.18  (0.61)\n  Random Forest (no limit)    4.29  (0.64)"
+        },
+        {
+          "type": "image",
+          "src": "images/day15/compare_bar.png",
+          "alt": "Bar chart of average test error for five models on 60 students",
+          "caption": "60 students: forests beat single trees and have a smaller spread. Linear Regression still wins"
+        }
+      ]
+    },
+    {
+      "id": "insights",
+      "icon": "🧠",
+      "title": "What the Comparison Shows",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Finding",
+            "Evidence"
+          ],
+          "rows": [
+            [
+              "A forest beats a single tree",
+              "12 students: 5.76 vs 8.75. 60 students: 4.18 vs 4.81 for depth 3, and 4.29 vs 6.02 with no depth limit"
+            ],
+            [
+              "A forest is steadier",
+              "Its spread across splits is smaller (60 students: 0.61 vs 1.11)"
+            ],
+            [
+              "A forest resists overfitting",
+              "With no depth limit it scores 4.29, almost the same as depth 3 (4.18), while an unlimited tree falls to 6.02"
+            ],
+            [
+              "Random Forest does NOT always win",
+              "Linear Regression is best (2.46 and 3.85) because these marks follow a smooth, nearly straight-line rule"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Pick the model by test performance, never by reputation. Forests shine when relationships are bumpy, have interactions or thresholds, and when you cannot guess the formula."
+        }
+      ]
+    },
+    {
+      "id": "smooth",
+      "icon": "📈",
+      "title": "Forests are Smoother",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "smooth.py",
+          "code": "cv_hours = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0]\ncv_marks = [33, 37, 51, 48, 53, 61, 57, 62, 67, 68, 67, 72, 74, 78, 73, 77, 84, 87, 78, 85, 81, 82, 82, 84, 89, 89, 87, 86, 87, 87]\ncurve = pd.DataFrame({\"hours\": cv_hours, \"marks\": cv_marks})\n\ndeep_tree = DecisionTreeRegressor(random_state=42).fit(curve[[\"hours\"]], curve[\"marks\"])\nbig_forest = RandomForestRegressor(n_estimators=100, random_state=42).fit(curve[[\"hours\"]], curve[\"marks\"])\n\nimport matplotlib.pyplot as plt\ngrid = pd.DataFrame({\"hours\": np.linspace(0.5, 15, 300)})\nplt.scatter(curve[\"hours\"], curve[\"marks\"], color=\"gray\", label=\"Noisy data\")\nplt.plot(grid[\"hours\"], deep_tree.predict(grid), color=\"red\", label=\"Single deep tree\")\nplt.plot(grid[\"hours\"], big_forest.predict(grid), color=\"green\", label=\"Random Forest\")\nplt.xlabel(\"Hours Studied\")\nplt.ylabel(\"Marks\")\nplt.title(\"One tree vs a forest on noisy data\")\nplt.legend()\nplt.show()"
+        },
+        {
+          "type": "image",
+          "src": "images/day15/curve_fit.png",
+          "alt": "A jagged single tree line and a slightly smoother forest line through noisy points",
+          "caption": "The forest follows the trend a little more smoothly. The single tree jumps at every noisy point"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The forest still looks steppy because trees predict in steps. But averaging 100 slightly different step functions rounds off the sharpest jumps."
+        }
+      ]
+    },
+    {
+      "id": "trees",
+      "icon": "🌲",
+      "title": "How Many Trees?",
+      "meta": "n_estimators",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "n_estimators.py",
+          "code": "print(\"Trees   avg test MAE (60 students)\")\nfor k in [1, 5, 25, 100, 200]:\n    mae, spread = avg_test_mae(lambda: RandomForestRegressor(n_estimators=k, random_state=42), df60[features], df60[\"marks\"])\n    print(f\"{k:5} {mae:10.2f}\")",
+          "output": "Trees   avg test MAE (60 students)\n    1       6.07\n    5       4.45\n   25       4.27\n  100       4.29\n  200       4.29"
+        },
+        {
+          "type": "image",
+          "src": "images/day15/n_estimators.png",
+          "alt": "Line chart of test error against number of trees that flattens out",
+          "caption": "One tree is the same as a single tree. The error drops fast, then levels off after about 25 trees"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "More trees never hurt accuracy, they only cost time and memory. Around 100 is a good default."
+        }
+      ]
+    },
+    {
+      "id": "importance",
+      "icon": "⭐",
+      "title": "Which Features Matter?",
+      "meta": "A bonus of forests",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "importance.py",
+          "code": "final_forest = RandomForestRegressor(n_estimators=100, random_state=42).fit(df60[features], df60[\"marks\"])\n\nimportance = pd.Series(final_forest.feature_importances_, index=features).round(2)\nprint(importance.sort_values(ascending=False))",
+          "output": "hours_studied    0.85\nattendance       0.11\nsleep_hours      0.04\ndtype: float64"
+        },
+        {
+          "type": "image",
+          "src": "images/day15/importance.png",
+          "alt": "Horizontal bar chart of feature importance",
+          "caption": "Study hours dominate the forest's decisions"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Feature importance shows what the forest USES, not a law of nature. Features that are correlated share the credit (here attendance also affects how much studying counts), so read it as a hint, not a proof."
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "icon": "⚡",
+      "title": "Step 6: Accept User Input",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "user_input.py",
+          "code": "hours = float(input(\"Hours studied: \"))\nsleep = float(input(\"Sleep hours: \"))\nattendance = float(input(\"Attendance percentage: \"))\n\nstudent = pd.DataFrame([{\n    \"hours_studied\": hours,\n    \"sleep_hours\": sleep,\n    \"attendance\": attendance\n}])\n\ntree_prediction = tree.predict(student)[0]\nforest_prediction = forest.predict(student)[0]\n\nprint(\"\\nDecision Tree prediction:\", round(tree_prediction, 2))\nprint(\"Random Forest prediction:\", round(forest_prediction, 2))"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Example: enter 5, 7 and 80 and you get Decision Tree 65.0 and Random Forest 64.4. These are educational estimates, not guarantees. The workspace asks for each value in a pop-up box."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Trees never predict outside the marks they were trained on (the forest here stays between 25 and 95), which is a handy safety net for impossible values."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Student Performance Predictor v3",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Student Predictor v3 compares a single Decision Tree with a Random Forest (and Linear Regression as a baseline) on unseen data, then predicts for new students with all three. It is the Final Program below."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Ensemble learning: many models voting beat one unstable model",
+            "A Random Forest averages many trees trained on different samples",
+            "Forests usually generalize better and resist overfitting",
+            "More trees help until about 100, then the gain flattens",
+            "Always compare on unseen data: forests do not always beat simpler models"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Performance Predictor v3 (Random Forest)",
+    "file": "day15_final.py",
+    "description": "One program combining Day 15: Linear Regression, a Decision Tree and a Random Forest compared on one split and over 10 splits, feature importance, predictions for new students and two charts.",
+    "concepts": [
+      "ensemble learning",
+      "RandomForestRegressor",
+      "n_estimators",
+      "train vs test MAE",
+      "feature importance",
+      "model comparison"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error, r2_score\n\n# 1. DATA: 60 students\ndata = {\n    \"hours_studied\": [3.3, 8.7, 7.2, 8.9, 2.7, 2.1, 8.3, 1.5, 1.6, 5.3, 1.7, 4.1, 6.3, 4.4, 1.4, 2.6, 4.6, 1.5, 3.4, 8.5, 3.3, 3.1, 4.3, 7.6, 5.1, 3.2, 3.7, 8.8, 2.5, 2.9, 6.5, 4.1, 4.7, 6.4, 1.7, 2.9, 5.2, 1.6, 1.7, 1.7, 3.6, 8.3, 7.7, 7.0, 4.8, 7.9, 3.2, 1.7, 2.2, 5.0, 3.4, 3.4, 1.1, 5.6, 6.7, 4.3, 2.3, 2.7, 7.1, 3.9],\n    \"sleep_hours\": [5.9, 7.8, 8.3, 7.7, 6.0, 6.1, 6.8, 6.3, 8.3, 8.1, 4.4, 5.6, 6.1, 7.3, 7.2, 6.6, 5.8, 4.2, 4.2, 7.9, 4.9, 6.0, 8.1, 6.2, 6.7, 4.1, 6.2, 6.3, 5.6, 7.1, 5.2, 4.8, 5.9, 7.2, 5.8, 6.8, 7.9, 7.4, 8.5, 7.9, 5.8, 8.9, 8.5, 6.8, 6.9, 6.4, 5.7, 4.4, 5.5, 4.3, 5.5, 4.8, 8.1, 8.5, 8.5, 8.8, 6.3, 6.3, 8.9, 5.6],\n    \"attendance\": [76, 62, 70, 79, 66, 98, 99, 57, 63, 73, 52, 58, 61, 91, 52, 85, 74, 77, 70, 92, 93, 61, 83, 62, 89, 60, 87, 98, 50, 57, 100, 62, 68, 77, 73, 53, 86, 57, 97, 52, 56, 90, 73, 97, 90, 63, 95, 69, 62, 60, 97, 54, 75, 52, 76, 66, 57, 61, 63, 51],\n    \"marks\": [37, 68, 67, 83, 38, 44, 88, 31, 39, 49, 23, 44, 55, 56, 34, 50, 44, 33, 30, 82, 48, 40, 50, 69, 54, 29, 50, 83, 39, 40, 72, 44, 54, 64, 33, 36, 61, 39, 46, 31, 42, 81, 69, 88, 56, 70, 44, 37, 35, 45, 59, 40, 35, 49, 64, 60, 41, 36, 65, 49]\n}\ndf = pd.DataFrame(data)\nfeatures = [\"hours_studied\", \"sleep_hours\", \"attendance\"]\nX, y = df[features], df[\"marks\"]\nprint(\"=== STUDENT PERFORMANCE PREDICTOR v3 (RANDOM FOREST) ===\")\nprint(\"Students:\", len(df))\n\n# 2. SPLIT AND TRAIN\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)\nmodels = {\n    \"Linear Regression\": LinearRegression(),\n    \"Decision Tree\": DecisionTreeRegressor(max_depth=3, random_state=42),\n    \"Random Forest\": RandomForestRegressor(n_estimators=100, max_depth=3, random_state=42),\n}\nfor model in models.values():\n    model.fit(X_train, y_train)\n\n# 3. EVALUATE ON UNSEEN STUDENTS\nprint(\"\\nOne split (15 test students):\")\nfor name, model in models.items():\n    train_mae = mean_absolute_error(y_train, model.predict(X_train))\n    test_mae = mean_absolute_error(y_test, model.predict(X_test))\n    print(f\"  {name:18} train MAE {train_mae:5.2f} | test MAE {test_mae:5.2f} | test R2 {r2_score(y_test, model.predict(X_test)):.3f}\")\n\n# 4. A FAIRER COMPARISON: average of 10 splits\ndef avg_test_mae(make_model):\n    errors = []\n    for seed in range(10):\n        X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, random_state=seed)\n        errors.append(mean_absolute_error(y_te, make_model().fit(X_tr, y_tr).predict(X_te)))\n    return np.mean(errors), np.std(errors)\n\ncandidates = {\n    \"Linear Regression\": LinearRegression,\n    \"Tree (depth 3)\": lambda: DecisionTreeRegressor(max_depth=3, random_state=42),\n    \"Tree (no limit)\": lambda: DecisionTreeRegressor(random_state=42),\n    \"Forest (depth 3)\": lambda: RandomForestRegressor(n_estimators=100, max_depth=3, random_state=42),\n    \"Forest (no limit)\": lambda: RandomForestRegressor(n_estimators=100, random_state=42),\n}\nprint(\"\\nAverage test MAE over 10 splits (spread):\")\nresults = {}\nfor name, make_model in candidates.items():\n    results[name] = avg_test_mae(make_model)\n    print(f\"  {name:18} {results[name][0]:5.2f} ({results[name][1]:.2f})\")\n\n# 5. WHICH FEATURES DOES THE FOREST USE?\nforest_all = RandomForestRegressor(n_estimators=100, random_state=42).fit(X, y)\nimportance = pd.Series(forest_all.feature_importances_, index=features).round(2)\nprint(\"\\nFeature importance:\")\nprint(importance.sort_values(ascending=False))\n\n# 6. PREDICT NEW STUDENTS WITH ALL THREE MODELS\nnew_students = pd.DataFrame({\n    \"hours_studied\": [2, 5, 8],\n    \"sleep_hours\": [5, 7, 8],\n    \"attendance\": [55, 80, 95]\n})\nfor name, model in models.items():\n    new_students[name] = model.predict(new_students[features]).round(1)\nprint(\"\\nPredictions:\")\nprint(new_students)\n\n# 7. CHARTS: model comparison and feature importance\nfig, axes = plt.subplots(1, 2, figsize=(12, 4))\nnames = list(results)\naxes[0].bar(names, [results[k][0] for k in names], yerr=[results[k][1] for k in names], color=\"steelblue\", capsize=4)\naxes[0].set_ylabel(\"Average test MAE\")\naxes[0].set_title(\"Test error over 10 splits\")\naxes[0].tick_params(axis=\"x\", rotation=30)\nimportance.sort_values().plot(kind=\"barh\", ax=axes[1], color=\"darkorange\")\naxes[1].set_title(\"Feature importance\")\nplt.tight_layout()\nplt.show()",
+    "output": "=== STUDENT PERFORMANCE PREDICTOR v3 (RANDOM FOREST) ===\nStudents: 60\n\nOne split (15 test students):\n  Linear Regression  train MAE  3.99 | test MAE  3.17 | test R2 0.920\n  Decision Tree      train MAE  3.00 | test MAE  4.38 | test R2 0.807\n  Random Forest      train MAE  2.84 | test MAE  4.58 | test R2 0.802\n\nAverage test MAE over 10 splits (spread):\n  Linear Regression   3.85 (0.76)\n  Tree (depth 3)      4.81 (1.11)\n  Tree (no limit)     6.02 (0.89)\n  Forest (depth 3)    4.18 (0.61)\n  Forest (no limit)   4.29 (0.64)\n\nFeature importance:\nhours_studied    0.85\nattendance       0.11\nsleep_hours      0.04\ndtype: float64\n\nPredictions:\n   hours_studied  sleep_hours  ...  Decision Tree  Random Forest\n0              2            5  ...           35.5           35.6\n1              5            7  ...           52.8           51.1\n2              8            8  ...           84.4           82.3\n\n[3 rows x 6 columns]",
+    "images": [
+      {
+        "type": "image",
+        "src": "images/day15/final.png",
+        "alt": "Bar chart of model test errors and feature importance",
+        "caption": "The two charts the program draws: model comparison and feature importance"
+      }
+    ]
+  },
+  "practice": [
+    {
+      "title": "Ad Spend: Tree vs Forest",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Sales grow with ad spending and then level off, with noise. See how a forest handles it compared with one deep tree.",
+      "tasks": [
+        "Create the DataFrame",
+        "Write avg_errors(make_model) that returns the average train MAE and test MAE over 10 splits (test_size=0.3, random_state 0 to 9)",
+        "Compare DecisionTreeRegressor(random_state=42) with RandomForestRegressor(n_estimators=100, random_state=42)",
+        "Print the number of trees in the forest and the forest's prediction for an ad spend of 12",
+        "Which model has the smaller gap between train and test error?"
+      ],
+      "hint": "forest.estimators_ is the list of trees, so len(forest.estimators_) counts them. Predict with pd.DataFrame({\"ad_spend\": [12]}).",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"ad_spend\": [1.0, 2.0, 2.9, 3.9, 4.8, 5.8, 6.8, 7.7, 8.7, 9.6, 10.6, 11.6, 12.5, 13.5, 14.4, 15.4, 16.4, 17.3, 18.3, 19.2, 20.2, 21.2, 22.1, 23.1, 24.0, 25.0],\n    \"sales\": [63, 69, 91, 86, 119, 109, 132, 138, 139, 178, 152, 167, 176, 159, 186, 176, 189, 173, 174, 196, 192, 190, 196, 196, 182, 173]\n}\n\n# TODO 1: DataFrame\n\n# TODO 2: avg_errors(make_model) -> (train MAE, test MAE)\n\n# TODO 3: compare a single tree and the forest\n\n# TODO 4: number of trees and the prediction for ad spend 12",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"ad_spend\": [1.0, 2.0, 2.9, 3.9, 4.8, 5.8, 6.8, 7.7, 8.7, 9.6, 10.6, 11.6, 12.5, 13.5, 14.4, 15.4, 16.4, 17.3, 18.3, 19.2, 20.2, 21.2, 22.1, 23.1, 24.0, 25.0],\n    \"sales\": [63, 69, 91, 86, 119, 109, 132, 138, 139, 178, 152, 167, 176, 159, 186, 176, 189, 173, 174, 196, 192, 190, 196, 196, 182, 173]\n}\ndf = pd.DataFrame(data)\n\ndef avg_errors(make_model):\n    train_errs, test_errs = [], []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[[\"ad_spend\"]], df[\"sales\"], test_size=0.3, random_state=seed)\n        model = make_model().fit(X_train, y_train)\n        train_errs.append(mean_absolute_error(y_train, model.predict(X_train)))\n        test_errs.append(mean_absolute_error(y_test, model.predict(X_test)))\n    return np.mean(train_errs), np.mean(test_errs)\n\nfor name, make_model in [(\"Single tree\", lambda: DecisionTreeRegressor(random_state=42)),\n                         (\"Random Forest\", lambda: RandomForestRegressor(n_estimators=100, random_state=42))]:\n    train, test = avg_errors(make_model)\n    print(f\"{name:14} train MAE {train:5.2f} | test MAE {test:5.2f} | gap {test - train:5.2f}\")\n\nforest = RandomForestRegressor(n_estimators=100, random_state=42).fit(df[[\"ad_spend\"]], df[\"sales\"])\nprint(\"\\nTrees in the forest:\", len(forest.estimators_))\nprint(\"Predicted sales at ad spend 12:\", round(forest.predict(pd.DataFrame({\"ad_spend\": [12]}))[0], 1))",
+      "output": "Single tree    train MAE  0.00 | test MAE 14.74 | gap 14.74\nRandom Forest  train MAE  4.78 | test MAE 12.02 | gap  7.24\n\nTrees in the forest: 100\nPredicted sales at ad spend 12: 168.2",
+      "images": [
+        {
+          "type": "image",
+          "src": "images/day15/practice1.png",
+          "alt": "Single tree and forest lines through noisy sales data",
+          "caption": "Expected chart style: the forest line follows the trend a little more smoothly than one tree"
+        }
+      ],
+      "note": "The single tree memorizes the training points (train error near 0), so its test error is much bigger than its train error. The forest also fits the training data closely, but averaging 100 trees keeps the test error lower. The gap between train and test is the overfitting."
+    },
+    {
+      "title": "Tune the Forest",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "House prices jump for large homes (a threshold effect). Tune the forest and see whether it beats a line.",
+      "tasks": [
+        "Create the DataFrame",
+        "Write avg_test_mae(make_model) averaging the test MAE over 10 splits (test_size=0.25, random_state 0 to 9)",
+        "Try every combination of n_estimators in [10, 50, 100] and max_depth in [2, 4, None] and print the table",
+        "Find the best combination, then compare it with a single DecisionTreeRegressor(max_depth=4) and LinearRegression",
+        "Print the feature importances of the best forest trained on all rows"
+      ],
+      "hint": "Store results in a dictionary keyed by (n_estimators, max_depth) and use min(results, key=results.get).",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"size_sqft\": [675, 1720, 1037, 1002, 2103, 711, 1419, 2139, 1872, 1709, 1922, 1035, 2108, 845, 866, 1054, 1230, 1404, 1691, 1592, 1956, 2419, 891, 1440, 2036, 1599, 1323, 750, 1530, 2311, 1968, 1568, 2227, 1849, 2348, 1676, 683, 1449, 1636, 1263, 1713, 2484, 790, 812, 701, 1986, 1050, 1272, 994, 1661],\n    \"rooms\": [4, 4, 1, 4, 1, 2, 1, 1, 5, 5, 5, 3, 2, 4, 1, 5, 1, 5, 4, 2, 4, 4, 4, 2, 4, 4, 5, 4, 2, 4, 2, 2, 2, 3, 4, 3, 3, 4, 4, 3, 1, 5, 4, 2, 2, 5, 4, 5, 5, 5],\n    \"age\": [15, 27, 3, 16, 4, 11, 8, 26, 26, 22, 11, 15, 23, 13, 18, 7, 3, 29, 12, 12, 15, 29, 8, 22, 6, 21, 6, 21, 12, 27, 7, 17, 10, 15, 5, 4, 20, 9, 9, 29, 26, 0, 28, 30, 22, 2, 12, 6, 8, 2],\n    \"price\": [47.8, 62.2, 34.4, 55.1, 108.2, 31.9, 41.6, 99.2, 130.7, 75.5, 140.2, 44.2, 116.2, 47.9, 27.9, 60.6, 37.1, 66.4, 62.3, 33.9, 131.9, 130.5, 59.6, 39.7, 141.2, 55.6, 71.7, 42.2, 38.5, 134.1, 118.3, 44.8, 119.7, 116.9, 140.6, 58.9, 32.3, 57.6, 72.0, 43.2, 33.7, 154.8, 42.9, 28.0, 27.3, 145.7, 52.2, 71.5, 75.4, 83.4]\n}\n\n# TODO 1: DataFrame\n\n# TODO 2: avg_test_mae(make_model)\n\n# TODO 3: grid over n_estimators and max_depth\n\n# TODO 4: best combination vs tree vs linear\n\n# TODO 5: feature importances",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.tree import DecisionTreeRegressor\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error\n\ndata = {\n    \"size_sqft\": [675, 1720, 1037, 1002, 2103, 711, 1419, 2139, 1872, 1709, 1922, 1035, 2108, 845, 866, 1054, 1230, 1404, 1691, 1592, 1956, 2419, 891, 1440, 2036, 1599, 1323, 750, 1530, 2311, 1968, 1568, 2227, 1849, 2348, 1676, 683, 1449, 1636, 1263, 1713, 2484, 790, 812, 701, 1986, 1050, 1272, 994, 1661],\n    \"rooms\": [4, 4, 1, 4, 1, 2, 1, 1, 5, 5, 5, 3, 2, 4, 1, 5, 1, 5, 4, 2, 4, 4, 4, 2, 4, 4, 5, 4, 2, 4, 2, 2, 2, 3, 4, 3, 3, 4, 4, 3, 1, 5, 4, 2, 2, 5, 4, 5, 5, 5],\n    \"age\": [15, 27, 3, 16, 4, 11, 8, 26, 26, 22, 11, 15, 23, 13, 18, 7, 3, 29, 12, 12, 15, 29, 8, 22, 6, 21, 6, 21, 12, 27, 7, 17, 10, 15, 5, 4, 20, 9, 9, 29, 26, 0, 28, 30, 22, 2, 12, 6, 8, 2],\n    \"price\": [47.8, 62.2, 34.4, 55.1, 108.2, 31.9, 41.6, 99.2, 130.7, 75.5, 140.2, 44.2, 116.2, 47.9, 27.9, 60.6, 37.1, 66.4, 62.3, 33.9, 131.9, 130.5, 59.6, 39.7, 141.2, 55.6, 71.7, 42.2, 38.5, 134.1, 118.3, 44.8, 119.7, 116.9, 140.6, 58.9, 32.3, 57.6, 72.0, 43.2, 33.7, 154.8, 42.9, 28.0, 27.3, 145.7, 52.2, 71.5, 75.4, 83.4]\n}\ndf = pd.DataFrame(data)\nfeatures = [\"size_sqft\", \"rooms\", \"age\"]\n\ndef avg_test_mae(make_model):\n    errors = []\n    for seed in range(10):\n        X_train, X_test, y_train, y_test = train_test_split(df[features], df[\"price\"], test_size=0.25, random_state=seed)\n        errors.append(mean_absolute_error(y_test, make_model().fit(X_train, y_train).predict(X_test)))\n    return np.mean(errors)\n\nresults = {}\nprint(\"n_estimators  max_depth  test MAE\")\nfor n_trees in [10, 50, 100]:\n    for depth in [2, 4, None]:\n        results[(n_trees, depth)] = avg_test_mae(lambda: RandomForestRegressor(n_estimators=n_trees, max_depth=depth, random_state=42))\n        print(f\"{n_trees:12}  {str(depth):9}  {results[(n_trees, depth)]:.2f}\")\n\nbest = min(results, key=results.get)\nprint(\"\\nBest forest:\", best, \"->\", round(results[best], 2))\nprint(\"Single tree (depth 4):\", round(avg_test_mae(lambda: DecisionTreeRegressor(max_depth=4, random_state=42)), 2))\nprint(\"Linear Regression    :\", round(avg_test_mae(LinearRegression), 2))\n\nbest_forest = RandomForestRegressor(n_estimators=best[0], max_depth=best[1], random_state=42).fit(df[features], df[\"price\"])\nprint()\nprint(pd.Series(best_forest.feature_importances_, index=features).round(2).sort_values(ascending=False))",
+      "output": "n_estimators  max_depth  test MAE\n          10  2          8.75\n          10  4          6.79\n          10  None       6.68\n          50  2          8.63\n          50  4          6.53\n          50  None       6.46\n         100  2          8.69\n         100  4          6.39\n         100  None       6.32\n\nBest forest: (100, None) -> 6.32\nSingle tree (depth 4): 7.67\nLinear Regression    : 16.0\n\nsize_sqft    0.87\nrooms        0.12\nage          0.02\ndtype: float64",
+      "images": [
+        {
+          "type": "image",
+          "src": "images/day15/practice2.png",
+          "alt": "Heatmap of test error for combinations of number of trees and depth",
+          "caption": "Expected chart: test error for each forest setting (darker green is better)"
+        }
+      ],
+      "note": "Price jumps by a large amount once a house passes about 1800 sqft. A straight line cannot make a jump, so Linear Regression does worst here, while trees and forests handle thresholds naturally. This is the opposite of the student marks data, where the line won. A forest with a few dozen trees is usually enough: going from 50 to 100 trees changes the error very little, and a very shallow depth (2) is clearly too simple. Always compare on test data."
+    }
+  ],
+  "checklist": [
+    "Understood ensemble learning",
+    "Trained a Decision Tree and a Random Forest",
+    "Evaluated both on unseen data",
+    "Looked at the votes of the individual trees",
+    "Compared models over many splits",
+    "Checked feature importance",
+    "Built Student Predictor v3"
+  ],
+  "quiz": [
+    {
+      "q": "How does a Random Forest make a regression prediction?",
+      "options": [
+        "It picks the best single tree",
+        "It averages the predictions of many trees",
+        "It takes the maximum of all trees",
+        "It uses one formula"
+      ],
+      "answer": 1,
+      "why": "Each tree predicts, and the forest returns the average of those predictions."
+    },
+    {
+      "q": "Why do the trees in a forest differ from each other?",
+      "options": [
+        "Each uses a random sample of rows and random features at splits",
+        "They use different datasets from the internet",
+        "They use different loss functions",
+        "They do not differ"
+      ],
+      "answer": 0,
+      "why": "Bootstrap samples of rows and random feature subsets make every tree a little different, and averaging cancels their individual errors."
+    },
+    {
+      "q": "What happens to the error as you add more trees?",
+      "options": [
+        "It always keeps falling",
+        "It drops quickly, then levels off",
+        "It gets worse",
+        "It stays the same"
+      ],
+      "answer": 1,
+      "why": "The first trees help a lot. After a few dozen the average is already stable."
+    },
+    {
+      "q": "Linear Regression beat the forest on our data. What does that tell us?",
+      "options": [
+        "The forest is broken",
+        "No model wins everywhere, so always compare on test data",
+        "Linear models are always best",
+        "Forests only work on classification"
+      ],
+      "answer": 1,
+      "why": "The marks follow a smooth rule that a line captures with little data. Choose models by test performance."
+    }
+  ]
+}
   ]
 };
