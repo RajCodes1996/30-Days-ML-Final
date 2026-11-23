@@ -7209,6 +7209,359 @@ Average used to fill: 245.0
       "why": "The marks follow a smooth rule that a line captures with little data. Choose models by test performance."
     }
   ]
-}
+},
+// DAY 16 snippet. In course-data.js: after Day 15's closing }, paste this object (keep the comma after Day 15). No images needed for this day.
+{
+  "day": 16,
+  "title": "Ensemble Learning",
+  "subtitle": "Combine multiple models with bagging, voting and boosting, then compare them honestly on a small Student Pass/Fail dataset.",
+  "level": "Intermediate",
+  "duration": "60-90 min",
+  "tags": [
+    "Ensemble Learning",
+    "Bagging",
+    "Voting Classifier",
+    "Boosting",
+    "Cross-Validation"
+  ],
+  "goals": [
+    "Understand what ensemble learning is",
+    "Know the difference between bagging, voting and boosting",
+    "Compare a Voting Ensemble with its member models",
+    "Look beyond accuracy using precision and recall"
+  ],
+  "sections": [
+    {
+      "id": "concept",
+      "icon": "🧠",
+      "title": "Step 1: Understand the Concept",
+      "meta": "Ensemble learning",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Ensemble Learning combines predictions from multiple models to try to improve performance and generalization."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Model",
+            "Prediction (marks)"
+          ],
+          "rows": [
+            [
+              "Model A",
+              "70"
+            ],
+            [
+              "Model B",
+              "80"
+            ],
+            [
+              "Model C",
+              "90"
+            ],
+            [
+              "Combined prediction",
+              "80 (average of the three)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The average above is a regression example. For classification, models can combine their predicted classes (hard voting) or class probabilities (soft voting)."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Technique",
+            "How it works",
+            "Example"
+          ],
+          "rows": [
+            [
+              "Bagging",
+              "Trains models on different bootstrap samples and combines their predictions",
+              "Random Forest"
+            ],
+            [
+              "Voting",
+              "Combines predictions from different classifiers",
+              "Voting Classifier"
+            ],
+            [
+              "Boosting",
+              "Builds models sequentially, improving on earlier errors or residuals",
+              "AdaBoost, Gradient Boosting, XGBoost"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Combining models does not guarantee better results. Model diversity, data quality, and evaluation matter."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Create the Dataset",
+      "meta": "Student Pass/Fail",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "We will predict whether a student passes from hours studied and attendance. Copy this into day16_ensemble.py:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day16_ensemble.py",
+          "code": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier, VotingClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, classification_report\n\ndata = {\n    \"hours_studied\": [\n        1, 2, 2, 3, 3, 4, 4, 5, 5, 6,\n        6, 7, 7, 8, 8, 9, 2, 4, 6, 9\n    ],\n    \"attendance\": [\n        40, 45, 50, 55, 60, 60, 65, 70, 75, 75,\n        80, 85, 88, 90, 95, 98, 48, 68, 82, 96\n    ],\n    \"passed\": [\n        0, 0, 0, 0, 0, 0, 1, 0, 1, 1,\n        1, 1, 1, 1, 1, 1, 0, 1, 1, 1\n    ]\n}\n\ndf = pd.DataFrame(data)\nX = df[[\"hours_studied\", \"attendance\"]]\ny = df[\"passed\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y,\n    test_size=0.30,\n    random_state=42,\n    stratify=y\n)\n\nprint(df.head())\nprint(\"Dataset shape:\", df.shape)",
+          "output": "   hours_studied  attendance  passed\n0              1          40       0\n1              2          45       0\n2              2          50       0\n3              3          55       0\n4              3          60       0\nDataset shape: (20, 3)"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Here, 0 = Fail and 1 = Pass. The split is stratified so the test set keeps the same pass/fail balance."
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "icon": "🛠️",
+      "title": "Step 3: Train and Compare the Models",
+      "meta": "Most important step",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "We compare a Decision Tree, Random Forest, Logistic Regression, and a hard-voting ensemble of those three."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare.py",
+          "code": "models = {\n    \"Decision Tree\": DecisionTreeClassifier(\n        max_depth=3, random_state=42\n    ),\n    \"Random Forest\": RandomForestClassifier(\n        n_estimators=100, random_state=42\n    ),\n    \"Logistic Regression\": LogisticRegression(\n        max_iter=1000\n    ),\n    \"Voting Ensemble\": VotingClassifier(\n        estimators=[\n            (\"dt\", DecisionTreeClassifier(\n                max_depth=3, random_state=42\n            )),\n            (\"rf\", RandomForestClassifier(\n                n_estimators=100, random_state=42\n            )),\n            (\"lr\", LogisticRegression(\n                max_iter=1000\n            ))\n        ],\n        voting=\"hard\"\n    )\n}\n\nfor name, model in models.items():\n    model.fit(X_train, y_train)\n    predictions = model.predict(X_test)\n    accuracy = accuracy_score(y_test, predictions)\n    print(f\"{name}: {accuracy:.2%}\")",
+          "output": "Decision Tree: 83.33%\nRandom Forest: 83.33%\nLogistic Regression: 83.33%\nVoting Ensemble: 83.33%"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Your task: compare the test accuracy of all four models. Don't assume the ensemble will win; the dataset is tiny and synthetic."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Only 6 test students: one student changes accuracy by about 17 points. All four models tie here, so this split cannot tell them apart."
+        }
+      ]
+    },
+    {
+      "id": "inspect",
+      "icon": "🔎",
+      "title": "Step 4: Inspect the Ensemble's Performance",
+      "meta": "Beyond accuracy",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "inspect.py",
+          "code": "ensemble = models[\"Voting Ensemble\"]\npredictions = ensemble.predict(X_test)\n\nprint(classification_report(\n    y_test,\n    predictions,\n    labels=[0, 1],\n    target_names=[\"Fail\", \"Pass\"],\n    zero_division=0\n))",
+          "output": "              precision    recall  f1-score   support\n\n        Fail       1.00      0.50      0.67         2\n        Pass       0.80      1.00      0.89         4\n\n    accuracy                           0.83         6\n   macro avg       0.90      0.75      0.78         6\nweighted avg       0.87      0.83      0.81         6"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Look beyond accuracy. Precision and recall show which class the model predicts well: here Pass has recall 1.00 but Fail has recall 0.50, so half of the failing students were predicted to pass."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "🎯",
+      "title": "Step 5: Predict for a New Student",
+      "meta": "Use the ensemble",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict.py",
+          "code": "student = pd.DataFrame({\n    \"hours_studied\": [6],\n    \"attendance\": [80]\n})\n\nprediction = ensemble.predict(student)[0]\nprint(\"Prediction:\", \"PASS\" if prediction == 1 else \"FAIL\")",
+          "output": "Prediction: PASS"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "This is only a model prediction, not a guarantee of the student's result."
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "icon": "⌨️",
+      "title": "Step 6: Accept User Input",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "user_input.py",
+          "code": "hours = float(input(\"Hours studied: \"))\nattendance = float(input(\"Attendance percentage: \"))\n\nstudent = pd.DataFrame({\n    \"hours_studied\": [hours],\n    \"attendance\": [attendance]\n})\n\nprediction = ensemble.predict(student)[0]\nprint(\"Prediction:\", \"PASS\" if prediction == 1 else \"FAIL\")"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Example: enter 6 and 80 and the ensemble predicts PASS. The workspace asks for each value in a pop-up box."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Student Pass/Fail Predictor",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Final Program below compares a single tree, Logistic Regression, Bagging, Random Forest, AdaBoost, Gradient Boosting and two voting ensembles, using one split and 25 repeated cross-validation folds."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Ensemble learning combines several models to try to improve generalization",
+            "Bagging trains on bootstrap samples, voting combines different classifiers, boosting learns from earlier mistakes",
+            "Hard voting combines predicted classes, soft voting averages probabilities",
+            "Accuracy on a tiny test set can tie, so use precision, recall and repeated cross-validation",
+            "An ensemble is not guaranteed to win"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Pass/Fail Predictor (Ensembles)",
+    "file": "day16_final.py",
+    "description": "One program combining Day 16: Decision Tree, Logistic Regression, Bagging, Random Forest, AdaBoost, Gradient Boosting and hard/soft Voting compared on one split and 25 cross-validation folds, a classification report and predictions with probabilities.",
+    "concepts": [
+      "ensemble learning",
+      "bagging",
+      "voting (hard and soft)",
+      "boosting",
+      "cross-validation",
+      "precision and recall"
+    ],
+    "code": "import pandas as pd\nfrom sklearn.model_selection import (\n    train_test_split, cross_val_score, RepeatedStratifiedKFold\n)\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.ensemble import (\n    BaggingClassifier, RandomForestClassifier, VotingClassifier,\n    AdaBoostClassifier, GradientBoostingClassifier\n)\nfrom sklearn.metrics import accuracy_score, classification_report\n\nprint(\"=== STUDENT PASS/FAIL PREDICTOR (ENSEMBLES) ===\")\n\ndata = {\n    \"hours_studied\": [1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 2, 4, 6, 9],\n    \"attendance\": [40, 45, 50, 55, 60, 60, 65, 70, 75, 75, 80, 85, 88, 90, 95, 98, 48, 68, 82, 96],\n    \"passed\": [0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]\n}\ndf = pd.DataFrame(data)\nX = df[[\"hours_studied\", \"attendance\"]]\ny = df[\"passed\"]\nprint(\"Students:\", len(df), \"| Pass rate:\", f\"{y.mean():.0%}\")\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.30, random_state=42, stratify=y\n)\n\ndef tree():\n    return DecisionTreeClassifier(max_depth=3, random_state=42)\n\nmodels = {\n    \"Decision Tree\": tree(),\n    \"Logistic Regression\": LogisticRegression(max_iter=1000),\n    \"Bagging (trees)\": BaggingClassifier(\n        estimator=tree(), n_estimators=50, random_state=42\n    ),\n    \"Random Forest\": RandomForestClassifier(n_estimators=100, random_state=42),\n    \"AdaBoost\": AdaBoostClassifier(n_estimators=50, random_state=42),\n    \"Gradient Boosting\": GradientBoostingClassifier(random_state=42),\n    \"Voting (hard)\": VotingClassifier(\n        estimators=[\n            (\"dt\", tree()),\n            (\"rf\", RandomForestClassifier(n_estimators=100, random_state=42)),\n            (\"lr\", LogisticRegression(max_iter=1000))\n        ],\n        voting=\"hard\"\n    ),\n    \"Voting (soft)\": VotingClassifier(\n        estimators=[\n            (\"dt\", tree()),\n            (\"rf\", RandomForestClassifier(n_estimators=100, random_state=42)),\n            (\"lr\", LogisticRegression(max_iter=1000))\n        ],\n        voting=\"soft\"\n    )\n}\n\ncv = RepeatedStratifiedKFold(n_splits=5, n_repeats=5, random_state=42)\n\nprint(\"\\nOne split (6 test students) and 25 repeated folds:\")\nrows = []\nfor name, model in models.items():\n    model.fit(X_train, y_train)\n    test_acc = accuracy_score(y_test, model.predict(X_test))\n    scores = cross_val_score(model, X, y, cv=cv)\n    rows.append((name, test_acc, scores.mean(), scores.std()))\n    print(f\"  {name:<20} test {test_acc:.0%} | CV {scores.mean():.1%} (+/- {scores.std():.1%})\")\n\nbest_name = max(rows, key=lambda r: r[2])[0]\nprint(\"\\nBest by cross-validation:\", best_name)\n\nensemble = models[\"Voting (soft)\"]\nprint(\"\\nClassification report (Voting soft):\")\nprint(classification_report(\n    y_test, ensemble.predict(X_test),\n    labels=[0, 1], target_names=[\"Fail\", \"Pass\"], zero_division=0\n))\n\nnew_students = pd.DataFrame({\n    \"hours_studied\": [6, 3, 9],\n    \"attendance\": [80, 55, 96]\n})\nlabels = ensemble.predict(new_students)\nproba = ensemble.predict_proba(new_students)[:, 1]\nprint(\"Predictions for new students:\")\nfor i, (lab, p) in enumerate(zip(labels, proba), start=1):\n    row = new_students.iloc[i - 1]\n    print(f\"  Student {i}: {row.hours_studied:.0f} h, {row.attendance:.0f}% -> \"\n          f\"{'PASS' if lab == 1 else 'FAIL'} (pass probability {p:.0%})\")\nprint(\"\\nThese are model predictions, not guarantees.\")",
+    "output": "=== STUDENT PASS/FAIL PREDICTOR (ENSEMBLES) ===\nStudents: 20 | Pass rate: 60%\n\nOne split (6 test students) and 25 repeated folds:\n  Decision Tree        test 83% | CV 86.0% (+/- 15.9%)\n  Logistic Regression  test 83% | CV 90.0% (+/- 12.2%)\n  Bagging (trees)      test 83% | CV 94.0% (+/- 10.7%)\n  Random Forest        test 83% | CV 88.0% (+/- 14.4%)\n  AdaBoost             test 83% | CV 90.0% (+/- 12.2%)\n  Gradient Boosting    test 83% | CV 84.0% (+/- 18.5%)\n  Voting (hard)        test 83% | CV 88.0% (+/- 14.4%)\n  Voting (soft)        test 83% | CV 86.0% (+/- 15.9%)\n\nBest by cross-validation: Bagging (trees)\n\nClassification report (Voting soft):\n              precision    recall  f1-score   support\n\n        Fail       1.00      0.50      0.67         2\n        Pass       0.80      1.00      0.89         4\n\n    accuracy                           0.83         6\n   macro avg       0.90      0.75      0.78         6\nweighted avg       0.87      0.83      0.81         6\n\nPredictions for new students:\n  Student 1: 6 h, 80% -> PASS (pass probability 100%)\n  Student 2: 3 h, 55% -> FAIL (pass probability 0%)\n  Student 3: 9 h, 96% -> PASS (pass probability 100%)\n\nThese are model predictions, not guarantees."
+  },
+  "practice": [
+    {
+      "title": "Loan Approval: Hard vs Soft Voting",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Combine a tree, Logistic Regression and KNN into voting ensembles and compare hard and soft voting.",
+      "tasks": [
+        "Create X and y from the DataFrame",
+        "Split 75/25 with random_state=1 and stratify=y",
+        "Build a list of 3 estimators: Decision Tree (max_depth=3), Logistic Regression and KNN (n_neighbors=5)",
+        "Train hard and soft VotingClassifiers and print both test accuracies",
+        "Print the soft model's rejected/approved probabilities for income 70 and credit score 640"
+      ],
+      "hint": "Soft voting needs every estimator to support predict_proba. Use soft.predict_proba(applicant)[0] on a one-row DataFrame.",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.ensemble import VotingClassifier\nfrom sklearn.metrics import accuracy_score\n\nrng = np.random.RandomState(7)\nincome = rng.randint(20, 120, 60)\ncredit = rng.randint(300, 850, 60)\nscore = income / 120 + (credit - 300) / 550 + rng.normal(0, 0.25, 60)\napproved = (score > 1.0).astype(int)\ndf = pd.DataFrame({\"income\": income, \"credit_score\": credit, \"approved\": approved})\n\n# TODO 1: X = the two feature columns, y = approved\n# TODO 2: split 75/25 with random_state=1 and stratify=y\n# TODO 3: build a list of 3 estimators: tree (max_depth=3), logistic regression, KNN (n_neighbors=5)\n# TODO 4: train hard and soft VotingClassifiers and print both test accuracies\n# TODO 5: predict_proba from the soft model for income=70, credit_score=640",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.ensemble import VotingClassifier\nfrom sklearn.metrics import accuracy_score\n\nrng = np.random.RandomState(7)\nincome = rng.randint(20, 120, 60)\ncredit = rng.randint(300, 850, 60)\nscore = income / 120 + (credit - 300) / 550 + rng.normal(0, 0.25, 60)\napproved = (score > 1.0).astype(int)\ndf = pd.DataFrame({\"income\": income, \"credit_score\": credit, \"approved\": approved})\n\nX = df[[\"income\", \"credit_score\"]]\ny = df[\"approved\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.25, random_state=1, stratify=y\n)\n\nestimators = [\n    (\"dt\", DecisionTreeClassifier(max_depth=3, random_state=1)),\n    (\"lr\", LogisticRegression(max_iter=1000)),\n    (\"knn\", KNeighborsClassifier(n_neighbors=5))\n]\n\nhard = VotingClassifier(estimators=estimators, voting=\"hard\")\nsoft = VotingClassifier(estimators=estimators, voting=\"soft\")\n\nfor name, model in [(\"Hard voting\", hard), (\"Soft voting\", soft)]:\n    model.fit(X_train, y_train)\n    acc = accuracy_score(y_test, model.predict(X_test))\n    print(f\"{name}: {acc:.2%}\")\n\napplicant = pd.DataFrame({\"income\": [70], \"credit_score\": [640]})\nproba = soft.predict_proba(applicant)[0]\nprint(f\"Rejected: {proba[0]:.0%} | Approved: {proba[1]:.0%}\")",
+      "output": "Hard voting: 80.00%\nSoft voting: 80.00%\nRejected: 20% | Approved: 80%",
+      "note": "Hard and soft voting tie on this small test set. Soft voting also gives a probability, which is more useful than a bare yes or no."
+    },
+    {
+      "title": "Bagging vs Boosting",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Compare a single tree with Bagging, Random Forest, AdaBoost and Gradient Boosting using repeated cross-validation.",
+      "tasks": [
+        "Create X and y from the DataFrame",
+        "Create cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=4, random_state=0)",
+        "Build a dictionary of the five models",
+        "Print the mean and standard deviation of cross_val_score for each model",
+        "Print the model with the highest mean and the model with the lowest spread"
+      ],
+      "hint": "Store (mean, std) in a dictionary and use max(results, key=lambda k: results[k][0]).",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import cross_val_score, RepeatedStratifiedKFold\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import (\n    BaggingClassifier, RandomForestClassifier,\n    AdaBoostClassifier, GradientBoostingClassifier\n)\n\nrng = np.random.RandomState(3)\nusage = rng.randint(1, 60, 80)\ncalls = rng.randint(0, 9, 80)\nrisk = calls / 8 - usage / 60 + rng.normal(0, 0.3, 80)\nchurn = (risk > -0.1).astype(int)\ndf = pd.DataFrame({\"monthly_usage\": usage, \"support_calls\": calls, \"churn\": churn})\n\n# TODO 1: X = the two features, y = churn\n# TODO 2: cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=4, random_state=0)\n# TODO 3: models dict: single tree (max_depth=3), Bagging of trees, Random Forest, AdaBoost, Gradient Boosting\n# TODO 4: print mean and std of cross_val_score for each model\n# TODO 5: print which model has the highest mean and which has the lowest spread",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import cross_val_score, RepeatedStratifiedKFold\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import (\n    BaggingClassifier, RandomForestClassifier,\n    AdaBoostClassifier, GradientBoostingClassifier\n)\n\nrng = np.random.RandomState(3)\nusage = rng.randint(1, 60, 80)\ncalls = rng.randint(0, 9, 80)\nrisk = calls / 8 - usage / 60 + rng.normal(0, 0.3, 80)\nchurn = (risk > -0.1).astype(int)\ndf = pd.DataFrame({\"monthly_usage\": usage, \"support_calls\": calls, \"churn\": churn})\n\nX = df[[\"monthly_usage\", \"support_calls\"]]\ny = df[\"churn\"]\ncv = RepeatedStratifiedKFold(n_splits=5, n_repeats=4, random_state=0)\n\nmodels = {\n    \"Single Tree\": DecisionTreeClassifier(max_depth=3, random_state=0),\n    \"Bagging\": BaggingClassifier(\n        estimator=DecisionTreeClassifier(max_depth=3),\n        n_estimators=50, random_state=0\n    ),\n    \"Random Forest\": RandomForestClassifier(n_estimators=100, random_state=0),\n    \"AdaBoost\": AdaBoostClassifier(n_estimators=50, random_state=0),\n    \"Gradient Boosting\": GradientBoostingClassifier(random_state=0)\n}\n\nresults = {}\nfor name, model in models.items():\n    scores = cross_val_score(model, X, y, cv=cv)\n    results[name] = (scores.mean(), scores.std())\n    print(f\"{name:<18} mean {scores.mean():.1%} | std {scores.std():.1%}\")\n\nbest = max(results, key=lambda k: results[k][0])\nsteadiest = min(results, key=lambda k: results[k][1])\nprint(\"Highest mean:\", best)\nprint(\"Lowest spread:\", steadiest)",
+      "output": "Single Tree        mean 78.4% | std 7.3%\nBagging            mean 81.2% | std 7.7%\nRandom Forest      mean 81.6% | std 7.3%\nAdaBoost           mean 80.0% | std 7.0%\nGradient Boosting  mean 80.9% | std 7.5%\nHighest mean: Random Forest\nLowest spread: AdaBoost",
+      "note": "All five means are within about 3 points and the spreads are similar, so no model clearly wins. Differences this small can be noise, so always check the spread, not just the mean."
+    }
+  ],
+  "checklist": [
+    "Understood ensemble learning",
+    "Learned bagging, voting and boosting",
+    "Trained a Voting Ensemble",
+    "Compared models on unseen data",
+    "Read precision and recall",
+    "Used cross-validation",
+    "Built the Student Pass/Fail Predictor"
+  ],
+  "quiz": [
+    {
+      "q": "What does a hard Voting Classifier do?",
+      "options": [
+        "Averages predicted probabilities",
+        "Takes the majority of predicted classes",
+        "Trains models one after another",
+        "Picks the most accurate model"
+      ],
+      "answer": 1,
+      "why": "Hard voting counts each model's predicted class and returns the majority. Averaging probabilities is soft voting."
+    },
+    {
+      "q": "Which technique builds models sequentially to fix earlier errors?",
+      "options": [
+        "Bagging",
+        "Voting",
+        "Boosting",
+        "Random sampling"
+      ],
+      "answer": 2,
+      "why": "Boosting trains each new model to improve on the mistakes or residuals of the previous ones, as in AdaBoost and Gradient Boosting."
+    },
+    {
+      "q": "All four models scored 83.33% on the test split. What does that tell us?",
+      "options": [
+        "The ensemble is the best",
+        "The test set is too small to separate them",
+        "Logistic Regression is the best",
+        "The models are identical"
+      ],
+      "answer": 1,
+      "why": "With only 6 test students, one prediction changes accuracy by about 17 points. Use cross-validation and other metrics to compare."
+    },
+    {
+      "q": "The ensemble's Fail recall is 0.50. What does that mean?",
+      "options": [
+        "Half of the actual failing students were caught",
+        "Half of the predictions were wrong",
+        "Half of the students passed",
+        "The model is 50% accurate"
+      ],
+      "answer": 0,
+      "why": "Recall is the share of real Fail students the model found. Here it found 1 of 2 and predicted the other as Pass."
+    },
+    {
+      "q": "Does combining models always give better results?",
+      "options": [
+        "Yes, always",
+        "No, diversity, data quality and evaluation matter",
+        "Only with boosting",
+        "Only with more than 10 models"
+      ],
+      "answer": 1,
+      "why": "An ensemble helps when its members make different errors. On tiny or noisy data it can tie with or lose to a simple model."
+    }
+  ]
+},
   ]
 };

@@ -1,63 +1,62 @@
-🚀 DAY 15: Random Forest — Ensemble Learning
+🚀 DAY 16 — Ensemble Learning 🔥
+You've completed Day 15: Random Forest vs Decision Tree. Let's continue your 30-day ML roadmap with a practical lesson on Ensemble Learning.
+Week 3 · Day 16 of 30
 
-🎯 Today's mission
-Build a Student Performance Predictor v3 that compares a single Decision Tree with a Random Forest.
+Hands-on
 
-By the end of today, you should understand:
-- What ensemble learning is.
-- How Random Forest combines multiple decision trees.
-- Why Random Forest often generalizes better than a single tree.
-- How to compare models using unseen test data.
-Step 1 — Understand the concept
-A Decision Tree makes predictions using one tree of learned rules.
+Estimated time: 60–90 minutes · Google Colab
 
-A Random Forest combines predictions from many decision trees. For regression, it typically averages their predictions.
-
-Decision Tree
-
-One tree learns patterns. It can overfit when allowed to become too complex.
-
-Random Forest
-
-Many trees contribute predictions, often making the overall model more stable.
+1. The core concept
+Ensemble Learning combines predictions from multiple models to try to improve performance and generalization.
+Model A
+70
 
 
-Step 2 — Prepare your dataset
-Run this in Google Colab or VS Code.
-import pandas as pddata = {    "hours_studied": [1, 2, 3, 4, 5, 6, 7, 8, 2, 6, 4, 7],    "sleep_hours":   [5, 6, 6, 7, 7, 8, 8, 9, 5, 7, 8, 6],    "attendance":    [45, 55, 60, 70, 75, 85, 90, 98, 50, 80, 65, 92],    "marks":         [25, 35, 42, 55, 65, 75, 85, 95, 30, 72, 58, 88]}df = pd.DataFrame(data)X = df[["hours_studied", "sleep_hours", "attendance"]]y = df["marks"]print(df.head())
+Model B
+80
 
 
-Your ML task: Use the three input features to predict student marks.
-Step 3 — Split the data
-from sklearn.model_selection import train_test_splitX_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.25,    random_state=42)
+Model C
+90
 
 
-We keep test data separate so that we can evaluate how well each model predicts unseen examples.
-Step 4 — Train both models
-from sklearn.tree import DecisionTreeRegressorfrom sklearn.ensemble import RandomForestRegressortree = DecisionTreeRegressor(    max_depth=3,    random_state=42)forest = RandomForestRegressor(    n_estimators=100,    max_depth=3,    random_state=42)tree.fit(X_train, y_train)forest.fit(X_train, y_train)print("Both models trained successfully!")
+
+Combined prediction
+80 marks
+Average of the three predictions
 
 
-Understand the new parameter
-- n_estimators=100: build 100 trees in the forest.
-- max_depth=3: limit each tree's depth.
-- random_state=42: make the experiment reproducible.
-Step 5 — Evaluate the models
-from sklearn.metrics import mean_absolute_error, r2_scoremodels = {    "Decision Tree": tree,    "Random Forest": forest}for name, model in models.items():    train_pred = model.predict(X_train)    test_pred = model.predict(X_test)    print(f"\n{name}")    print("Train MAE:", round(        mean_absolute_error(y_train, train_pred), 2    ))    print("Test MAE:", round(        mean_absolute_error(y_test, test_pred), 2    ))    print("Test R²:", round(        r2_score(y_test, test_pred), 3    ))
+The average above is a regression example. For classification, models can combine their predicted classes or class probabilities.
+2. Three techniques to know
+Technique	How it works	Example
+Bagging	Trains models on different bootstrap samples and combines their predictions	Random Forest
+Voting	Combines predictions from different classifiers	Voting Classifier
+Boosting	Builds models sequentially, improving on earlier errors or residuals	AdaBoost, Gradient Boosting, XGBoost
+
+Remember: combining models does not guarantee better results. Model diversity, data quality, and evaluation matter.
+3. Mini-project — Student Pass/Fail Predictor
+We'll compare a Decision Tree, Random Forest, Logistic Regression, and a Voting Ensemble.
+Step 1: Create the dataset
+import pandas as pdfrom sklearn.model_selection import train_test_splitfrom sklearn.tree import DecisionTreeClassifierfrom sklearn.ensemble import RandomForestClassifier, VotingClassifierfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import accuracy_score, classification_reportdata = {    "hours_studied": [        1, 2, 2, 3, 3, 4, 4, 5, 5, 6,        6, 7, 7, 8, 8, 9, 2, 4, 6, 9    ],    "attendance": [        40, 45, 50, 55, 60, 60, 65, 70, 75, 75,        80, 85, 88, 90, 95, 98, 48, 68, 82, 96    ],    "passed": [        0, 0, 0, 0, 0, 0, 1, 0, 1, 1,        1, 1, 1, 1, 1, 1, 0, 1, 1, 1    ]}df = pd.DataFrame(data)X = df[["hours_studied", "attendance"]]y = df["passed"]X_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.30,    random_state=42,    stratify=y)print(df.head())print("Dataset shape:", df.shape)
 
 
-Interpret the results:
-Metric	Meaning
-Train MAE	Average absolute prediction error on training data
-Test MAE	Average absolute prediction error on unseen test data
-Test R²	How well predictions explain variation in test targets
 
-Important: Lower test MAE is better. A higher test R² is generally better, but R² can be negative. With this small, synthetic dataset, results can vary considerably with the split; don't assume Random Forest must win.
-Step 6 — Accept user input
-hours = float(input("Hours studied: "))sleep = float(input("Sleep hours: "))attendance = float(input("Attendance percentage: "))student = pd.DataFrame([{    "hours_studied": hours,    "sleep_hours": sleep,    "attendance": attendance}])tree_prediction = tree.predict(student)[0]forest_prediction = forest.predict(student)[0]print("\nDecision Tree prediction:",      round(tree_prediction, 2))print("Random Forest prediction:",      round(forest_prediction, 2))
+Here, 0 = Fail and 1 = Pass.
+Step 2: Train and compare the models
+models = {    "Decision Tree": DecisionTreeClassifier(        max_depth=3, random_state=42    ),    "Random Forest": RandomForestClassifier(        n_estimators=100, random_state=42    ),    "Logistic Regression": LogisticRegression(        max_iter=1000    ),    "Voting Ensemble": VotingClassifier(        estimators=[            ("dt", DecisionTreeClassifier(                max_depth=3, random_state=42            )),            ("rf", RandomForestClassifier(                n_estimators=100, random_state=42            )),            ("lr", LogisticRegression(                max_iter=1000            ))        ],        voting="hard"    )}for name, model in models.items():    model.fit(X_train, y_train)    predictions = model.predict(X_test)    accuracy = accuracy_score(y_test, predictions)    print(f"{name}: {accuracy:.2%}")
 
 
-Try inputs such as:
-- Study hours: 5
-- Sleep hours: 7
-- Attendance: 80
-Compare the predictions. These are educational estimates, not guarantees of actual marks.
+
+Your task: Compare the test accuracy of all four models. Don't assume the ensemble will win; the dataset is tiny and synthetic.
+Step 3: Inspect the ensemble's performance
+ensemble = models["Voting Ensemble"]predictions = ensemble.predict(X_test)print(classification_report(    y_test,    predictions,    labels=[0, 1],    target_names=["Fail", "Pass"],    zero_division=0))
+
+
+
+Look beyond accuracy. Precision and recall help you understand which class the model predicts well.
+Step 4: Predict for a new student
+student = pd.DataFrame({    "hours_studied": [6],    "attendance": [80]})prediction = ensemble.predict(student)[0]print("Prediction:", "PASS" if prediction == 1 else "FAIL")
+
+
+
+This is only a model prediction, not a guarantee of the student's result.
