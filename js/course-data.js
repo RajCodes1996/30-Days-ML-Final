@@ -7563,5 +7563,830 @@ Average used to fill: 245.0
     }
   ]
 },
+// DAY 17 snippet. In course-data.js: after Day 16's closing }, paste this object (keep the comma after Day 16). No images needed for this day.
+{
+  "day": 17,
+  "title": "Hyperparameter Tuning with GridSearchCV",
+  "subtitle": "Find better model settings systematically with GridSearchCV and cross-validation, and tune a Random Forest on the Breast Cancer dataset.",
+  "level": "Intermediate",
+  "duration": "60-90 min",
+  "tags": [
+    "Hyperparameters",
+    "GridSearchCV",
+    "Cross-Validation",
+    "Random Forest",
+    "Model Tuning"
+  ],
+  "goals": [
+    "Understand what hyperparameters are",
+    "Know how GridSearchCV and k-fold cross-validation work",
+    "Tune a Random Forest and compare it with a baseline",
+    "Inspect the top parameter combinations"
+  ],
+  "sections": [
+    {
+      "id": "concept",
+      "icon": "🧠",
+      "title": "Step 1: Understand the Concept",
+      "meta": "Hyperparameters and GridSearchCV",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Hyperparameters are settings you choose before training a model. Different settings can produce different results."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Decision Tree setting",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "max_depth",
+              "Maximum depth of the tree"
+            ],
+            [
+              "min_samples_split",
+              "Minimum samples needed to split a node"
+            ],
+            [
+              "min_samples_leaf",
+              "Minimum samples allowed in a leaf"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "head": [
+            "Approach",
+            "How it works"
+          ],
+          "rows": [
+            [
+              "Manual tuning",
+              "Try a few values yourself and compare. Slow, and it can miss useful combinations."
+            ],
+            [
+              "GridSearchCV",
+              "You give candidate values. scikit-learn evaluates every combination with cross-validation and picks the best by your chosen scoring metric."
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Cross-validation: instead of relying on one train/validation split, k-fold cross-validation divides the training data into k folds. Each fold gets a turn as the validation fold while the others train the model. With 5 folds, every combination is scored on five splits and GridSearchCV compares the average scores."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The test set stays untouched. GridSearchCV uses only the training set to choose hyperparameters."
+        }
+      ]
+    },
+    {
+      "id": "load",
+      "icon": "⚡",
+      "title": "Step 2: Load the Data",
+      "meta": "Breast Cancer Wisconsin",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "We use scikit-learn's built-in Breast Cancer dataset to classify tumors as malignant or benign. No CSV download is needed. Copy this into day17_tuning.py:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day17_tuning.py",
+          "code": "import pandas as pd\nfrom sklearn.datasets import load_breast_cancer\nfrom sklearn.model_selection import train_test_split, GridSearchCV\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score, classification_report\n\n# Load dataset\ndata = load_breast_cancer()\nX = pd.DataFrame(data.data, columns=data.feature_names)\ny = data.target\n\nprint(\"Dataset shape:\", X.shape)\nprint(\"Classes:\", data.target_names)\nprint(X.head())",
+          "output": "Dataset shape: (569, 30)\nClasses: ['malignant' 'benign']\n   mean radius  mean texture  ...  worst symmetry  worst fractal dimension\n0        17.99         10.38  ...          0.4601                  0.11890\n1        20.57         17.77  ...          0.2750                  0.08902\n2        19.69         21.25  ...          0.3613                  0.08758\n3        11.42         20.38  ...          0.6638                  0.17300\n4        20.29         14.34  ...          0.2364                  0.07678\n\n[5 rows x 30 columns]"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "569 samples and 30 measurements per sample. The target classes are malignant and benign."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "✂️",
+      "title": "Step 3: Split the Data",
+      "meta": "Reserve a test set",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split.py",
+          "code": "X_train, X_test, y_train, y_test = train_test_split(\n    X, y,\n    test_size=0.20,\n    random_state=42,\n    stratify=y\n)\n\nprint(\"Training samples:\", len(X_train))\nprint(\"Testing samples:\", len(X_test))",
+          "output": "Training samples: 455\nTesting samples: 114"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Important: we reserve the test set for the final evaluation. Stratify keeps the malignant/benign balance the same in both parts."
+        }
+      ]
+    },
+    {
+      "id": "baseline",
+      "icon": "📏",
+      "title": "Step 4: Create a Baseline Model",
+      "meta": "Train without tuning",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First, train a Random Forest with default settings. Keep this score to compare against the tuned model."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "baseline.py",
+          "code": "baseline = RandomForestClassifier(random_state=42)\nbaseline.fit(X_train, y_train)\nbaseline_predictions = baseline.predict(X_test)\n\nprint(\n    \"Baseline test accuracy:\",\n    round(accuracy_score(y_test, baseline_predictions), 4)\n)",
+          "output": "Baseline test accuracy: 0.9561"
+        }
+      ]
+    },
+    {
+      "id": "grid",
+      "icon": "🎛️",
+      "title": "Step 5: Define the Hyperparameter Grid",
+      "meta": "24 combinations",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "grid.py",
+          "code": "param_grid = {\n    \"n_estimators\": [50, 100],\n    \"max_depth\": [None, 5, 10],\n    \"min_samples_split\": [2, 5],\n    \"min_samples_leaf\": [1, 2]\n}\n\nprint(\"Combinations:\", 2 * 3 * 2 * 2)",
+          "output": "Combinations: 24"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Parameter",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "n_estimators",
+              "Number of trees"
+            ],
+            [
+              "max_depth",
+              "Maximum depth of each tree"
+            ],
+            [
+              "min_samples_split",
+              "Minimum samples needed to split a node"
+            ],
+            [
+              "min_samples_leaf",
+              "Minimum samples allowed in a leaf"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "2 x 3 x 2 x 2 = 24 combinations. With 5-fold cross-validation, GridSearchCV performs 24 x 5 = 120 model fits, then refits the best configuration on the full training set."
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "icon": "🔥",
+      "title": "Step 6: Run GridSearchCV",
+      "meta": "Most important step",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "search.py",
+          "code": "rf = RandomForestClassifier(random_state=42)\n\ngrid_search = GridSearchCV(\n    estimator=rf,\n    param_grid=param_grid,\n    cv=5,\n    scoring=\"accuracy\",\n    n_jobs=-1,\n    verbose=1\n)\n\ngrid_search.fit(X_train, y_train)\n\nprint(\"Best parameters:\")\nprint(grid_search.best_params_)\n\nprint(\"\\nBest cross-validation accuracy:\")\nprint(round(grid_search.best_score_, 4))",
+          "output": "Fitting 5 folds for each of 24 candidates, totalling 120 fits\nBest parameters:\n{'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}\n\nBest cross-validation accuracy:\n0.9604"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "best_params_ holds the winning settings and best_score_ holds their mean cross-validation score. With the default refit=True, best_estimator_ is refitted on the whole training set."
+        }
+      ]
+    },
+    {
+      "id": "evaluate",
+      "icon": "🎯",
+      "title": "Step 7: Evaluate on Unseen Test Data",
+      "meta": "Baseline vs tuned",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "evaluate.py",
+          "code": "best_model = grid_search.best_estimator_\ntuned_predictions = best_model.predict(X_test)\n\nprint(\n    \"Baseline accuracy:\",\n    round(accuracy_score(y_test, baseline_predictions), 4)\n)\nprint(\n    \"Tuned accuracy:\",\n    round(accuracy_score(y_test, tuned_predictions), 4)\n)\n\nprint(\"\\nClassification Report:\")\nprint(classification_report(\n    y_test,\n    tuned_predictions,\n    target_names=data.target_names\n))",
+          "output": "Baseline accuracy: 0.9561\nTuned accuracy: 0.9474\n\nClassification Report:\n              precision    recall  f1-score   support\n\n   malignant       0.93      0.93      0.93        42\n      benign       0.96      0.96      0.96        72\n\n    accuracy                           0.95       114\n   macro avg       0.94      0.94      0.94       114\nweighted avg       0.95      0.95      0.95       114"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Your goal: compare the baseline and tuned models on the same test set. Tuning may improve performance, but an improvement is not guaranteed."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Here the tuned model scores slightly lower on the test set (0.9474 vs 0.9561). That is one sample out of 114. The best cross-validation score is higher than the baseline's, but the test set is only one sample of data, so do not read too much into a one-sample gap."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Do not use the test set repeatedly to choose parameters. That would gradually turn it into another validation set."
+        }
+      ]
+    },
+    {
+      "id": "inspect",
+      "icon": "🔎",
+      "title": "Step 8: Inspect the Top Combinations",
+      "meta": "Beyond the winner",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "inspect.py",
+          "code": "results = pd.DataFrame(grid_search.cv_results_)\n\ntop_results = results[\n    [\n        \"params\",\n        \"mean_test_score\",\n        \"std_test_score\",\n        \"rank_test_score\"\n    ]\n].sort_values(\"rank_test_score\").head(5)\n\nprint(top_results.to_string(index=False))",
+          "output": "                                                                                params  mean_test_score  std_test_score  rank_test_score\n{'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}         0.960440        0.025631                1\n  {'max_depth': 10, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}         0.960440        0.025631                1\n{'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 50}         0.958242        0.028146                3\n{'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 5, 'n_estimators': 50}         0.958242        0.023466                3\n  {'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 5, 'n_estimators': 50}         0.958242        0.023466                3"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Which configurations performed best?",
+            "Were the top scores very close?",
+            "Was there substantial variation across folds?"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Two configurations tie at rank 1 (max_depth None and 10 give identical scores), and the next three are only about 0.002 behind. The fold-to-fold std is about 0.025. Close scores and fold variation mean there is no single clearly superior configuration."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "🩺",
+      "title": "Step 9: Predict a Sample",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict.py",
+          "code": "sample = X_test.iloc[[0]]\n\nprediction = best_model.predict(sample)[0]\nprobability = best_model.predict_proba(sample)[0]\n\nprint(\"Prediction:\", data.target_names[prediction])\nprint(\"Actual:\", data.target_names[y_test[0]])\nprint(f\"Malignant: {probability[0]:.0%} | Benign: {probability[1]:.0%}\")",
+          "output": "Prediction: malignant\nActual: malignant\nMalignant: 100% | Benign: 0%"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "This is a learning exercise, not a medical tool. Never use a model like this to make a real diagnosis."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🔥",
+      "title": "Mini Project: Tune and Compare",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Final Program below tunes both a Decision Tree and a Random Forest with GridSearchCV, compares baseline and tuned scores, inspects the top configurations, and evaluates the winner once on the test set."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Hyperparameters are set before training; parameters are learned from data",
+            "GridSearchCV tries every combination using k-fold cross-validation",
+            "Tune on the training set only and keep the test set for one final check",
+            "Compare the tuned model with a baseline",
+            "Inspect the top results: ties and large fold variation mean no clear winner",
+            "Tuning may improve performance, but an improvement is not guaranteed"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Hyperparameter Tuning with GridSearchCV",
+    "file": "day17_final.py",
+    "description": "One program combining Day 17: a Decision Tree and a Random Forest tuned with GridSearchCV, baseline vs tuned scores with cross-validation and the test set, the top configurations, a classification report and a confusion matrix.",
+    "concepts": [
+      "hyperparameters",
+      "GridSearchCV",
+      "k-fold cross-validation",
+      "baseline comparison",
+      "top-results inspection",
+      "single final test evaluation"
+    ],
+    "code": "import pandas as pd\nfrom sklearn.datasets import load_breast_cancer\nfrom sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score, classification_report, confusion_matrix\n\nprint(\"=== HYPERPARAMETER TUNING WITH GRIDSEARCHCV ===\")\n\ndata = load_breast_cancer()\nX = pd.DataFrame(data.data, columns=data.feature_names)\ny = data.target\nprint(\"Samples:\", X.shape[0], \"| Features:\", X.shape[1])\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y\n)\n\nsearches = {\n    \"Decision Tree\": (\n        DecisionTreeClassifier(random_state=42),\n        {\n            \"max_depth\": [None, 3, 5, 8],\n            \"min_samples_split\": [2, 5, 10],\n            \"min_samples_leaf\": [1, 2, 4]\n        }\n    ),\n    \"Random Forest\": (\n        RandomForestClassifier(random_state=42),\n        {\n            \"n_estimators\": [50, 100],\n            \"max_depth\": [None, 5, 10],\n            \"min_samples_split\": [2, 5],\n            \"min_samples_leaf\": [1, 2]\n        }\n    )\n}\n\ntuned = {}\nprint(\"\\nBaseline vs tuned (5-fold CV on training data, then the test set):\")\nfor name, (model, grid) in searches.items():\n    base_cv = cross_val_score(model, X_train, y_train, cv=5).mean()\n    model.fit(X_train, y_train)\n    base_test = accuracy_score(y_test, model.predict(X_test))\n\n    gs = GridSearchCV(model, grid, cv=5, scoring=\"accuracy\", n_jobs=-1)\n    gs.fit(X_train, y_train)\n    tuned_test = accuracy_score(y_test, gs.predict(X_test))\n    tuned[name] = gs\n\n    print(f\"\\n{name}\")\n    print(f\"  Baseline: CV {base_cv:.4f} | test {base_test:.4f}\")\n    print(f\"  Tuned:    CV {gs.best_score_:.4f} | test {tuned_test:.4f}\")\n    print(\"  Best params:\", gs.best_params_)\n\nbest_name = max(tuned, key=lambda n: tuned[n].best_score_)\nbest = tuned[best_name]\nprint(\"\\nBest by cross-validation:\", best_name)\n\nprint(\"\\nTop 3 configurations:\")\nres = pd.DataFrame(best.cv_results_)\nprint(\n    res[[\"params\", \"mean_test_score\", \"std_test_score\", \"rank_test_score\"]]\n    .sort_values(\"rank_test_score\").head(3).to_string(index=False)\n)\n\npredictions = best.predict(X_test)\nprint(\"\\nClassification report:\")\nprint(classification_report(y_test, predictions, target_names=data.target_names))\n\ncm = confusion_matrix(y_test, predictions)\nprint(\"Confusion matrix (rows = actual, columns = predicted):\")\nprint(pd.DataFrame(cm, index=data.target_names, columns=data.target_names))\n\nprint(\"\\nThe test set was used only once, for this final check.\")",
+    "output": "=== HYPERPARAMETER TUNING WITH GRIDSEARCHCV ===\nSamples: 569 | Features: 30\n\nBaseline vs tuned (5-fold CV on training data, then the test set):\n\nDecision Tree\n  Baseline: CV 0.9099 | test 0.9123\n  Tuned:    CV 0.9385 | test 0.9211\n  Best params: {'max_depth': 5, 'min_samples_leaf': 1, 'min_samples_split': 5}\n\nRandom Forest\n  Baseline: CV 0.9538 | test 0.9561\n  Tuned:    CV 0.9604 | test 0.9474\n  Best params: {'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}\n\nBest by cross-validation: Random Forest\n\nTop 3 configurations:\n                                                                                params  mean_test_score  std_test_score  rank_test_score\n{'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}         0.960440        0.025631                1\n  {'max_depth': 10, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}         0.960440        0.025631                1\n{'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 50}         0.958242        0.028146                3\n\nClassification report:\n              precision    recall  f1-score   support\n\n   malignant       0.93      0.93      0.93        42\n      benign       0.96      0.96      0.96        72\n\n    accuracy                           0.95       114\n   macro avg       0.94      0.94      0.94       114\nweighted avg       0.95      0.95      0.95       114\n\nConfusion matrix (rows = actual, columns = predicted):\n           malignant  benign\nmalignant         39       3\nbenign             3      69\n\nThe test set was used only once, for this final check."
+  },
+  "practice": [
+    {
+      "title": "Tune a Decision Tree on Wine Data",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Tune a Decision Tree with GridSearchCV on the built-in Wine dataset and compare it with a baseline.",
+      "tasks": [
+        "Split 80/20 with random_state=1 and stratify=y",
+        "Train a baseline DecisionTreeClassifier(random_state=1) and print its test accuracy",
+        "Create a param_grid with max_depth [2, 3, 4, 5, None] and min_samples_leaf [1, 2, 4]",
+        "Run GridSearchCV with cv=5 and scoring=\"accuracy\" on the training set only",
+        "Print best_params_, best_score_ and the tuned test accuracy",
+        "Print the number of combinations and total fits"
+      ],
+      "hint": "Combinations = 5 x 3 = 15. Total fits = combinations x number of folds.",
+      "starter": "import pandas as pd\nfrom sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split, GridSearchCV\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score\n\ndata = load_wine()\nX = pd.DataFrame(data.data, columns=data.feature_names)\ny = data.target\n\n# TODO 1: split 80/20 with random_state=1 and stratify=y\n# TODO 2: train a baseline DecisionTreeClassifier(random_state=1) and print its test accuracy\n# TODO 3: param_grid with max_depth [2, 3, 4, 5, None] and min_samples_leaf [1, 2, 4]\n# TODO 4: run GridSearchCV with cv=5, scoring=\"accuracy\" on the training set only\n# TODO 5: print best_params_, best_score_ and the tuned test accuracy\n# TODO 6: print the number of parameter combinations and total fits",
+      "solution": "import pandas as pd\nfrom sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split, GridSearchCV\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score\n\ndata = load_wine()\nX = pd.DataFrame(data.data, columns=data.feature_names)\ny = data.target\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=1, stratify=y\n)\n\nbaseline = DecisionTreeClassifier(random_state=1)\nbaseline.fit(X_train, y_train)\nprint(\"Baseline test accuracy:\", round(accuracy_score(y_test, baseline.predict(X_test)), 4))\n\nparam_grid = {\n    \"max_depth\": [2, 3, 4, 5, None],\n    \"min_samples_leaf\": [1, 2, 4]\n}\n\ngrid = GridSearchCV(\n    DecisionTreeClassifier(random_state=1),\n    param_grid, cv=5, scoring=\"accuracy\"\n)\ngrid.fit(X_train, y_train)\n\ncombos = 5 * 3\nprint(\"Combinations:\", combos, \"| Total fits:\", combos * 5)\nprint(\"Best parameters:\", grid.best_params_)\nprint(\"Best CV accuracy:\", round(grid.best_score_, 4))\nprint(\"Tuned test accuracy:\", round(accuracy_score(y_test, grid.predict(X_test)), 4))",
+      "output": "Baseline test accuracy: 0.9444\nCombinations: 15 | Total fits: 75\nBest parameters: {'max_depth': 4, 'min_samples_leaf': 2}\nBest CV accuracy: 0.8869\nTuned test accuracy: 0.9444",
+      "note": "The tuned test accuracy equals the baseline's. The best cross-validation score (0.8869) is lower than the test accuracy, a reminder that the small test set is just one sample."
+    },
+    {
+      "title": "Tune an SVM Pipeline with F1",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Tune a scaled SVM inside a Pipeline, score with F1 and inspect the top configurations.",
+      "tasks": [
+        "Split 75/25 with random_state=0 and stratify=y",
+        "Build a Pipeline with StandardScaler and SVC",
+        "Create a grid with svc__C [0.1, 1, 10], svc__kernel [\"linear\", \"rbf\"] and svc__gamma [\"scale\", 0.01]",
+        "Run GridSearchCV with cv=5 and scoring=\"f1\" on the training data",
+        "Print best_params_ and the best CV F1",
+        "Print the test F1 and the classification report",
+        "Print the 3 best configurations (params, mean, std)"
+      ],
+      "hint": "Pipeline parameters use the step name, a double underscore and the parameter, such as svc__C. Sort cv_results_ by mean_test_score.",
+      "starter": "import pandas as pd\nfrom sklearn.datasets import load_breast_cancer\nfrom sklearn.model_selection import train_test_split, GridSearchCV\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.svm import SVC\nfrom sklearn.metrics import f1_score, classification_report\n\ndata = load_breast_cancer()\nX = pd.DataFrame(data.data, columns=data.feature_names)\ny = data.target\n\n# TODO 1: split 75/25 with random_state=0 and stratify=y\n# TODO 2: build Pipeline([(\"scale\", StandardScaler()), (\"svc\", SVC())])\n# TODO 3: param_grid with keys \"svc__C\" [0.1, 1, 10], \"svc__kernel\" [\"linear\", \"rbf\"], \"svc__gamma\" [\"scale\", 0.01]\n# TODO 4: GridSearchCV with cv=5 and scoring=\"f1\" (training data only)\n# TODO 5: print best_params_ and best CV F1\n# TODO 6: print test F1 and the classification report\n# TODO 7: print the 3 best configurations from cv_results_ (params, mean, std)",
+      "solution": "import pandas as pd\nfrom sklearn.datasets import load_breast_cancer\nfrom sklearn.model_selection import train_test_split, GridSearchCV\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.svm import SVC\nfrom sklearn.metrics import f1_score, classification_report\n\ndata = load_breast_cancer()\nX = pd.DataFrame(data.data, columns=data.feature_names)\ny = data.target\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.25, random_state=0, stratify=y\n)\n\npipe = Pipeline([(\"scale\", StandardScaler()), (\"svc\", SVC())])\n\nparam_grid = {\n    \"svc__C\": [0.1, 1, 10],\n    \"svc__kernel\": [\"linear\", \"rbf\"],\n    \"svc__gamma\": [\"scale\", 0.01]\n}\n\ngrid = GridSearchCV(pipe, param_grid, cv=5, scoring=\"f1\", n_jobs=-1)\ngrid.fit(X_train, y_train)\n\nprint(\"Best parameters:\", grid.best_params_)\nprint(\"Best CV F1:\", round(grid.best_score_, 4))\n\npred = grid.predict(X_test)\nprint(\"Test F1:\", round(f1_score(y_test, pred), 4))\nprint(classification_report(y_test, pred, target_names=data.target_names))\n\nres = pd.DataFrame(grid.cv_results_)\nprint(\n    res[[\"params\", \"mean_test_score\", \"std_test_score\"]]\n    .sort_values(\"mean_test_score\", ascending=False)\n    .head(3).to_string(index=False)\n)",
+      "output": "Best parameters: {'svc__C': 0.1, 'svc__gamma': 'scale', 'svc__kernel': 'linear'}\nBest CV F1: 0.9906\nTest F1: 0.9674\n              precision    recall  f1-score   support\n\n   malignant       0.98      0.91      0.94        53\n      benign       0.95      0.99      0.97        90\n\n    accuracy                           0.96       143\n   macro avg       0.96      0.95      0.95       143\nweighted avg       0.96      0.96      0.96       143\n\n                                                         params  mean_test_score  std_test_score\n{'svc__C': 0.1, 'svc__gamma': 'scale', 'svc__kernel': 'linear'}         0.990616        0.010434\n   {'svc__C': 0.1, 'svc__gamma': 0.01, 'svc__kernel': 'linear'}         0.990616        0.010434\n     {'svc__C': 1, 'svc__gamma': 'scale', 'svc__kernel': 'rbf'}         0.988886        0.009077",
+      "note": "The top two configurations have identical scores because gamma has no effect with a linear kernel. Putting StandardScaler in the Pipeline means scaling is fitted only on each training fold, which avoids leakage."
+    }
+  ],
+  "checklist": [
+    "Understood hyperparameters",
+    "Learned how GridSearchCV and k-fold cross-validation work",
+    "Trained a baseline Random Forest",
+    "Defined a hyperparameter grid",
+    "Ran GridSearchCV on the training set",
+    "Evaluated the tuned model on the test set once",
+    "Inspected the top parameter combinations"
+  ],
+  "quiz": [
+    {
+      "q": "What is a hyperparameter?",
+      "options": [
+        "A value learned from the data during training",
+        "A setting chosen before training",
+        "The model's accuracy",
+        "A column in the dataset"
+      ],
+      "answer": 1,
+      "why": "Hyperparameters such as max_depth or n_estimators are set before training. Parameters are what the model learns from the data."
+    },
+    {
+      "q": "A grid has 2 x 3 x 2 x 2 combinations and cv=5. How many model fits does the search perform before the final refit?",
+      "options": [
+        "24",
+        "60",
+        "120",
+        "240"
+      ],
+      "answer": 2,
+      "why": "There are 24 combinations and each is fitted on 5 folds, so 24 x 5 = 120 fits, then the best configuration is refitted once."
+    },
+    {
+      "q": "Which data should GridSearchCV be fitted on?",
+      "options": [
+        "The full dataset",
+        "The test set",
+        "The training set only",
+        "The validation set from the test set"
+      ],
+      "answer": 2,
+      "why": "Fitting the search on the training set keeps the test set untouched for one final, unbiased evaluation."
+    },
+    {
+      "q": "The tuned model scores slightly below the baseline on the test set. What is the best conclusion?",
+      "options": [
+        "GridSearchCV is broken",
+        "Tuning is guaranteed to fail",
+        "A small gap on one test set can be noise; check the cross-validation scores and the spread",
+        "Retune repeatedly until the test score rises"
+      ],
+      "answer": 2,
+      "why": "With 114 test samples, one sample moves accuracy by about 0.9 points. Judge using cross-validation, and avoid tuning against the test set."
+    },
+    {
+      "q": "The top 5 configurations have almost identical scores. What does that suggest?",
+      "options": [
+        "Only the first one is usable",
+        "There is no single clearly superior configuration",
+        "The data is invalid",
+        "cv must be 10"
+      ],
+      "answer": 1,
+      "why": "Near-tied scores with fold-to-fold variation mean the choice among them matters little, so you can prefer the simpler or cheaper model."
+    }
+  ]
+},
+
+// DAY 18 snippet. In course-data.js: after Day 17's closing }, paste this object (keep the comma after Day 17). No images needed for this day.
+{
+  "day": 18,
+  "title": "Fraud Detection Baseline",
+  "subtitle": "Work with rare-event data: build a dummy baseline and a Logistic Regression baseline, and learn why accuracy alone is misleading.",
+  "level": "Intermediate",
+  "duration": "60-90 min",
+  "tags": [
+    "Imbalanced Data",
+    "Fraud Detection",
+    "Confusion Matrix",
+    "Precision and Recall",
+    "Baseline Models"
+  ],
+  "goals": [
+    "Understand why accuracy is misleading on rare-event data",
+    "Build a DummyClassifier baseline and a Logistic Regression baseline",
+    "Read a confusion matrix as TN, FP, FN and TP",
+    "Compare models with fraud precision, recall and F1"
+  ],
+  "sections": [
+    {
+      "id": "concept",
+      "icon": "🧠",
+      "title": "Step 1: Understand the Problem",
+      "meta": "Rare events and accuracy",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "In fraud detection, almost every transaction is legitimate. A model can look excellent on accuracy while catching no fraud at all, so we build simple baselines first and judge them with the right metrics."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Term",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "TN",
+              "Legitimate transactions correctly predicted as legitimate"
+            ],
+            [
+              "FP",
+              "Legitimate transactions incorrectly flagged as fraud"
+            ],
+            [
+              "FN",
+              "Fraud transactions incorrectly predicted as legitimate"
+            ],
+            [
+              "TP",
+              "Fraud transactions correctly detected"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "head": [
+            "Metric",
+            "Question it answers"
+          ],
+          "rows": [
+            [
+              "Precision = TP / (TP + FP)",
+              "Of the transactions flagged as fraud, how many really were fraud?"
+            ],
+            [
+              "Recall = TP / (TP + FN)",
+              "Of all actual fraud cases, how many did the model detect?"
+            ],
+            [
+              "F1",
+              "A single score that balances precision and recall"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "In a confusion matrix, rows are actual classes and columns are predicted classes. The class order is 0 (Legitimate), then 1 (Fraud)."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "⚡",
+      "title": "Step 2: Create the Dataset",
+      "meta": "Synthetic fraud data",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "We create a synthetic fraud dataset: 30,000 transactions with ten features, an Amount column and a Class column (1 = fraud, 0 = legitimate). Copy this into day18_fraud.py:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day18_fraud.py",
+          "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\n\n# Synthetic stand-in for a credit-card fraud dataset (fraud is rare)\nX_raw, y_raw = make_classification(\n    n_samples=30000,\n    n_features=10,\n    n_informative=6,\n    n_redundant=0,\n    weights=[0.99, 0.01],\n    class_sep=0.8,\n    flip_y=0,\n    random_state=42\n)\n\ndf = pd.DataFrame(X_raw, columns=[f\"V{i}\" for i in range(1, 11)])\nrng = np.random.RandomState(42)\ndf[\"Amount\"] = rng.lognormal(mean=3.5, sigma=1.0, size=len(df)).round(2)\ndf[\"Class\"] = y_raw\n\nprint(\"Dataset shape:\", df.shape)\nprint(\"\\nClass counts:\")\nprint(df[\"Class\"].value_counts())\nprint(\"\\nFraud rate:\", f\"{df['Class'].mean():.2%}\")",
+          "output": "Dataset shape: (30000, 12)\n\nClass counts:\nClass\n0    29700\n1      300\nName: count, dtype: int64\n\nFraud rate: 1.00%"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Using a real fraud CSV (for example creditcard.csv)? Replace this step with df = pd.read_csv(\"creditcard.csv\"). The target column must be named Class. Every later step works unchanged, but your numbers will differ."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "✂️",
+      "title": "Step 3: Separate Features and Target",
+      "meta": "Stratified split",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Features (X) are the transaction information used to predict. The target (y) says whether the transaction is fraud (1) or legitimate (0)."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split.py",
+          "code": "from sklearn.model_selection import train_test_split\n\nX = df.drop(columns=[\"Class\"])\ny = df[\"Class\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X,\n    y,\n    test_size=0.20,\n    random_state=42,\n    stratify=y\n)\n\nprint(\"Training rows:\", len(X_train))\nprint(\"Testing rows:\", len(X_test))\n\nprint(\"\\nFraud cases in training data:\", int(y_train.sum()))\nprint(\"Fraud cases in test data:\", int(y_test.sum()))",
+          "output": "Training rows: 24000\nTesting rows: 6000\n\nFraud cases in training data: 240\nFraud cases in test data: 60"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Why stratify=y? Fraud is rare. Stratification keeps about the same fraud proportion in both sets: 240 fraud cases in training and 60 in testing."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Reserve the test set for evaluation. Do not repeatedly use it to tune the model."
+        }
+      ]
+    },
+    {
+      "id": "dummy",
+      "icon": "📏",
+      "title": "Step 4: Baseline A — The Simplest Model",
+      "meta": "Always predict legitimate",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First, a model that always predicts the majority class."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "dummy.py",
+          "code": "from sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import (\n    accuracy_score,\n    classification_report,\n    confusion_matrix\n)\n\ndummy_model = DummyClassifier(strategy=\"most_frequent\")\ndummy_model.fit(X_train, y_train)\n\ndummy_predictions = dummy_model.predict(X_test)\n\nprint(\"Dummy Model Accuracy:\",\n      accuracy_score(y_test, dummy_predictions))\n\nprint(\"\\nConfusion Matrix:\")\nprint(confusion_matrix(y_test, dummy_predictions, labels=[0, 1]))\n\nprint(\"\\nClassification Report:\")\nprint(classification_report(\n    y_test,\n    dummy_predictions,\n    labels=[0, 1],\n    target_names=[\"Legitimate\", \"Fraud\"],\n    zero_division=0\n))",
+          "output": "Dummy Model Accuracy: 0.99\n\nConfusion Matrix:\n[[5940    0]\n [  60    0]]\n\nClassification Report:\n              precision    recall  f1-score   support\n\n  Legitimate       0.99      1.00      0.99      5940\n       Fraud       0.00      0.00      0.00        60\n\n    accuracy                           0.99      6000\n   macro avg       0.49      0.50      0.50      6000\nweighted avg       0.98      0.99      0.99      6000"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Accuracy is 0.99, yet the model caught 0 of 60 fraud cases. The dummy model never predicts fraud, so fraud recall is zero. This is the warning against trusting accuracy alone."
+        }
+      ]
+    },
+    {
+      "id": "logistic",
+      "icon": "🔥",
+      "title": "Step 5: Baseline B — Logistic Regression",
+      "meta": "Most important step",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Now a real ML model. A pipeline scales the features before fitting Logistic Regression."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "logistic.py",
+          "code": "from sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\nlogistic_model = make_pipeline(\n    StandardScaler(),\n    LogisticRegression(max_iter=1000, random_state=42)\n)\n\nlogistic_model.fit(X_train, y_train)\n\nlogistic_predictions = logistic_model.predict(X_test)\n\nprint(\"Logistic Regression Accuracy:\",\n      accuracy_score(y_test, logistic_predictions))\n\nprint(\"\\nConfusion Matrix:\")\nprint(confusion_matrix(\n    y_test,\n    logistic_predictions,\n    labels=[0, 1]\n))\n\nprint(\"\\nClassification Report:\")\nprint(classification_report(\n    y_test,\n    logistic_predictions,\n    labels=[0, 1],\n    target_names=[\"Legitimate\", \"Fraud\"],\n    zero_division=0\n))",
+          "output": "Logistic Regression Accuracy: 0.992\n\nConfusion Matrix:\n[[5939    1]\n [  47   13]]\n\nClassification Report:\n              precision    recall  f1-score   support\n\n  Legitimate       0.99      1.00      1.00      5940\n       Fraud       0.93      0.22      0.35        60\n\n    accuracy                           0.99      6000\n   macro avg       0.96      0.61      0.67      6000\nweighted avg       0.99      0.99      0.99      6000"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "This is our initial baseline, not our final fraud detector. With default settings it caught 13 of 60 frauds (recall 0.22) and flagged only 1 legitimate transaction (precision 0.93). That gives us a measurable starting point."
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "icon": "📊",
+      "title": "Step 6: Compare the Two Models",
+      "meta": "Look at fraud recall first",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare.py",
+          "code": "from sklearn.metrics import precision_score, recall_score, f1_score\n\nresults = pd.DataFrame([\n    {\n        \"Model\": \"Dummy Classifier\",\n        \"Accuracy\": accuracy_score(y_test, dummy_predictions),\n        \"Fraud Precision\": precision_score(\n            y_test, dummy_predictions, zero_division=0\n        ),\n        \"Fraud Recall\": recall_score(\n            y_test, dummy_predictions, zero_division=0\n        ),\n        \"Fraud F1\": f1_score(\n            y_test, dummy_predictions, zero_division=0\n        )\n    },\n    {\n        \"Model\": \"Logistic Regression\",\n        \"Accuracy\": accuracy_score(y_test, logistic_predictions),\n        \"Fraud Precision\": precision_score(\n            y_test, logistic_predictions, zero_division=0\n        ),\n        \"Fraud Recall\": recall_score(\n            y_test, logistic_predictions, zero_division=0\n        ),\n        \"Fraud F1\": f1_score(\n            y_test, logistic_predictions, zero_division=0\n        )\n    }\n])\n\nprint(results.round(4).to_string(index=False))",
+          "output": "              Model  Accuracy  Fraud Precision  Fraud Recall  Fraud F1\n   Dummy Classifier     0.990           0.0000        0.0000    0.0000\nLogistic Regression     0.992           0.9286        0.2167    0.3514"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Fraud Recall: what proportion of all actual fraud cases did the model detect?",
+            "Fraud Precision: how many flagged transactions really were fraud?",
+            "Fraud F1: the balance between precision and recall"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Accuracy rose only from 0.990 to 0.992, but fraud recall went from 0 to 0.22. High accuracy alone does not mean fraud detection is good."
+        }
+      ]
+    },
+    {
+      "id": "matrix",
+      "icon": "🔎",
+      "title": "Step 7: Read the Confusion Matrix",
+      "meta": "TN, FP, FN, TP",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "matrix.py",
+          "code": "tn, fp, fn, tp = confusion_matrix(\n    y_test, logistic_predictions, labels=[0, 1]\n).ravel()\n\nprint(\"TN (legitimate, correct):\", tn)\nprint(\"FP (legitimate flagged as fraud):\", fp)\nprint(\"FN (fraud missed):\", fn)\nprint(\"TP (fraud caught):\", tp)\n\nprint(\"\\nFraud recall   = TP / (TP + FN) =\", round(tp / (tp + fn), 4))\nprint(\"Fraud precision = TP / (TP + FP) =\", round(tp / (tp + fp), 4))\nprint(f\"\\nFraud missed: {fn} of {fn + tp} ({fn / (fn + tp):.0%})\")",
+          "output": "TN (legitimate, correct): 5939\nFP (legitimate flagged as fraud): 1\nFN (fraud missed): 47\nTP (fraud caught): 13\n\nFraud recall   = TP / (TP + FN) = 0.2167\nFraud precision = TP / (TP + FP) = 0.9286\n\nFraud missed: 47 of 60 (78%)"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The model is cautious: very few false alarms, but 47 of 60 frauds (78%) slip through. Improving this precision/recall trade-off is the topic of Day 19."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🏁",
+      "title": "Mini Project: Fraud Baseline Report",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Final Program below builds the dataset, splits it, trains both baselines and prints one comparison table, the confusion matrix and the classification report."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "In rare-event problems, accuracy can be high while the model detects nothing",
+            "A DummyClassifier baseline shows how much a real model must beat",
+            "Rows of a confusion matrix are actual classes, columns are predicted classes",
+            "Precision, recall and F1 describe the rare class far better than accuracy",
+            "A default Logistic Regression can have high precision but low recall",
+            "Stratified splitting preserves the fraud rate in both sets"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Fraud Detection Baseline",
+    "file": "day18_final.py",
+    "description": "One program combining Day 18: a synthetic fraud dataset, a stratified split, a Dummy baseline and a Logistic Regression baseline compared by accuracy, fraud precision, recall and F1, with the confusion matrix and classification report.",
+    "concepts": [
+      "imbalanced data",
+      "stratified split",
+      "dummy baseline",
+      "Logistic Regression pipeline",
+      "confusion matrix",
+      "precision, recall and F1"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import (\n    accuracy_score, precision_score, recall_score, f1_score,\n    confusion_matrix, classification_report\n)\n\nprint(\"=== FRAUD DETECTION BASELINE ===\")\n\nX_raw, y_raw = make_classification(\n    n_samples=30000, n_features=10, n_informative=6, n_redundant=0,\n    weights=[0.99, 0.01], class_sep=0.8, flip_y=0, random_state=42\n)\ndf = pd.DataFrame(X_raw, columns=[f\"V{i}\" for i in range(1, 11)])\nrng = np.random.RandomState(42)\ndf[\"Amount\"] = rng.lognormal(mean=3.5, sigma=1.0, size=len(df)).round(2)\ndf[\"Class\"] = y_raw\n\nprint(\"Transactions:\", len(df))\nprint(\"Fraud cases:\", int(df[\"Class\"].sum()), f\"({df['Class'].mean():.2%})\")\n\nX = df.drop(columns=[\"Class\"])\ny = df[\"Class\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y\n)\nprint(\"Fraud in train/test:\", int(y_train.sum()), \"/\", int(y_test.sum()))\n\nmodels = {\n    \"Dummy Classifier\": DummyClassifier(strategy=\"most_frequent\"),\n    \"Logistic Regression\": make_pipeline(\n        StandardScaler(),\n        LogisticRegression(max_iter=1000, random_state=42)\n    )\n}\n\nrows = []\nfor name, model in models.items():\n    model.fit(X_train, y_train)\n    pred = model.predict(X_test)\n    tn, fp, fn, tp = confusion_matrix(y_test, pred, labels=[0, 1]).ravel()\n    rows.append({\n        \"Model\": name,\n        \"Accuracy\": accuracy_score(y_test, pred),\n        \"Fraud Precision\": precision_score(y_test, pred, zero_division=0),\n        \"Fraud Recall\": recall_score(y_test, pred, zero_division=0),\n        \"Fraud F1\": f1_score(y_test, pred, zero_division=0),\n        \"TP\": tp, \"FN\": fn, \"FP\": fp\n    })\n\nprint(\"\\nModel comparison:\")\nprint(pd.DataFrame(rows).round(4).to_string(index=False))\n\nlogistic = models[\"Logistic Regression\"]\npred = logistic.predict(X_test)\nprint(\"\\nConfusion matrix (rows = actual, columns = predicted):\")\nprint(pd.DataFrame(\n    confusion_matrix(y_test, pred, labels=[0, 1]),\n    index=[\"Legitimate\", \"Fraud\"], columns=[\"Legitimate\", \"Fraud\"]\n))\n\nprint(\"\\nClassification report (Logistic Regression):\")\nprint(classification_report(\n    y_test, pred, labels=[0, 1],\n    target_names=[\"Legitimate\", \"Fraud\"], zero_division=0\n))\n\nbest = max(rows, key=lambda r: r[\"Fraud Recall\"])\nprint(\"Highest fraud recall:\", best[\"Model\"])\nprint(\"Accuracy alone is misleading when fraud is rare.\")",
+    "output": "=== FRAUD DETECTION BASELINE ===\nTransactions: 30000\nFraud cases: 300 (1.00%)\nFraud in train/test: 240 / 60\n\nModel comparison:\n              Model  Accuracy  Fraud Precision  Fraud Recall  Fraud F1  TP  FN  FP\n   Dummy Classifier     0.990           0.0000        0.0000    0.0000   0  60   0\nLogistic Regression     0.992           0.9286        0.2167    0.3514  13  47   1\n\nConfusion matrix (rows = actual, columns = predicted):\n            Legitimate  Fraud\nLegitimate        5939      1\nFraud               47     13\n\nClassification report (Logistic Regression):\n              precision    recall  f1-score   support\n\n  Legitimate       0.99      1.00      1.00      5940\n       Fraud       0.93      0.22      0.35        60\n\n    accuracy                           0.99      6000\n   macro avg       0.96      0.61      0.67      6000\nweighted avg       0.99      0.99      0.99      6000\n\nHighest fraud recall: Logistic Regression\nAccuracy alone is misleading when fraud is rare."
+  },
+  "practice": [
+    {
+      "title": "Accuracy Paradox: Defect Detection",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Show that a dummy model gets high accuracy but zero recall on a factory defect dataset.",
+      "tasks": [
+        "Print the defect rate of y as a percentage",
+        "Split 75/25 with random_state=0 and stratify=y",
+        "Train DummyClassifier(strategy=\"most_frequent\") and predict on the test set",
+        "Print accuracy and defect recall (zero_division=0)",
+        "Print the confusion matrix with labels=[0, 1]",
+        "Print how many defective items the dummy model caught"
+      ],
+      "hint": "In confusion_matrix(...), cm[1, 1] is TP and y_test.sum() is the number of actual defects.",
+      "starter": "import pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import accuracy_score, recall_score, confusion_matrix\n\nX, y = make_classification(\n    n_samples=10000, n_features=8, n_informative=5, n_redundant=0,\n    weights=[0.97, 0.03], class_sep=1.0, flip_y=0, random_state=5\n)\nX = pd.DataFrame(X, columns=[f\"sensor_{i}\" for i in range(1, 9)])\n\n# TODO 1: print the defect rate of y as a percentage\n# TODO 2: split 75/25 with random_state=0 and stratify=y\n# TODO 3: train DummyClassifier(strategy=\"most_frequent\") and predict on the test set\n# TODO 4: print accuracy and defect recall (zero_division=0)\n# TODO 5: print the confusion matrix with labels=[0, 1]\n# TODO 6: print how many defective items the dummy model caught",
+      "solution": "import pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import accuracy_score, recall_score, confusion_matrix\n\nX, y = make_classification(\n    n_samples=10000, n_features=8, n_informative=5, n_redundant=0,\n    weights=[0.97, 0.03], class_sep=1.0, flip_y=0, random_state=5\n)\nX = pd.DataFrame(X, columns=[f\"sensor_{i}\" for i in range(1, 9)])\n\nprint(\"Defect rate:\", f\"{y.mean():.2%}\")\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.25, random_state=0, stratify=y\n)\n\ndummy = DummyClassifier(strategy=\"most_frequent\")\ndummy.fit(X_train, y_train)\npred = dummy.predict(X_test)\n\nprint(\"Accuracy:\", round(accuracy_score(y_test, pred), 4))\nprint(\"Defect recall:\", recall_score(y_test, pred, zero_division=0))\n\ncm = confusion_matrix(y_test, pred, labels=[0, 1])\nprint(\"Confusion matrix:\")\nprint(cm)\nprint(\"Defective items caught:\", cm[1, 1], \"of\", int(y_test.sum()))",
+      "output": "Defect rate: 3.00%\nAccuracy: 0.97\nDefect recall: 0.0\nConfusion matrix:\n[[2425    0]\n [  75    0]]\nDefective items caught: 0 of 75",
+      "note": "Accuracy equals the share of good items (0.97) while recall is 0. A model with 97% accuracy that finds no defects is useless."
+    },
+    {
+      "title": "Metrics by Hand",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Train a Logistic Regression pipeline and calculate precision, recall and F1 from TN, FP, FN and TP yourself.",
+      "tasks": [
+        "Split 80/20 with random_state=11 and stratify=y",
+        "Build a pipeline with StandardScaler and LogisticRegression(max_iter=1000)",
+        "Fit the pipeline and predict on the test set",
+        "Unpack tn, fp, fn, tp from confusion_matrix(..., labels=[0, 1]).ravel()",
+        "Compute precision, recall and F1 by hand",
+        "Verify them with precision_score, recall_score and f1_score",
+        "Print the percentage of positive cases that were missed"
+      ],
+      "hint": "F1 = 2 x precision x recall / (precision + recall). Missed share = FN / (FN + TP).",
+      "starter": "import pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score\n\nX, y = make_classification(\n    n_samples=12000, n_features=8, n_informative=5, n_redundant=0,\n    weights=[0.95, 0.05], class_sep=0.9, flip_y=0, random_state=11\n)\nX = pd.DataFrame(X, columns=[f\"feature_{i}\" for i in range(1, 9)])\n\n# TODO 1: split 80/20 with random_state=11 and stratify=y\n# TODO 2: pipeline = StandardScaler + LogisticRegression(max_iter=1000)\n# TODO 3: fit and predict on the test set\n# TODO 4: unpack tn, fp, fn, tp from confusion_matrix(..., labels=[0, 1]).ravel()\n# TODO 5: compute precision, recall and F1 by hand from tn/fp/fn/tp\n# TODO 6: verify your numbers with precision_score, recall_score, f1_score\n# TODO 7: print how many positive cases were missed, as a percentage",
+      "solution": "import pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score\n\nX, y = make_classification(\n    n_samples=12000, n_features=8, n_informative=5, n_redundant=0,\n    weights=[0.95, 0.05], class_sep=0.9, flip_y=0, random_state=11\n)\nX = pd.DataFrame(X, columns=[f\"feature_{i}\" for i in range(1, 9)])\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=11, stratify=y\n)\n\nmodel = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))\nmodel.fit(X_train, y_train)\npred = model.predict(X_test)\n\ntn, fp, fn, tp = confusion_matrix(y_test, pred, labels=[0, 1]).ravel()\nprint(\"TN:\", tn, \"| FP:\", fp, \"| FN:\", fn, \"| TP:\", tp)\n\nprecision = tp / (tp + fp)\nrecall = tp / (tp + fn)\nf1 = 2 * precision * recall / (precision + recall)\nprint(f\"By hand  -> precision {precision:.4f}, recall {recall:.4f}, F1 {f1:.4f}\")\n\nprint(f\"Sklearn  -> precision {precision_score(y_test, pred):.4f}, \"\n      f\"recall {recall_score(y_test, pred):.4f}, F1 {f1_score(y_test, pred):.4f}\")\n\nprint(f\"Positive cases missed: {fn / (fn + tp):.0%}\")",
+      "output": "TN: 2280 | FP: 0 | FN: 119 | TP: 1\nBy hand  -> precision 1.0000, recall 0.0083, F1 0.0165\nSklearn  -> precision 1.0000, recall 0.0083, F1 0.0165\nPositive cases missed: 99%",
+      "note": "Precision is 1.00 but recall is 0.0083: the model flags almost nothing, so it is never wrong when it does flag, yet it misses 99% of positives. Precision alone can also mislead."
+    }
+  ],
+  "checklist": [
+    "Understood why accuracy misleads on rare events",
+    "Built a stratified train/test split",
+    "Trained a Dummy baseline",
+    "Trained a Logistic Regression pipeline",
+    "Read the confusion matrix (TN, FP, FN, TP)",
+    "Compared precision, recall and F1",
+    "Built the Fraud Detection Baseline"
+  ],
+  "quiz": [
+    {
+      "q": "Only 1% of transactions are fraud. A model that always predicts legitimate has what accuracy?",
+      "options": [
+        "About 50%",
+        "About 1%",
+        "About 99%",
+        "Exactly 100%"
+      ],
+      "answer": 2,
+      "why": "It is right for every legitimate transaction, which is about 99% of the data, while detecting no fraud at all."
+    },
+    {
+      "q": "What does fraud recall measure?",
+      "options": [
+        "The share of flagged transactions that were fraud",
+        "The share of actual fraud cases that were detected",
+        "The overall share of correct predictions",
+        "The share of legitimate transactions flagged"
+      ],
+      "answer": 1,
+      "why": "Recall = TP / (TP + FN): of all real fraud cases, how many the model caught. The first option describes precision."
+    },
+    {
+      "q": "In confusion_matrix(y_test, pred, labels=[0, 1]), what do the rows represent?",
+      "options": [
+        "Predicted classes",
+        "Actual classes",
+        "Features",
+        "Folds"
+      ],
+      "answer": 1,
+      "why": "Rows are actual classes and columns are predicted classes, in the order 0 then 1."
+    },
+    {
+      "q": "A fraud model has FN = 47 and TP = 13. How many fraud cases did it miss?",
+      "options": [
+        "13",
+        "47",
+        "60",
+        "0"
+      ],
+      "answer": 1,
+      "why": "False negatives are fraud cases predicted as legitimate. FN = 47, out of 47 + 13 = 60 actual fraud cases."
+    },
+    {
+      "q": "Why use stratify=y when splitting fraud data?",
+      "options": [
+        "To make the data balanced",
+        "To keep about the same fraud proportion in train and test",
+        "To remove legitimate rows",
+        "To speed up training"
+      ],
+      "answer": 1,
+      "why": "Stratification preserves the class proportions in both sets. It does not balance the classes, it just avoids a test set with almost no fraud."
+    }
+  ]
+},
   ]
 };

@@ -1,62 +1,164 @@
-🚀 DAY 16 — Ensemble Learning 🔥
-You've completed Day 15: Random Forest vs Decision Tree. Let's continue your 30-day ML roadmap with a practical lesson on Ensemble Learning.
-Week 3 · Day 16 of 30
+ok carry on
+Day 18 — Step 2: Build our first fraud-detection baseline
+Let's continue! Since I haven't seen your dataset inspection outputs yet, we'll proceed with the next step assuming your dataset loaded successfully. If you encounter an error, share it and we'll fix it.
 
-Hands-on
+Our first model will be deliberately simple. Before building a sophisticated fraud detector, we need to understand how a model performs when it takes the easiest possible approach.
 
-Estimated time: 60–90 minutes · Google Colab
+2.1 Separate features and target
+Features (X): transaction information used to make predictions.
 
-1. The core concept
-Ensemble Learning combines predictions from multiple models to try to improve performance and generalization.
-Model A
-70
+Target (y): whether the transaction is fraudulent (1) or legitimate (0).
 
+from sklearn.model_selection import train_test_split
 
-Model B
-80
+X = df.drop(columns=["Class"])
+y = df["Class"]
 
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
+)
 
-Model C
-90
+print("Training rows:", len(X_train))
+print("Testing rows:", len(X_test))
 
+print("\nFraud cases in training data:", int(y_train.sum()))
+print("Fraud cases in test data:", int(y_test.sum()))
 
+Why stratify=y? Fraud is rare. Stratification helps preserve approximately the same fraud proportion in both sets.
 
-Combined prediction
-80 marks
-Average of the three predictions
+We reserve the test set for evaluation, rather than repeatedly using it to tune the model.
 
+2.2 Baseline A — The simplest possible model
+First, let's use a model that always predicts the majority class.
 
-The average above is a regression example. For classification, models can combine their predicted classes or class probabilities.
-2. Three techniques to know
-Technique	How it works	Example
-Bagging	Trains models on different bootstrap samples and combines their predictions	Random Forest
-Voting	Combines predictions from different classifiers	Voting Classifier
-Boosting	Builds models sequentially, improving on earlier errors or residuals	AdaBoost, Gradient Boosting, XGBoost
+from sklearn.dummy import DummyClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix
+)
 
-Remember: combining models does not guarantee better results. Model diversity, data quality, and evaluation matter.
-3. Mini-project — Student Pass/Fail Predictor
-We'll compare a Decision Tree, Random Forest, Logistic Regression, and a Voting Ensemble.
-Step 1: Create the dataset
-import pandas as pdfrom sklearn.model_selection import train_test_splitfrom sklearn.tree import DecisionTreeClassifierfrom sklearn.ensemble import RandomForestClassifier, VotingClassifierfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import accuracy_score, classification_reportdata = {    "hours_studied": [        1, 2, 2, 3, 3, 4, 4, 5, 5, 6,        6, 7, 7, 8, 8, 9, 2, 4, 6, 9    ],    "attendance": [        40, 45, 50, 55, 60, 60, 65, 70, 75, 75,        80, 85, 88, 90, 95, 98, 48, 68, 82, 96    ],    "passed": [        0, 0, 0, 0, 0, 0, 1, 0, 1, 1,        1, 1, 1, 1, 1, 1, 0, 1, 1, 1    ]}df = pd.DataFrame(data)X = df[["hours_studied", "attendance"]]y = df["passed"]X_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.30,    random_state=42,    stratify=y)print(df.head())print("Dataset shape:", df.shape)
+dummy_model = DummyClassifier(strategy="most_frequent")
+dummy_model.fit(X_train, y_train)
 
+dummy_predictions = dummy_model.predict(X_test)
 
+print("Dummy Model Accuracy:",
+      accuracy_score(y_test, dummy_predictions))
 
-Here, 0 = Fail and 1 = Pass.
-Step 2: Train and compare the models
-models = {    "Decision Tree": DecisionTreeClassifier(        max_depth=3, random_state=42    ),    "Random Forest": RandomForestClassifier(        n_estimators=100, random_state=42    ),    "Logistic Regression": LogisticRegression(        max_iter=1000    ),    "Voting Ensemble": VotingClassifier(        estimators=[            ("dt", DecisionTreeClassifier(                max_depth=3, random_state=42            )),            ("rf", RandomForestClassifier(                n_estimators=100, random_state=42            )),            ("lr", LogisticRegression(                max_iter=1000            ))        ],        voting="hard"    )}for name, model in models.items():    model.fit(X_train, y_train)    predictions = model.predict(X_test)    accuracy = accuracy_score(y_test, predictions)    print(f"{name}: {accuracy:.2%}")
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, dummy_predictions, labels=[0, 1]))
 
+print("\nClassification Report:")
+print(classification_report(
+    y_test,
+    dummy_predictions,
+    labels=[0, 1],
+    target_names=["Legitimate", "Fraud"],
+    zero_division=0
+))
 
+Read the confusion matrix in this order:
 
-Your task: Compare the test accuracy of all four models. Don't assume the ensemble will win; the dataset is tiny and synthetic.
-Step 3: Inspect the ensemble's performance
-ensemble = models["Voting Ensemble"]predictions = ensemble.predict(X_test)print(classification_report(    y_test,    predictions,    labels=[0, 1],    target_names=["Fail", "Pass"],    zero_division=0))
+TN
+Legitimate transactions correctly predicted as legitimate.
 
+FP
+Legitimate transactions incorrectly flagged as fraud.
 
+FN
+Fraud transactions incorrectly predicted as legitimate.
 
-Look beyond accuracy. Precision and recall help you understand which class the model predicts well.
-Step 4: Predict for a new student
-student = pd.DataFrame({    "hours_studied": [6],    "attendance": [80]})prediction = ensemble.predict(student)[0]print("Prediction:", "PASS" if prediction == 1 else "FAIL")
+TP
+Fraud transactions correctly detected.
 
+Rows represent actual classes; columns represent predicted classes. The class order is 0, then 1.
 
+The dummy model should have zero fraud recall because it never predicts fraud. That's our warning against trusting accuracy alone.
 
-This is only a model prediction, not a guarantee of the student's result.
+2.3 Baseline B — Logistic Regression
+Now let's train an actual ML model. We'll use a pipeline to scale the features before fitting Logistic Regression.
+
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+logistic_model = make_pipeline(
+    StandardScaler(),
+    LogisticRegression(max_iter=1000, random_state=42)
+)
+
+logistic_model.fit(X_train, y_train)
+
+logistic_predictions = logistic_model.predict(X_test)
+
+print("Logistic Regression Accuracy:",
+      accuracy_score(y_test, logistic_predictions))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(
+    y_test,
+    logistic_predictions,
+    labels=[0, 1]
+))
+
+print("\nClassification Report:")
+print(classification_report(
+    y_test,
+    logistic_predictions,
+    labels=[0, 1],
+    target_names=["Legitimate", "Fraud"],
+    zero_division=0
+))
+
+This is our initial baseline, not our final fraud detector. With the default settings, Logistic Regression may miss many fraud cases. That's useful information: we now have a measurable starting point.
+
+2.4 Compare the two models
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+results = pd.DataFrame([
+    {
+        "Model": "Dummy Classifier",
+        "Accuracy": accuracy_score(y_test, dummy_predictions),
+        "Fraud Precision": precision_score(
+            y_test, dummy_predictions, zero_division=0
+        ),
+        "Fraud Recall": recall_score(
+            y_test, dummy_predictions, zero_division=0
+        ),
+        "Fraud F1": f1_score(
+            y_test, dummy_predictions, zero_division=0
+        )
+    },
+    {
+        "Model": "Logistic Regression",
+        "Accuracy": accuracy_score(y_test, logistic_predictions),
+        "Fraud Precision": precision_score(
+            y_test, logistic_predictions, zero_division=0
+        ),
+        "Fraud Recall": recall_score(
+            y_test, logistic_predictions, zero_division=0
+        ),
+        "Fraud F1": f1_score(
+            y_test, logistic_predictions, zero_division=0
+        )
+    }
+])
+
+print(results.round(4).to_string(index=False))
+
+Focus on the Fraud Recall column first: what proportion of all actual fraud cases did the model detect?
+
+High accuracy alone doesn't mean fraud detection is good.
+
+High recall means catching a larger proportion of fraud cases.
+
+Precision tells us how many transactions flagged as fraud really were fraud.
+
+F1 balances precision and recall.
+
+We'll explore ways to improve the trade-off on Day 19.
