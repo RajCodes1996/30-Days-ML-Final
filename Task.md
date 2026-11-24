@@ -1,148 +1,214 @@
-Day 19 — Imbalanced Classification: Catch More Fraud 🚀
-Day 18 is complete. Today, we'll improve our fraud-detection approach by learning how to handle rare classes.
+🚀 Day 20 — ML Pipelines, ColumnTransformer & Data Leakage Prevention
+Day 19 completed
+Day 20 started
+Week 3
 
-Your Logistic Regression baseline achieved a reported fraud recall of 0.64. That means it detected roughly 64% of the actual fraud cases in your test set. Our goal today is to understand how to improve fraud detection while keeping false alarms under control.
-1. The four concepts you need to master
+Today we're moving from training individual ML models to building professional, reusable machine learning workflows.
 
-Precision — how trustworthy are fraud alerts?
+Your main project context remains our Credit Card Fraud Detection dataset.
+Today's learning objectives
+By the end of Day 20, you'll understand:
+1. Why preprocessing is necessary.
+2. What an ML Pipeline is.
+3. How ColumnTransformer works.
+4. How to handle numerical and categorical columns.
+5. What data leakage is and how to prevent it.
+6. How to combine preprocessing and model training into one workflow.
+Today's time plan: 2–3 hours, with most of the time spent coding.
 
-Of all transactions predicted as fraud, what fraction were actually fraud?
-\[
-\text{Precision}=\frac{TP}{TP+FP}
-\]
+1. The problem: Why do we need pipelines?
+Imagine your ML workflow looks like this:
+Without a Pipeline
+Load Dataset
 
+Handle Missing Values
 
+Scale Features
 
+Encode Categories
 
+Train Model
+Every step is managed separately. It's easier to make mistakes or forget preprocessing during prediction.
+A Pipeline combines preprocessing and model training into one organized workflow.
+With a Pipeline
+Single ML Pipeline
 
-Recall — how much fraud do we catch?
+Imputation → Scaling → Model
 
-Of all actual fraud cases, what fraction did the model detect?
-\[
-\text{Recall}=\frac{TP}{TP+FN}
-\]
 
+Train / Predict
 
+Preprocessing and model execution are handled consistently.
+Think of a Pipeline as an automated assembly line for your ML model.
+2. First practical: Build your first Pipeline
+Let's use a small dataset so you understand the concept before applying it to fraud detection.
+Step 1 — Import libraries
+Run this in Google Colab or Jupyter Notebook.
+import pandas as pdimport numpy as npfrom sklearn.model_selection import train_test_splitfrom sklearn.pipeline import Pipelinefrom sklearn.preprocessing import StandardScalerfrom sklearn.impute import SimpleImputerfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import classification_report
 
 
 
-F1-score — one balanced measure
+Step 2 — Create a sample dataset
+data = {    "Age": [22, 25, 47, 52, 46, 56, 23, 40, 35, 60],    "Salary": [        25000, 30000, 60000, 80000, 55000,        90000, 28000, 50000, 45000, 100000    ],    "Purchased": [0, 0, 1, 1, 1, 1, 0, 1, 0, 1]}df = pd.DataFrame(data)print(df)
 
-F1 is the harmonic mean of precision and recall. It is useful when you want to consider both missed fraud and false alarms.
-\[
-F1=2\frac{Precision\cdot Recall}{Precision+Recall}
-\]
 
 
+Our objective: predict whether a customer purchases a product.
+Step 3 — Separate X and y
+X = df[["Age", "Salary"]]y = df["Purchased"]X_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.3,    random_state=42,    stratify=y)
 
 
 
-Threshold — how readily does the model flag fraud?
+Step 4 — Create the Pipeline
+pipeline = Pipeline([    ("imputer", SimpleImputer(strategy="mean")),    ("scaler", StandardScaler()),    ("model", LogisticRegression())])
 
-A lower decision threshold generally catches more fraud but may also flag more legitimate transactions.
 
 
+Understand the three steps:
+Step	Purpose
+imputer	Fills missing numerical values
+scaler	Standardizes numerical features
+model	Trains Logistic Regression
 
-2. Understand the decision threshold visually
-A classifier can output a fraud probability, then use a threshold to convert that probability into a class prediction. For example, a transaction with a predicted fraud probability of 0.30 would be classified as fraud at a threshold of 0.25, but not at 0.50.
+Step 5 — Train and evaluate
+pipeline.fit(X_train, y_train)predictions = pipeline.predict(X_test)print(classification_report(    y_test,    predictions,    zero_division=0))
 
 
 
-Threshold 0.50
-Actual Positive
+That's your first complete ML Pipeline!
 
+Important: This tiny dataset is only for learning the workflow. Its test metrics aren't reliable evidence of real-world performance.
 
+3. Data Leakage — one of the most important ML concepts
+Before learning ColumnTransformer, understand this problem.
 
+Data leakage happens when information from outside the training data improperly influences model training.
 
+For example, suppose you have 10,000 records:
+- 8,000 training records
+- 2,000 test records
+You calculate the average salary using all 10,000 records, fill missing values, and then split the data.
+Incorrect workflow
+# WRONG: preprocessing before splittingX_scaled = StandardScaler().fit_transform(X)X_train, X_test, y_train, y_test = train_test_split(    X_scaled, y, test_size=0.2, random_state=42)
 
 
 
+Why is this wrong?
 
-Actual Negative
+Because the scaler calculated its mean and standard deviation using both training and test data.
 
+The model's training process has indirectly received information from the test set.
+Correct workflow
+# Split firstX_train, X_test, y_train, y_test = train_test_split(    X, y, test_size=0.2, random_state=42)# Fit preprocessing only on training datascaler = StandardScaler()X_train_scaled = scaler.fit_transform(X_train)# Only transform test dataX_test_scaled = scaler.transform(X_test)
 
 
 
+Remember these two methods:
+Method	Meaning
+fit()	Learn parameters from data
+transform()	Apply learned parameters to data
+fit_transform()	Learn and apply
 
+A Pipeline handles this correctly when you call fit() on training data. During prediction, it only applies the already-learned transformations.
 
+4. ColumnTransformer — handle different column types
+Real-world datasets often contain different types of features.
 
+Example:
+Age	Salary	City	Education
+25	30000	Delhi	Graduate
+35	60000	Mumbai	Postgraduate
+42	80000	Pune	Graduate
 
-TPTrue positive	3
-FPFalse positive	3
-TNTrue negative	2
-FNFalse negative	2
+Problem:
+- Age and Salary are numerical.
+- City and Education are categorical.
+- Numerical features need numerical preprocessing.
+- Categorical features need encoding.
+This is where ColumnTransformer helps.
+ColumnTransformer workflow
+Input Dataset
 
+Age · Salary · City · Education
 
+Numerical
 
+Age, Salary
 
+Imputer + Scaler
 
-\(\text{Precision}=\frac{TP}{TP+FP}=\frac{3}{3+3}=50\%\)
-\(\text{Recall}=\frac{TP}{TP+FN}=\frac{3}{3+2}=60\%\)
 
-Threshold
+Categorical
 
+City, Education
 
+Imputer + Encoder
 
 
 
 
+Combined processed data
 
 
+Machine Learning Model
 
 
-Give feedback
+Step 1 — Create a mixed dataset
+data = {    "Age": [22, 25, 47, 52, 46, 56, 23, 40, 35, 60,            28, 32, 45, 50, 29, 38, 42, 55, 31, 48],    "Salary": [25000, 30000, 60000, 80000, 55000,               90000, 28000, 50000, 45000, 100000,               32000, 40000, 70000, 85000, 35000,               52000, 65000, 95000, 42000, 75000],    "City": ["Delhi", "Mumbai", "Pune", "Delhi", "Pune",             "Mumbai", "Delhi", "Pune", "Mumbai", "Delhi",             "Pune", "Mumbai", "Delhi", "Pune", "Mumbai",             "Delhi", "Pune", "Mumbai", "Delhi", "Pune"],    "Education": ["Graduate", "Postgraduate", "Graduate",                  "Postgraduate", "Graduate", "Postgraduate",                  "Graduate", "Graduate", "Postgraduate",                  "Postgraduate", "Graduate", "Graduate",                  "Postgraduate", "Graduate", "Graduate",                  "Postgraduate", "Graduate", "Postgraduate",                  "Graduate", "Postgraduate"],    "Purchased": [0, 0, 1, 1, 1, 1, 0, 1, 0, 1,                  0, 0, 1, 1, 0, 1, 1, 1, 0, 1]}df = pd.DataFrame(data)X = df.drop("Purchased", axis=1)y = df["Purchased"]
 
-The key idea: the model's probabilities don't have to change for its predicted labels to change. Changing the threshold changes which transactions get flagged.
-3. Practical: improve our baseline
-We'll compare two approaches:
-1. Default Logistic Regression — your original starting point.
-2. Class-weighted Logistic Regression — penalizes mistakes on the minority class more heavily during training.
-We'll use a validation split from the training data to compare approaches and choose a threshold. The test set stays untouched until the final evaluation.
-3.1 Split your training data again
-Run this after your Day 18 code. It assumes X_train, X_test, y_train, and y_test still exist.
-from sklearn.model_selection import train_test_splitX_fit, X_val, y_fit, y_val = train_test_split(    X_train,    y_train,    test_size=0.20,    random_state=42,    stratify=y_train)print("Model training rows:", len(X_fit))print("Validation rows:", len(X_val))print("Final test rows:", len(X_test))
 
 
+Step 2 — Identify numerical and categorical columns
+numeric_features = ["Age", "Salary"]categorical_features = ["City", "Education"]
 
-Why three sets?
-- Training set: learns model parameters.
-- Validation set: helps compare models and choose a threshold.
-- Test set: gives us a final, independent evaluation.
-3.2 Train both models
-from sklearn.pipeline import make_pipelinefrom sklearn.preprocessing import StandardScalerfrom sklearn.linear_model import LogisticRegression# Model A: ordinary Logistic Regressionmodel_default = make_pipeline(    StandardScaler(),    LogisticRegression(max_iter=1000, random_state=42))model_default.fit(X_fit, y_fit)# Model B: class-weighted Logistic Regressionmodel_balanced = make_pipeline(    StandardScaler(),    LogisticRegression(        class_weight="balanced",        max_iter=1000,        random_state=42    ))model_balanced.fit(X_fit, y_fit)print("Both models trained!")
 
 
+Step 3 — Create preprocessing pipelines
+from sklearn.compose import ColumnTransformerfrom sklearn.preprocessing import OneHotEncodernumeric_transformer = Pipeline([    ("imputer", SimpleImputer(strategy="median")),    ("scaler", StandardScaler())])categorical_transformer = Pipeline([    ("imputer", SimpleImputer(strategy="most_frequent")),    ("encoder", OneHotEncoder(handle_unknown="ignore"))])
 
-What does class_weight="balanced" do?
 
-It automatically assigns greater weight to the minority class during training. Fraud-related mistakes can therefore have more influence on the model's learning.
 
-It does not duplicate fraud rows or create new transactions, and it does not guarantee better performance.
-3.3 Compare precision, recall and F1
-We'll evaluate both models at the default threshold of 0.50.
-from sklearn.metrics import (    accuracy_score,    precision_score,    recall_score,    f1_score)import pandas as pddef evaluate_predictions(y_true, predictions, model_name):    return {        "Model": model_name,        "Accuracy": accuracy_score(y_true, predictions),        "Fraud Precision": precision_score(            y_true, predictions, zero_division=0        ),        "Fraud Recall": recall_score(            y_true, predictions, zero_division=0        ),        "Fraud F1": f1_score(            y_true, predictions, zero_division=0        )    }default_val_pred = model_default.predict(X_val)balanced_val_pred = model_balanced.predict(X_val)comparison = pd.DataFrame([    evaluate_predictions(        y_val, default_val_pred, "Default Logistic Regression"    ),    evaluate_predictions(        y_val, balanced_val_pred, "Class-Weighted Logistic Regression"    )])print(comparison.round(4).to_string(index=False))
+What's OneHotEncoder?
 
+It converts categories into numerical columns.
 
+For example:
+City	Delhi	Mumbai	Pune
+Delhi	1	0	0
+Mumbai	0	1	0
+Pune	0	0	1
 
-Look for these patterns in your actual results:
-- Did class-weighted Logistic Regression increase fraud recall?
-- Did its precision decrease?
-- Did accuracy change?
-A trade-off is common, but don't assume the weighted model is better until you inspect your output.
-3.4 Experiment with thresholds
-Let's try several thresholds for the class-weighted model.
-import numpy as np# Probability that each validation transaction is fraudval_probabilities = model_balanced.predict_proba(X_val)[:, 1]threshold_results = []for threshold in [0.10, 0.20, 0.30, 0.40, 0.50, 0.60]:    predictions = (        val_probabilities >= threshold    ).astype(int)    threshold_results.append({        "Threshold": threshold,        "Fraud Precision": precision_score(            y_val, predictions, zero_division=0        ),        "Fraud Recall": recall_score(            y_val, predictions, zero_division=0        ),        "Fraud F1": f1_score(            y_val, predictions, zero_division=0        ),        "Fraud Alerts": int(predictions.sum())    })threshold_df = pd.DataFrame(threshold_results)print(threshold_df.round(4).to_string(index=False))
+Step 4 — Combine using ColumnTransformer
+preprocessor = ColumnTransformer([    ("num", numeric_transformer, numeric_features),    ("cat", categorical_transformer, categorical_features)])
 
 
 
-Interpret the results:
-- Lower threshold: usually more fraud alerts and higher recall, but potentially lower precision.
-- Higher threshold: usually fewer fraud alerts and higher precision, but potentially lower recall.
-These are typical patterns, not guarantees. Your data determines the actual results.
-3.5 Evaluate your chosen threshold on the test set
-For this exercise, let's use 0.30 as an illustrative threshold. We're not claiming it's optimal; we'll use the validation results to decide whether it makes sense for your model.
-chosen_threshold = 0.30test_probabilities = model_balanced.predict_proba(X_test)[:, 1]test_predictions = (    test_probabilities >= chosen_threshold).astype(int)print("Chosen threshold:", chosen_threshold)print("\nFinal test metrics:")print(pd.DataFrame([    evaluate_predictions(        y_test,        test_predictions,        "Balanced Logistic Regression (threshold 0.30)"    )]).round(4).to_string(index=False))from sklearn.metrics import confusion_matrixprint("\nTest confusion matrix:")print(confusion_matrix(y_test, test_predictions, labels=[0, 1]))
+This tells Scikit-learn:
+- Apply numerical preprocessing to Age and Salary.
+- Apply categorical preprocessing to City and Education.
+- Combine the resulting features.
+Step 5 — Create the complete ML Pipeline
+full_pipeline = Pipeline([    ("preprocessing", preprocessor),    ("model", LogisticRegression(max_iter=1000))])
 
 
 
-For a rigorous experiment, choose the threshold based on your validation results first, then evaluate that chosen threshold on the test set once. Don't keep changing the threshold in response to test-set scores.
+Step 6 — Train and evaluate
+X_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.25,    random_state=42,    stratify=y)full_pipeline.fit(X_train, y_train)predictions = full_pipeline.predict(X_test)print(classification_report(    y_test, predictions, zero_division=0))
+
+
+
+You have now built a complete preprocessing and model-training workflow.
+
+5. Apply today's learning to your Fraud Detection project
+Your Credit Card Fraud Detection dataset contains numerical features (V1–V28, Time, Amount).
+
+Therefore, you don't need categorical encoding for this dataset.
+
+You can create a clean pipeline like this:
+from sklearn.pipeline import Pipelinefrom sklearn.preprocessing import StandardScalerfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import classification_report, confusion_matrixfraud_pipeline = Pipeline([    ("scaler", StandardScaler()),    ("model", LogisticRegression(        class_weight="balanced",        max_iter=1000,        random_state=42    ))])# Fit only on training datafraud_pipeline.fit(X_train, y_train)# Predict on test datafraud_predictions = fraud_pipeline.predict(X_test)print("Confusion Matrix:")print(confusion_matrix(y_test, fraud_predictions))print("\nClassification Report:")print(classification_report(    y_test,    fraud_predictions,    target_names=["Legitimate", "Fraud"],    zero_division=0))
+
+
+
+This gives you a reusable model that automatically scales incoming data before prediction.
+
+Important: This example uses the default classification threshold of 0.5. It is a new baseline, not a replacement for your Day 19 threshold experiment. Keep your original test set untouched when comparing models; use validation data for model and threshold selection.
