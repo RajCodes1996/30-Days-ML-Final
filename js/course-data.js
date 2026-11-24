@@ -8388,5 +8388,443 @@ Average used to fill: 245.0
     }
   ]
 },
+// DAY 19 snippet. In course-data.js: add a comma after your last day's closing } (Day 17 or Day 18), then paste this object. No images for this day.
+{
+  "day": 19,
+  "title": "Imbalanced Classification: Catch More Fraud",
+  "subtitle": "Handle rare classes: precision, recall, F1, the decision threshold, class weights and an honest validation-then-test workflow.",
+  "level": "Intermediate",
+  "duration": "60-90 min",
+  "tags": [
+    "Imbalanced Data",
+    "Precision / Recall / F1",
+    "Threshold",
+    "class_weight",
+    "Fraud Detection"
+  ],
+  "goals": [
+    "Understand precision, recall, F1 and the decision threshold",
+    "Improve fraud recall with class weights",
+    "Choose a threshold on validation data and evaluate once on the test set"
+  ],
+  "sections": [
+    {
+      "id": "concepts",
+      "icon": "🧠",
+      "title": "1. The Four Concepts You Need to Master",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Concept",
+            "Question it answers",
+            "Formula"
+          ],
+          "rows": [
+            [
+              "Precision",
+              "Of all transactions predicted as fraud, how many really were fraud? (How trustworthy are the alerts?)",
+              "TP / (TP + FP)"
+            ],
+            [
+              "Recall",
+              "Of all real fraud, how much did we catch?",
+              "TP / (TP + FN)"
+            ],
+            [
+              "F1-score",
+              "One balanced number: the harmonic mean of precision and recall",
+              "2 x Precision x Recall / (Precision + Recall)"
+            ],
+            [
+              "Threshold",
+              "How readily does the model flag fraud? Lower threshold = more alerts",
+              "predict fraud if probability >= threshold"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Fraud is rare (here about 4% of transactions). A model that says 'legitimate' every time scores about 96% accuracy and catches zero fraud. That is why we look at fraud recall, precision and F1 instead of accuracy."
+        }
+      ]
+    },
+    {
+      "id": "threshold",
+      "icon": "🎚️",
+      "title": "2. Understand the Decision Threshold",
+      "meta": "The model's probabilities stay the same, the labels change",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A classifier outputs a fraud probability. The threshold turns it into a label. Ten transactions: 5 really fraud, 5 legitimate, with the probabilities a model gave them:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day19_threshold.py",
+          "code": "import numpy as np\n\nactual = np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0])\nprobability = np.array([0.90, 0.80, 0.60, 0.40, 0.20, 0.70, 0.55, 0.52, 0.30, 0.10])\n\nfor threshold in [0.25, 0.50, 0.75]:\n    flagged = probability >= threshold\n    tp = int((flagged & (actual == 1)).sum())\n    fp = int((flagged & (actual == 0)).sum())\n    fn = int((~flagged & (actual == 1)).sum())\n    tn = int((~flagged & (actual == 0)).sum())\n    print(f\"Threshold {threshold:.2f}: TP={tp} FP={fp} TN={tn} FN={fn} | precision {tp / (tp + fp):.0%} | recall {tp / (tp + fn):.0%}\")",
+          "output": "Threshold 0.25: TP=4 FP=4 TN=1 FN=1 | precision 50% | recall 80%\nThreshold 0.50: TP=3 FP=3 TN=2 FN=2 | precision 50% | recall 60%\nThreshold 0.75: TP=2 FP=0 TN=5 FN=3 | precision 100% | recall 40%"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "At 0.50 the model flags 6 transactions: 3 are fraud and 3 are not, so precision is 50% and recall is 3 of 5 = 60%. Lowering the threshold to 0.25 catches one more fraud (recall 80%) but flags one more legitimate transaction too. Raising it to 0.75 gives 100% precision but misses most fraud (recall 40%)."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "The key idea: the model's probabilities do not change. Changing the threshold changes which transactions get flagged."
+        }
+      ]
+    },
+    {
+      "id": "setup",
+      "icon": "⚡",
+      "title": "Setup: Your Fraud Dataset and Baseline",
+      "meta": "Stands in for your Day 18 data",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The lesson says to run this after your Day 18 code. To make this page self-contained, the code below creates a synthetic fraud dataset (6000 transactions, about 4% fraud) and the same kind of baseline: a default Logistic Regression."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "setup.py",
+          "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n\ndef make_fraud_data(seed=19, n=6000, fraud_rate=0.04):\n    rs = np.random.RandomState(seed)\n    fraud = (rs.uniform(size=n) < fraud_rate).astype(int)\n    f = fraud == 1\n    amount = np.round(np.where(f, rs.lognormal(5.3, 0.8, n), rs.lognormal(4.2, 0.8, n)), 2)\n    night = rs.uniform(size=n) < 0.6\n    hour = np.where(f, np.where(night, rs.randint(0, 6, n), rs.randint(0, 24, n)), rs.randint(0, 24, n))\n    distance = np.round(np.where(f, rs.exponential(90, n), rs.exponential(25, n)), 1)\n    tx_24h = np.where(f, rs.poisson(5.5, n), rs.poisson(2.2, n))\n    foreign = np.where(f, rs.uniform(size=n) < 0.45, rs.uniform(size=n) < 0.05).astype(int)\n    return pd.DataFrame({\"amount\": amount, \"hour\": hour, \"distance_km\": distance,\n                         \"tx_last_24h\": tx_24h, \"foreign\": foreign, \"fraud\": fraud})\n\ndf = make_fraud_data()\nX = df.drop(columns=\"fraud\")\ny = df[\"fraud\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y)\n\nprint(\"Transactions:\", len(df), \"| fraud:\", y.sum(), f\"({y.mean():.1%})\")\nprint(X.head(3))\n\nbaseline = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=42))\nbaseline.fit(X_train, y_train)\nbaseline_test = baseline.predict(X_test)\nprint(\"\\nBaseline fraud recall on the test set:\", round(recall_score(y_test, baseline_test), 2))\nprint(\"Baseline accuracy:\", round(accuracy_score(y_test, baseline_test), 3))",
+          "output": "Transactions: 6000 | fraud: 205 (3.4%)\n   amount  hour  distance_km  tx_last_24h  foreign\n0  198.76     3         45.4            1        0\n1   42.06     4         43.6            2        0\n2  111.09    14         34.4            4        0\n\nBaseline fraud recall on the test set: 0.61\nBaseline accuracy: 0.983"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The baseline catches about 61% of fraud, close to the 0.64 in your Day 18 notes, while accuracy looks excellent (about 98%). Same trap, same goal: catch more fraud while keeping false alarms under control."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "⚡",
+      "title": "3.1 Split Your Training Data Again",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "three_sets.py",
+          "code": "X_fit, X_val, y_fit, y_val = train_test_split(\n    X_train, y_train, test_size=0.20, random_state=42, stratify=y_train)\n\nprint(\"Model training rows:\", len(X_fit))\nprint(\"Validation rows:\", len(X_val))\nprint(\"Final test rows:\", len(X_test))\nprint(\"Fraud in each:\", y_fit.sum(), \"/\", y_val.sum(), \"/\", y_test.sum())",
+          "output": "Model training rows: 3840\nValidation rows: 960\nFinal test rows: 1200\nFraud in each: 131 / 33 / 41"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Set",
+            "Job"
+          ],
+          "rows": [
+            [
+              "Training set",
+              "Learns the model's parameters"
+            ],
+            [
+              "Validation set",
+              "Compares models and chooses the threshold"
+            ],
+            [
+              "Test set",
+              "Gives one final, independent evaluation"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "With only 33 fraud cases in the validation set, every recall number moves in steps of 3 points. Treat small differences as noise."
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "icon": "⚡",
+      "title": "3.2 Train Both Models",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train_models.py",
+          "code": "# Model A: ordinary Logistic Regression\nmodel_default = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=42))\nmodel_default.fit(X_fit, y_fit)\n\n# Model B: class-weighted Logistic Regression\nmodel_balanced = make_pipeline(\n    StandardScaler(),\n    LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))\nmodel_balanced.fit(X_fit, y_fit)\n\nprint(\"Both models trained!\")",
+          "output": "Both models trained!"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "class_weight=\"balanced\" gives the rare class a bigger weight during training (here each fraud counts about 28 times as much as a legitimate transaction), so fraud mistakes influence the model more. It does not copy fraud rows or invent transactions, and it does not guarantee better results."
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "icon": "📊",
+      "title": "3.3 Compare Precision, Recall and F1",
+      "meta": "At the default threshold of 0.50",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "compare.py",
+          "code": "def evaluate_predictions(y_true, predictions, model_name):\n    return {\n        \"Model\": model_name,\n        \"Accuracy\": accuracy_score(y_true, predictions),\n        \"Fraud Precision\": precision_score(y_true, predictions, zero_division=0),\n        \"Fraud Recall\": recall_score(y_true, predictions, zero_division=0),\n        \"Fraud F1\": f1_score(y_true, predictions, zero_division=0),\n    }\n\ndefault_val_pred = model_default.predict(X_val)\nbalanced_val_pred = model_balanced.predict(X_val)\n\ncomparison = pd.DataFrame([\n    evaluate_predictions(y_val, default_val_pred, \"Default Logistic Regression\"),\n    evaluate_predictions(y_val, balanced_val_pred, \"Class-Weighted Logistic Regression\"),\n])\nprint(comparison.round(4).to_string(index=False))",
+          "output": "                             Model  Accuracy  Fraud Precision  Fraud Recall  Fraud F1\n       Default Logistic Regression    0.9823            0.900        0.5455    0.6792\nClass-Weighted Logistic Regression    0.9323            0.314        0.8182    0.4538"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Question",
+            "Answer from the output"
+          ],
+          "rows": [
+            [
+              "Did class weights raise fraud recall?",
+              "Yes, a lot"
+            ],
+            [
+              "Did precision drop?",
+              "Yes, a lot: many more legitimate transactions get flagged"
+            ],
+            [
+              "Did accuracy change?",
+              "It fell: the model now makes more false alarms"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "A trade-off is normal. Whether the weighted model is better depends on what a missed fraud costs compared with a false alarm."
+        }
+      ]
+    },
+    {
+      "id": "thresholds",
+      "icon": "🎚️",
+      "title": "3.4 Experiment with Thresholds",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "threshold_sweep.py",
+          "code": "def threshold_table(y_true, probabilities, thresholds):\n    rows = []\n    for threshold in thresholds:\n        predictions = (probabilities >= threshold).astype(int)\n        rows.append({\n            \"Threshold\": threshold,\n            \"Fraud Precision\": precision_score(y_true, predictions, zero_division=0),\n            \"Fraud Recall\": recall_score(y_true, predictions, zero_division=0),\n            \"Fraud F1\": f1_score(y_true, predictions, zero_division=0),\n            \"Fraud Alerts\": int(predictions.sum()),\n        })\n    return pd.DataFrame(rows)\n\nval_probabilities = model_balanced.predict_proba(X_val)[:, 1]\nthreshold_df = threshold_table(y_val, val_probabilities, [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80])\nprint(threshold_df.round(4).to_string(index=False))",
+          "output": " Threshold  Fraud Precision  Fraud Recall  Fraud F1  Fraud Alerts\n       0.1           0.1075        1.0000    0.1941           307\n       0.2           0.1590        0.9394    0.2719           195\n       0.3           0.2199        0.9394    0.3563           141\n       0.4           0.2522        0.8788    0.3919           115\n       0.5           0.3140        0.8182    0.4538            86\n       0.6           0.4219        0.8182    0.5567            64\n       0.7           0.5000        0.7879    0.6118            52\n       0.8           0.5652        0.7879    0.6582            46"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Pattern",
+            "What you see"
+          ],
+          "rows": [
+            [
+              "Lower threshold",
+              "More alerts and higher recall, but lower precision"
+            ],
+            [
+              "Higher threshold",
+              "Fewer alerts and higher precision, but lower recall"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Notice the threshold 0.30 of the original task: it flags about 15% of all validation transactions (141 of 960) as fraud, although only about 3.4% really are. Class weights also inflate the probabilities, so a score of 0.30 from this model does NOT mean a 30% chance of fraud. Only the validation table can tell you which threshold makes sense."
+        }
+      ]
+    },
+    {
+      "id": "choose",
+      "icon": "🎯",
+      "title": "Choosing the Threshold with the Validation Set",
+      "meta": "Decide before you touch the test set",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Three common ways to pick a threshold, all using the validation set only:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "choose_threshold.py",
+          "code": "grid = np.round(np.arange(0.05, 0.96, 0.05), 2)\nsweep = threshold_table(y_val, val_probabilities, grid)\n\n# Cost view: a missed fraud costs 100, a false alarm costs 5 (example numbers)\nfraud_total = int(y_val.sum())\ntp = (sweep[\"Fraud Recall\"] * fraud_total).round().astype(int)\nfp = sweep[\"Fraud Alerts\"] - tp\nfn = fraud_total - tp\nsweep[\"Total Cost\"] = 100 * fn + 5 * fp\n\nbest_f1 = sweep.loc[sweep[\"Fraud F1\"].idxmax()]\nmeets_goal = sweep[sweep[\"Fraud Recall\"] >= 0.80]\nbest_for_goal = meets_goal.loc[meets_goal[\"Fraud Precision\"].idxmax()]\ncheapest = sweep.loc[sweep[\"Total Cost\"].idxmin()]\n\nprint(\"1. Best F1                      -> threshold\", best_f1[\"Threshold\"], \"| recall\", round(best_f1[\"Fraud Recall\"], 2), \"| precision\", round(best_f1[\"Fraud Precision\"], 2), \"| alerts\", int(best_f1[\"Fraud Alerts\"]))\nprint(\"2. Recall >= 0.80, best precision -> threshold\", best_for_goal[\"Threshold\"], \"| recall\", round(best_for_goal[\"Fraud Recall\"], 2), \"| precision\", round(best_for_goal[\"Fraud Precision\"], 2), \"| alerts\", int(best_for_goal[\"Fraud Alerts\"]))\nprint(\"3. Lowest cost                  -> threshold\", cheapest[\"Threshold\"], \"| recall\", round(cheapest[\"Fraud Recall\"], 2), \"| precision\", round(cheapest[\"Fraud Precision\"], 2), \"| alerts\", int(cheapest[\"Fraud Alerts\"]))\n\nchosen_threshold = float(best_for_goal[\"Threshold\"])\nprint(\"\\nChosen threshold (rule 2):\", chosen_threshold)",
+          "output": "1. Best F1                      -> threshold 0.9 | recall 0.67 | precision 0.76 | alerts 29\n2. Recall >= 0.80, best precision -> threshold 0.6 | recall 0.82 | precision 0.42 | alerts 64\n3. Lowest cost                  -> threshold 0.3 | recall 0.94 | precision 0.22 | alerts 141\n\nChosen threshold (rule 2): 0.6"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Different goals choose different thresholds. Rule 2 says: catch at least 80% of fraud, then keep false alarms as low as possible. That matches today's goal. In a real company the cost numbers (100 and 5 here) come from the business."
+        }
+      ]
+    },
+    {
+      "id": "final",
+      "icon": "🏁",
+      "title": "3.5 Evaluate the Chosen Threshold on the Test Set",
+      "meta": "Once",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "final_test.py",
+          "code": "test_probabilities = model_balanced.predict_proba(X_test)[:, 1]\ntest_predictions = (test_probabilities >= chosen_threshold).astype(int)\n\nprint(\"Chosen threshold:\", chosen_threshold)\nprint(\"\\nFinal test metrics:\")\nfinal_row = evaluate_predictions(y_test, test_predictions, f\"Balanced LR (threshold {chosen_threshold})\")\nbaseline_row = evaluate_predictions(y_test, baseline_test, \"Baseline LR (threshold 0.50)\")\nprint(pd.DataFrame([baseline_row, final_row]).round(4).to_string(index=False))\n\nprint(\"\\nTest confusion matrix (rows: actual 0, 1 | columns: predicted 0, 1):\")\nprint(confusion_matrix(y_test, test_predictions, labels=[0, 1]))",
+          "output": "Chosen threshold: 0.6\n\nFinal test metrics:\n                       Model  Accuracy  Fraud Precision  Fraud Recall  Fraud F1\nBaseline LR (threshold 0.50)    0.9833           0.8621        0.6098    0.7143\n Balanced LR (threshold 0.6)    0.9442           0.3646        0.8537    0.5109\n\nTest confusion matrix (rows: actual 0, 1 | columns: predicted 0, 1):\n[[1098   61]\n [   6   35]]"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Compared with the baseline, fraud recall rises a lot and precision falls. The confusion matrix shows the price: how many legitimate transactions get flagged for every extra fraud caught. Whether that is a good deal depends on the cost of a missed fraud and of a false alarm."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The original task uses 0.30 as an illustrative threshold. Here the threshold came from validation results. The test set is evaluated once. Do not keep changing the threshold after seeing test scores, or the test set becomes another validation set."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "On rare classes, accuracy hides the problem: use precision, recall and F1",
+            "The decision threshold moves you along the precision/recall trade-off",
+            "class_weight=\"balanced\" raises recall at the price of precision, and inflates probabilities",
+            "Use a validation set to choose the threshold, then evaluate the test set once",
+            "The right threshold depends on the cost of missed fraud versus false alarms"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Catch More Fraud: Threshold-Tuned Detector",
+    "file": "day19_final.py",
+    "description": "One program combining Day 19: a rare-class dataset, three data sets, default vs class-weighted models, a threshold sweep, a validation-based threshold choice, one final test evaluation and the price of the alerts in false alarms.",
+    "concepts": [
+      "precision / recall / F1",
+      "decision threshold",
+      "class_weight",
+      "validation set",
+      "threshold sweep",
+      "confusion matrix"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n\ndef make_fraud_data(seed=19, n=6000, fraud_rate=0.04):\n    rs = np.random.RandomState(seed)\n    fraud = (rs.uniform(size=n) < fraud_rate).astype(int)\n    f = fraud == 1\n    amount = np.round(np.where(f, rs.lognormal(5.3, 0.8, n), rs.lognormal(4.2, 0.8, n)), 2)\n    night = rs.uniform(size=n) < 0.6\n    hour = np.where(f, np.where(night, rs.randint(0, 6, n), rs.randint(0, 24, n)), rs.randint(0, 24, n))\n    distance = np.round(np.where(f, rs.exponential(90, n), rs.exponential(25, n)), 1)\n    tx_24h = np.where(f, rs.poisson(5.5, n), rs.poisson(2.2, n))\n    foreign = np.where(f, rs.uniform(size=n) < 0.45, rs.uniform(size=n) < 0.05).astype(int)\n    return pd.DataFrame({\"amount\": amount, \"hour\": hour, \"distance_km\": distance,\n                         \"tx_last_24h\": tx_24h, \"foreign\": foreign, \"fraud\": fraud})\n\ndef evaluate_predictions(y_true, predictions, model_name):\n    return {\n        \"Model\": model_name,\n        \"Accuracy\": accuracy_score(y_true, predictions),\n        \"Fraud Precision\": precision_score(y_true, predictions, zero_division=0),\n        \"Fraud Recall\": recall_score(y_true, predictions, zero_division=0),\n        \"Fraud F1\": f1_score(y_true, predictions, zero_division=0),\n    }\n\ndef threshold_table(y_true, probabilities, thresholds):\n    rows = []\n    for threshold in thresholds:\n        predictions = (probabilities >= threshold).astype(int)\n        rows.append({\n            \"Threshold\": threshold,\n            \"Fraud Precision\": precision_score(y_true, predictions, zero_division=0),\n            \"Fraud Recall\": recall_score(y_true, predictions, zero_division=0),\n            \"Fraud F1\": f1_score(y_true, predictions, zero_division=0),\n            \"Fraud Alerts\": int(predictions.sum()),\n        })\n    return pd.DataFrame(rows)\n\n# 1. DATA AND THREE SETS\ndf = make_fraud_data()\nX, y = df.drop(columns=\"fraud\"), df[\"fraud\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\nX_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, test_size=0.20, random_state=42, stratify=y_train)\nprint(\"=== CATCH MORE FRAUD ===\")\nprint(\"Fit / validation / test rows:\", len(X_fit), \"/\", len(X_val), \"/\", len(X_test), \"| fraud:\", y_fit.sum(), \"/\", y_val.sum(), \"/\", y_test.sum())\n\n# 2. TWO MODELS (default and class-weighted)\nmodel_default = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=42)).fit(X_fit, y_fit)\nmodel_balanced = make_pipeline(StandardScaler(), LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42)).fit(X_fit, y_fit)\n\n# 3. COMPARE AT THRESHOLD 0.50 ON THE VALIDATION SET\ncomparison = pd.DataFrame([\n    evaluate_predictions(y_val, model_default.predict(X_val), \"Default LR\"),\n    evaluate_predictions(y_val, model_balanced.predict(X_val), \"Class-Weighted LR\"),\n])\nprint(\"\\nValidation, threshold 0.50:\")\nprint(comparison.round(4).to_string(index=False))\n\n# 4. THRESHOLD SWEEP FOR THE WEIGHTED MODEL\nval_probabilities = model_balanced.predict_proba(X_val)[:, 1]\nsweep = threshold_table(y_val, val_probabilities, np.round(np.arange(0.05, 0.96, 0.05), 2))\nprint(\"\\nThreshold sweep (validation):\")\nprint(sweep.round(3).to_string(index=False))\n\n# 5. CHOOSE: at least 80% recall, then the best precision\nmeets_goal = sweep[sweep[\"Fraud Recall\"] >= 0.80]\nchosen_threshold = float(meets_goal.loc[meets_goal[\"Fraud Precision\"].idxmax(), \"Threshold\"])\nprint(\"\\nChosen threshold:\", chosen_threshold)\n\n# 6. FINAL TEST EVALUATION (once)\ntest_predictions = (model_balanced.predict_proba(X_test)[:, 1] >= chosen_threshold).astype(int)\nrows = [\n    evaluate_predictions(y_test, model_default.predict(X_test), \"Default LR (0.50)\"),\n    evaluate_predictions(y_test, test_predictions, f\"Weighted LR ({chosen_threshold})\"),\n]\nprint(\"\\nFinal test metrics:\")\nprint(pd.DataFrame(rows).round(4).to_string(index=False))\nprint(\"\\nTest confusion matrix (rows: actual 0, 1 | columns: predicted 0, 1):\")\nprint(confusion_matrix(y_test, test_predictions, labels=[0, 1]))\n\n# 7. WHAT THE ALERTS COST\ncm = confusion_matrix(y_test, test_predictions, labels=[0, 1])\nprint(f\"\\nFraud caught: {cm[1, 1]} of {cm[1].sum()} | false alarms: {cm[0, 1]} of {cm[0].sum()} legitimate transactions\")",
+    "output": "=== CATCH MORE FRAUD ===\nFit / validation / test rows: 3840 / 960 / 1200 | fraud: 131 / 33 / 41\n\nValidation, threshold 0.50:\n            Model  Accuracy  Fraud Precision  Fraud Recall  Fraud F1\n       Default LR    0.9823            0.900        0.5455    0.6792\nClass-Weighted LR    0.9323            0.314        0.8182    0.4538\n\nThreshold sweep (validation):\n Threshold  Fraud Precision  Fraud Recall  Fraud F1  Fraud Alerts\n      0.05            0.074         1.000     0.139           443\n      0.10            0.107         1.000     0.194           307\n      0.15            0.134         1.000     0.237           246\n      0.20            0.159         0.939     0.272           195\n      0.25            0.186         0.939     0.310           167\n      0.30            0.220         0.939     0.356           141\n      0.35            0.244         0.909     0.385           123\n      0.40            0.252         0.879     0.392           115\n      0.45            0.283         0.848     0.424            99\n      0.50            0.314         0.818     0.454            86\n      0.55            0.360         0.818     0.500            75\n      0.60            0.422         0.818     0.557            64\n      0.65            0.456         0.788     0.578            57\n      0.70            0.500         0.788     0.612            52\n      0.75            0.553         0.788     0.650            47\n      0.80            0.565         0.788     0.658            46\n      0.85            0.667         0.727     0.696            36\n      0.90            0.759         0.667     0.710            29\n      0.95            0.826         0.576     0.679            23\n\nChosen threshold: 0.6\n\nFinal test metrics:\n            Model  Accuracy  Fraud Precision  Fraud Recall  Fraud F1\nDefault LR (0.50)    0.9825           0.8333        0.6098    0.7042\nWeighted LR (0.6)    0.9442           0.3646        0.8537    0.5109\n\nTest confusion matrix (rows: actual 0, 1 | columns: predicted 0, 1):\n[[1098   61]\n [   6   35]]\n\nFraud caught: 35 of 41 | false alarms: 61 of 1159 legitimate transactions"
+  },
+  "practice": [
+    {
+      "title": "Threshold by Hand",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "A model scored 20 transactions (6 fraud, 14 legitimate). Find the threshold that gives the best F1.",
+      "tasks": [
+        "Write a loop over the thresholds 0.2, 0.4, 0.6 and 0.8",
+        "For each, print the alerts, precision, recall and F1 (use zero_division=0)",
+        "Find the threshold with the highest F1",
+        "Print the confusion matrix for that threshold",
+        "Which threshold would you choose if missing fraud is very expensive?"
+      ],
+      "hint": "flagged = (probability >= threshold).astype(int). Keep the F1 values in a dictionary and use max(results, key=results.get).",
+      "starter": "import numpy as np\nfrom sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix\n\nactual = np.array([1, 1, 1, 1, 1, 1] + [0] * 14)\nprobability = np.array([0.92, 0.85, 0.70, 0.55, 0.35, 0.15,\n                        0.80, 0.60, 0.45, 0.40, 0.30, 0.25, 0.20, 0.18, 0.12, 0.10, 0.08, 0.05, 0.04, 0.02])\n\n# TODO 1: loop over the thresholds\n\n# TODO 2: precision, recall, F1, alerts\n\n# TODO 3: best F1 threshold\n\n# TODO 4: confusion matrix for it",
+      "solution": "import numpy as np\nfrom sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix\n\nactual = np.array([1, 1, 1, 1, 1, 1] + [0] * 14)\nprobability = np.array([0.92, 0.85, 0.70, 0.55, 0.35, 0.15,\n                        0.80, 0.60, 0.45, 0.40, 0.30, 0.25, 0.20, 0.18, 0.12, 0.10, 0.08, 0.05, 0.04, 0.02])\n\nresults = {}\nfor threshold in [0.2, 0.4, 0.6, 0.8]:\n    flagged = (probability >= threshold).astype(int)\n    precision = precision_score(actual, flagged, zero_division=0)\n    recall = recall_score(actual, flagged, zero_division=0)\n    f1 = f1_score(actual, flagged, zero_division=0)\n    results[threshold] = f1\n    print(f\"Threshold {threshold}: alerts {flagged.sum():2} | precision {precision:.2f} | recall {recall:.2f} | F1 {f1:.2f}\")\n\nbest = max(results, key=results.get)\nprint(\"\\nBest F1 threshold:\", best)\nprint(confusion_matrix(actual, (probability >= best).astype(int), labels=[0, 1]))",
+      "output": "Threshold 0.2: alerts 12 | precision 0.42 | recall 0.83 | F1 0.56\nThreshold 0.4: alerts  8 | precision 0.50 | recall 0.67 | F1 0.57\nThreshold 0.6: alerts  5 | precision 0.60 | recall 0.50 | F1 0.55\nThreshold 0.8: alerts  3 | precision 0.67 | recall 0.33 | F1 0.44\n\nBest F1 threshold: 0.4\n[[10  4]\n [ 2  4]]",
+      "note": "If missing fraud is very expensive, choose a LOW threshold such as 0.2, which catches almost every fraud at the price of many false alarms. The best F1 treats both mistakes equally, which is rarely true in real life."
+    },
+    {
+      "title": "Loan Default Detector",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "About 1 in 15 loans defaults. Compare three class-weight settings, tune the threshold on validation data and evaluate once on the test set.",
+      "tasks": [
+        "Create the data, split 80/20 for the test set, then split the training part 80/20 again for validation (random_state=42, stratified)",
+        "Train three pipelines (scaler + LogisticRegression): default, class_weight=\"balanced\" and class_weight={0: 1, 1: 10}",
+        "Print the validation precision, recall and F1 of each at threshold 0.50",
+        "For the custom weight model, sweep thresholds 0.1 to 0.9 (step 0.1) and pick the threshold with the best validation F1",
+        "Evaluate that threshold ONCE on the test set: precision, recall, F1 and the confusion matrix"
+      ],
+      "hint": "Probabilities: model.predict_proba(X_val)[:, 1]. Labels: (probabilities >= threshold).astype(int). Pick the threshold with max(f1_by_threshold, key=f1_by_threshold.get).",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix\n\ndef make_loan_data(seed=3, n=5000):\n    rs = np.random.RandomState(seed)\n    income = np.round(rs.lognormal(3.8, 0.4, n), 1)            # thousands per month\n    debt_ratio = np.round(rs.beta(2, 5, n), 2)\n    late_payments = rs.poisson(0.8, n)\n    credit_years = rs.randint(1, 26, n)\n    z = -5.0 + 0.8 * late_payments + 4.0 * debt_ratio - 0.02 * income - 0.04 * credit_years\n    default = (rs.uniform(size=n) < 1 / (1 + np.exp(-z))).astype(int)\n    return pd.DataFrame({\"income\": income, \"debt_ratio\": debt_ratio, \"late_payments\": late_payments,\n                         \"credit_years\": credit_years, \"default\": default})\n\n# TODO 1: data and the three sets\n\n# TODO 2: three models\n\n# TODO 3: validation table at threshold 0.50\n\n# TODO 4: threshold sweep for the custom weight model\n\n# TODO 5: one final test evaluation",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix\n\ndef make_loan_data(seed=3, n=5000):\n    rs = np.random.RandomState(seed)\n    income = np.round(rs.lognormal(3.8, 0.4, n), 1)            # thousands per month\n    debt_ratio = np.round(rs.beta(2, 5, n), 2)\n    late_payments = rs.poisson(0.8, n)\n    credit_years = rs.randint(1, 26, n)\n    z = -5.0 + 0.8 * late_payments + 4.0 * debt_ratio - 0.02 * income - 0.04 * credit_years\n    default = (rs.uniform(size=n) < 1 / (1 + np.exp(-z))).astype(int)\n    return pd.DataFrame({\"income\": income, \"debt_ratio\": debt_ratio, \"late_payments\": late_payments,\n                         \"credit_years\": credit_years, \"default\": default})\n\ndf = make_loan_data()\nX, y = df.drop(columns=\"default\"), df[\"default\"]\nprint(\"Loans:\", len(df), \"| defaults:\", y.sum(), f\"({y.mean():.1%})\")\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)\nX_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42, stratify=y_train)\n\nweights = {\"Default\": None, \"Balanced\": \"balanced\", \"Custom 1:10\": {0: 1, 1: 10}}\nmodels = {name: make_pipeline(StandardScaler(), LogisticRegression(class_weight=w, max_iter=1000, random_state=42)).fit(X_fit, y_fit)\n          for name, w in weights.items()}\n\nprint(\"\\nValidation at threshold 0.50:\")\nfor name, model in models.items():\n    pred = model.predict(X_val)\n    print(f\"  {name:12} precision {precision_score(y_val, pred, zero_division=0):.2f} | recall {recall_score(y_val, pred, zero_division=0):.2f} | F1 {f1_score(y_val, pred, zero_division=0):.2f}\")\n\nmodel = models[\"Custom 1:10\"]\nval_probabilities = model.predict_proba(X_val)[:, 1]\nf1_by_threshold = {}\nfor threshold in [round(t, 1) for t in np.arange(0.1, 0.95, 0.1)]:\n    f1_by_threshold[threshold] = f1_score(y_val, (val_probabilities >= threshold).astype(int), zero_division=0)\nbest_threshold = max(f1_by_threshold, key=f1_by_threshold.get)\nprint(\"\\nBest validation threshold:\", best_threshold)\n\ntest_pred = (model.predict_proba(X_test)[:, 1] >= best_threshold).astype(int)\nprint(\"\\nFinal test metrics:\")\nprint(f\"  precision {precision_score(y_test, test_pred, zero_division=0):.2f} | recall {recall_score(y_test, test_pred, zero_division=0):.2f} | F1 {f1_score(y_test, test_pred, zero_division=0):.2f}\")\nprint(confusion_matrix(y_test, test_pred, labels=[0, 1]))",
+      "output": "Loans: 5000 | defaults: 89 (1.8%)\n\nValidation at threshold 0.50:\n  Default      precision 0.50 | recall 0.07 | F1 0.12\n  Balanced     precision 0.05 | recall 0.79 | F1 0.10\n  Custom 1:10  precision 0.19 | recall 0.43 | F1 0.27\n\nBest validation threshold: 0.5\n\nFinal test metrics:\n  precision 0.10 | recall 0.22 | F1 0.14\n[[946  36]\n [ 14   4]]",
+      "note": "The best threshold came from validation data only, and the test set was used once. The custom 1:10 weight raises recall, but, like class_weight=\"balanced\", it also inflates probabilities, so the best threshold ends up well above 0.5. The right balance depends on what a missed default costs compared with refusing a good customer."
+    }
+  ],
+  "checklist": [
+    "Understood precision, recall and F1",
+    "Saw how the threshold changes the flagged transactions",
+    "Split data into training, validation and test sets",
+    "Compared default and class-weighted models",
+    "Swept thresholds and chose one on the validation set",
+    "Evaluated once on the test set",
+    "Read the price of the alerts in false alarms"
+  ],
+  "quiz": [
+    {
+      "q": "A fraud model flags 100 transactions and 40 are really fraud. What is the precision?",
+      "options": [
+        "40%",
+        "60%",
+        "100%",
+        "Cannot tell"
+      ],
+      "answer": 0,
+      "why": "Precision = TP / (TP + FP) = 40 / 100 = 40%."
+    },
+    {
+      "q": "What happens when you lower the decision threshold?",
+      "options": [
+        "Fewer alerts and higher precision",
+        "More alerts and usually higher recall but lower precision",
+        "The model is retrained",
+        "Nothing changes"
+      ],
+      "answer": 1,
+      "why": "A lower threshold flags more transactions, so it catches more fraud but also flags more legitimate ones."
+    },
+    {
+      "q": "Why choose the threshold on the validation set and not on the test set?",
+      "options": [
+        "The test set is too big",
+        "Choosing on the test set turns it into a second validation set and the final score becomes optimistic",
+        "Validation data is cleaner",
+        "It is faster"
+      ],
+      "answer": 1,
+      "why": "The test set must stay an independent judge, used once at the end."
+    },
+    {
+      "q": "Does a probability of 0.30 from a class_weight=\"balanced\" model mean a 30% chance of fraud?",
+      "options": [
+        "Yes, always",
+        "No, class weights inflate the probabilities",
+        "Only for tree models",
+        "Only above 0.5"
+      ],
+      "answer": 1,
+      "why": "Re-weighting the classes shifts the scores, so use them to rank and choose a threshold, not as literal chances."
+    },
+  {
+  "q": "If you lower the classification threshold on your fraud model from 0.50 to 0.25, what is the most common effect?",
+  "options": [
+    "Higher recall and more fraud alerts, potentially with lower precision",
+    "Lower recall and fewer fraud alerts, with higher precision",
+    "No change to predictions unless the model is retrained",
+    "Fewer false positives and more false negatives"
+  ],
+  "answer": 0,
+  "why": "A lower threshold flags more transactions as fraud, usually catching more actual fraud (higher recall) at the cost of more false alarms (potentially lower precision)."
+},
+  ]
+}
   ]
 };
