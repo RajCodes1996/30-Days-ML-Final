@@ -8813,7 +8813,7 @@ Average used to fill: 245.0
       "answer": 1,
       "why": "Re-weighting the classes shifts the scores, so use them to rank and choose a threshold, not as literal chances."
     },
-  {
+    {
   "q": "If you lower the classification threshold on your fraud model from 0.50 to 0.25, what is the most common effect?",
   "options": [
     "Higher recall and more fraud alerts, potentially with lower precision",
@@ -8823,8 +8823,458 @@ Average used to fill: 245.0
   ],
   "answer": 0,
   "why": "A lower threshold flags more transactions as fraud, usually catching more actual fraud (higher recall) at the cost of more false alarms (potentially lower precision)."
-},
-  ]
 }
+  ]
+},
+{
+  "day": 20,
+  "title": "ML Pipelines, ColumnTransformer & Data Leakage Prevention",
+  "subtitle": "Move from training single models to building reusable workflows that preprocess data correctly and keep test information out of training.",
+  "level": "Intermediate",
+  "duration": "2-3 hours",
+  "tags": [
+    "Pipeline",
+    "ColumnTransformer",
+    "Data Leakage",
+    "OneHotEncoder",
+    "Preprocessing"
+  ],
+  "goals": [
+    "Understand why preprocessing is necessary and what a Pipeline is",
+    "Use ColumnTransformer for numerical and categorical columns",
+    "Understand data leakage and how to prevent it",
+    "Combine preprocessing and model training into one workflow"
+  ],
+  "sections": [
+    {
+      "id": "concept",
+      "icon": "🧠",
+      "title": "Step 1: Why We Need Pipelines",
+      "meta": "From models to workflows",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Without a pipeline, every step (load, impute, scale, encode, train) is managed separately. It is easy to make mistakes or forget preprocessing during prediction."
+        },
+        {
+          "type": "p",
+          "text": "A Pipeline combines preprocessing and model training into one organized workflow: Imputation, Scaling, Model. Preprocessing and model execution are handled consistently for both training and prediction. Think of it as an automated assembly line for your ML model."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Today's goal",
+            "Tool"
+          ],
+          "rows": [
+            [
+              "Chain preprocessing and model",
+              "Pipeline"
+            ],
+            [
+              "Different preprocessing per column type",
+              "ColumnTransformer"
+            ],
+            [
+              "Keep test information out of training",
+              "fit on training data only"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "first",
+      "icon": "⚡",
+      "title": "Step 2: Build Your First Pipeline",
+      "meta": "Small dataset",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "We start with a small customer dataset so the idea is clear before we apply it to fraud detection. Copy this into day20_pipelines.py:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "day20_pipelines.py",
+          "code": "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import classification_report\n\ndata = {\n    \"Age\": [22, 25, 47, 52, 46, 56, 23, 40, 35, 60],\n    \"Salary\": [\n        25000, 30000, 60000, 80000, 55000,\n        90000, 28000, 50000, 45000, 100000\n    ],\n    \"Purchased\": [0, 0, 1, 1, 1, 1, 0, 1, 0, 1]\n}\n\ndf = pd.DataFrame(data)\nprint(df)",
+          "output": "   Age  Salary  Purchased\n0   22   25000          0\n1   25   30000          0\n2   47   60000          1\n3   52   80000          1\n4   46   55000          1\n5   56   90000          1\n6   23   28000          0\n7   40   50000          1\n8   35   45000          0\n9   60  100000          1"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "split.py",
+          "code": "X = df[[\"Age\", \"Salary\"]]\ny = df[\"Purchased\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y,\n    test_size=0.3,\n    random_state=42,\n    stratify=y\n)\n\nprint(\"Training rows:\", len(X_train))\nprint(\"Testing rows:\", len(X_test))",
+          "output": "Training rows: 7\nTesting rows: 3"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "pipeline.py",
+          "code": "pipeline = Pipeline([\n    (\"imputer\", SimpleImputer(strategy=\"mean\")),\n    (\"scaler\", StandardScaler()),\n    (\"model\", LogisticRegression())\n])\n\nprint(pipeline)",
+          "output": "Pipeline(steps=[('imputer', SimpleImputer()), ('scaler', StandardScaler()),\n                ('model', LogisticRegression())])"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Step",
+            "Purpose"
+          ],
+          "rows": [
+            [
+              "imputer",
+              "Fills missing numerical values"
+            ],
+            [
+              "scaler",
+              "Standardizes numerical features"
+            ],
+            [
+              "model",
+              "Trains Logistic Regression"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train.py",
+          "code": "pipeline.fit(X_train, y_train)\npredictions = pipeline.predict(X_test)\n\nprint(classification_report(\n    y_test,\n    predictions,\n    zero_division=0\n))",
+          "output": "              precision    recall  f1-score   support\n\n           0       0.50      1.00      0.67         1\n           1       1.00      0.50      0.67         2\n\n    accuracy                           0.67         3\n   macro avg       0.75      0.75      0.67         3\nweighted avg       0.83      0.67      0.67         3"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "This tiny dataset is only for learning the workflow. With 3 test rows, one prediction changes accuracy by 33 points, so these metrics are not reliable evidence of real-world performance."
+        }
+      ]
+    },
+    {
+      "id": "leakage",
+      "icon": "🚨",
+      "title": "Step 3: Data Leakage",
+      "meta": "Most important concept",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Data leakage happens when information from outside the training data improperly influences model training. For example, fitting a scaler on all records and then splitting means the scaler's mean and standard deviation already include the test rows."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "leakage.py",
+          "code": "# WRONG: preprocessing before splitting\nleaky_scaler = StandardScaler().fit(X)\nprint(\"Scaler mean using ALL rows:  \", [round(float(m), 1) for m in leaky_scaler.mean_])\n\n# RIGHT: split first, fit preprocessing on training data only\nscaler = StandardScaler().fit(X_train)\nprint(\"Scaler mean using TRAIN only:\", [round(float(m), 1) for m in scaler.mean_])\n\nX_train_scaled = scaler.transform(X_train)\nX_test_scaled = scaler.transform(X_test)   # transform only, never fit\n\nprint(\"\\nTest rows were NOT used to learn the training mean.\")\nprint(\"Pipeline.fit() does this automatically.\")",
+          "output": "Scaler mean using ALL rows:   [40.6, 56300.0]\nScaler mean using TRAIN only: [42.4, 61428.6]\n\nTest rows were NOT used to learn the training mean.\nPipeline.fit() does this automatically."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Method",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "fit()",
+              "Learn parameters from data"
+            ],
+            [
+              "transform()",
+              "Apply learned parameters to data"
+            ],
+            [
+              "fit_transform()",
+              "Learn and apply"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "A Pipeline handles this correctly: fit() learns every transformation from the training data only, and prediction just applies what was already learned."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Wrong: StandardScaler().fit_transform(X) before train_test_split. Right: split first, fit on training data, then transform the test data."
+        }
+      ]
+    },
+    {
+      "id": "columns",
+      "icon": "🧩",
+      "title": "Step 4: ColumnTransformer",
+      "meta": "Numerical + categorical",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Real datasets mix column types. Age and Salary are numerical and need imputing and scaling. City and Education are categorical and need imputing and encoding. ColumnTransformer applies the right preprocessing to the right columns and combines the results."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "mixed_data.py",
+          "code": "data = {\n    \"Age\": [22, 25, 47, 52, 46, 56, 23, 40, 35, 60,\n            28, 32, 45, 50, 29, 38, 42, 55, 31, 48],\n    \"Salary\": [25000, 30000, 60000, 80000, 55000,\n               90000, 28000, 50000, 45000, 100000,\n               32000, 40000, 70000, 85000, 35000,\n               52000, 65000, 95000, 42000, 75000],\n    \"City\": [\"Delhi\", \"Mumbai\", \"Pune\", \"Delhi\", \"Pune\",\n             \"Mumbai\", \"Delhi\", \"Pune\", \"Mumbai\", \"Delhi\",\n             \"Pune\", \"Mumbai\", \"Delhi\", \"Pune\", \"Mumbai\",\n             \"Delhi\", \"Pune\", \"Mumbai\", \"Delhi\", \"Pune\"],\n    \"Education\": [\"Graduate\", \"Postgraduate\", \"Graduate\",\n                  \"Postgraduate\", \"Graduate\", \"Postgraduate\",\n                  \"Graduate\", \"Graduate\", \"Postgraduate\",\n                  \"Postgraduate\", \"Graduate\", \"Graduate\",\n                  \"Postgraduate\", \"Graduate\", \"Graduate\",\n                  \"Postgraduate\", \"Graduate\", \"Postgraduate\",\n                  \"Graduate\", \"Postgraduate\"],\n    \"Purchased\": [0, 0, 1, 1, 1, 1, 0, 1, 0, 1,\n                  0, 0, 1, 1, 0, 1, 1, 1, 0, 1]\n}\n\ndf = pd.DataFrame(data)\nX = df.drop(\"Purchased\", axis=1)\ny = df[\"Purchased\"]\n\nnumeric_features = [\"Age\", \"Salary\"]\ncategorical_features = [\"City\", \"Education\"]\n\nprint(df.head())\nprint(\"\\nNumerical:\", numeric_features)\nprint(\"Categorical:\", categorical_features)",
+          "output": "   Age  Salary    City     Education  Purchased\n0   22   25000   Delhi      Graduate          0\n1   25   30000  Mumbai  Postgraduate          0\n2   47   60000    Pune      Graduate          1\n3   52   80000   Delhi  Postgraduate          1\n4   46   55000    Pune      Graduate          1\n\nNumerical: ['Age', 'Salary']\nCategorical: ['City', 'Education']"
+        },
+        {
+          "type": "table",
+          "head": [
+            "City",
+            "Delhi",
+            "Mumbai",
+            "Pune"
+          ],
+          "rows": [
+            [
+              "Delhi",
+              "1",
+              "0",
+              "0"
+            ],
+            [
+              "Mumbai",
+              "0",
+              "1",
+              "0"
+            ],
+            [
+              "Pune",
+              "0",
+              "0",
+              "1"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "OneHotEncoder converts each category into its own 0/1 column. handle_unknown=\"ignore\" lets the pipeline accept a city it never saw in training."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "column_transformer.py",
+          "code": "from sklearn.compose import ColumnTransformer\nfrom sklearn.preprocessing import OneHotEncoder\n\nnumeric_transformer = Pipeline([\n    (\"imputer\", SimpleImputer(strategy=\"median\")),\n    (\"scaler\", StandardScaler())\n])\n\ncategorical_transformer = Pipeline([\n    (\"imputer\", SimpleImputer(strategy=\"most_frequent\")),\n    (\"encoder\", OneHotEncoder(handle_unknown=\"ignore\"))\n])\n\npreprocessor = ColumnTransformer([\n    (\"num\", numeric_transformer, numeric_features),\n    (\"cat\", categorical_transformer, categorical_features)\n])\n\nfull_pipeline = Pipeline([\n    (\"preprocessing\", preprocessor),\n    (\"model\", LogisticRegression(max_iter=1000))\n])\n\nprint(full_pipeline)",
+          "output": "Pipeline(steps=[('preprocessing',\n                 ColumnTransformer(transformers=[('num',\n                                                  Pipeline(steps=[('imputer',\n                                                                   SimpleImputer(strategy='median')),\n                                                                  ('scaler',\n                                                                   StandardScaler())]),\n                                                  ['Age', 'Salary']),\n                                                 ('cat',\n                                                  Pipeline(steps=[('imputer',\n                                                                   SimpleImputer(strategy='most_frequent')),\n                                                                  ('encoder',\n                                                                   OneHotEncoder(handle_unknown='ignore'))]),\n                                                  ['City', 'Education'])])),\n                ('model', LogisticRegression(max_iter=1000))])"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "train_full.py",
+          "code": "X_train, X_test, y_train, y_test = train_test_split(\n    X, y,\n    test_size=0.25,\n    random_state=42,\n    stratify=y\n)\n\nfull_pipeline.fit(X_train, y_train)\npredictions = full_pipeline.predict(X_test)\n\nprint(classification_report(\n    y_test, predictions, zero_division=0\n))\n\nnames = full_pipeline.named_steps[\"preprocessing\"].get_feature_names_out()\nprint(\"Features after preprocessing:\")\nprint(list(names))",
+          "output": "              precision    recall  f1-score   support\n\n           0       1.00      1.00      1.00         2\n           1       1.00      1.00      1.00         3\n\n    accuracy                           1.00         5\n   macro avg       1.00      1.00      1.00         5\nweighted avg       1.00      1.00      1.00         5\n\nFeatures after preprocessing:\n['num__Age', 'num__Salary', 'cat__City_Delhi', 'cat__City_Mumbai', 'cat__City_Pune', 'cat__Education_Graduate', 'cat__Education_Postgraduate']"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Perfect scores on just 5 test rows prove nothing. Use more data and cross-validation before trusting a result."
+        }
+      ]
+    },
+    {
+      "id": "newdata",
+      "icon": "🔥",
+      "title": "Step 5: Predict on Raw New Data",
+      "meta": "Why pipelines pay off",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The pipeline accepts raw rows. Missing values are imputed with values learned during training, and an unseen city is encoded as all zeros."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "predict_new.py",
+          "code": "new_customers = pd.DataFrame({\n    \"Age\": [30, np.nan, 50],\n    \"Salary\": [48000, 70000, np.nan],\n    \"City\": [\"Delhi\", \"Chennai\", np.nan],\n    \"Education\": [\"Graduate\", \"Postgraduate\", \"Graduate\"]\n})\n\nlabels = full_pipeline.predict(new_customers)\nproba = full_pipeline.predict_proba(new_customers)[:, 1]\n\nfor i, (lab, p) in enumerate(zip(labels, proba), start=1):\n    print(f\"Customer {i}: {'PURCHASE' if lab == 1 else 'NO PURCHASE'} \"\n          f\"(probability {p:.0%})\")",
+          "output": "Customer 1: NO PURCHASE (probability 30%)\nCustomer 2: PURCHASE (probability 84%)\nCustomer 3: PURCHASE (probability 77%)"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "No manual scaling or encoding was needed. Forgetting preprocessing at prediction time is exactly the mistake pipelines prevent."
+        }
+      ]
+    },
+    {
+      "id": "fraud",
+      "icon": "💳",
+      "title": "Step 6: Apply It to Fraud Detection",
+      "meta": "Credit card project",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The fraud features are all numerical, so no categorical encoding is needed. A scaler plus Logistic Regression in one pipeline automatically scales incoming data before prediction. We recreate the Day 18 synthetic data so the code runs on its own."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "fraud_pipeline.py",
+          "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import confusion_matrix\n\n# Same synthetic fraud data as Day 18 (swap in your real df if you have it)\nX_raw, y_raw = make_classification(\n    n_samples=30000, n_features=10, n_informative=6, n_redundant=0,\n    weights=[0.99, 0.01], class_sep=0.8, flip_y=0, random_state=42\n)\nfraud_df = pd.DataFrame(X_raw, columns=[f\"V{i}\" for i in range(1, 11)])\nrng = np.random.RandomState(42)\nfraud_df[\"Amount\"] = rng.lognormal(mean=3.5, sigma=1.0, size=len(fraud_df)).round(2)\nfraud_df[\"Class\"] = y_raw\n\nX = fraud_df.drop(columns=[\"Class\"])\ny = fraud_df[\"Class\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y\n)\n\nfraud_pipeline = Pipeline([\n    (\"scaler\", StandardScaler()),\n    (\"model\", LogisticRegression(\n        class_weight=\"balanced\",\n        max_iter=1000,\n        random_state=42\n    ))\n])\n\n# Fit only on training data\nfraud_pipeline.fit(X_train, y_train)\n\n# Predict on test data\nfraud_predictions = fraud_pipeline.predict(X_test)\n\nprint(\"Confusion Matrix:\")\nprint(confusion_matrix(y_test, fraud_predictions))\n\nprint(\"\\nClassification Report:\")\nprint(classification_report(\n    y_test,\n    fraud_predictions,\n    target_names=[\"Legitimate\", \"Fraud\"],\n    zero_division=0\n))",
+          "output": "Confusion Matrix:\n[[4663 1277]\n [  11   49]]\n\nClassification Report:\n              precision    recall  f1-score   support\n\n  Legitimate       1.00      0.79      0.88      5940\n       Fraud       0.04      0.82      0.07        60\n\n    accuracy                           0.79      6000\n   macro avg       0.52      0.80      0.47      6000\nweighted avg       0.99      0.79      0.87      6000"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "class_weight=\"balanced\" raised fraud recall to 0.82 (49 of 60 caught) but precision fell to 0.04 with 1,277 false alarms. Compare that with the default model's recall of 0.22 and precision of 0.93."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "This uses the default 0.5 threshold. It is a new baseline, not a replacement for your Day 19 threshold experiment. Keep the original test set untouched when comparing models; use validation data for model and threshold selection."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🏁",
+      "title": "Mini Project: Leakage-Safe Workflow",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Final Program below builds a ColumnTransformer pipeline on mixed customer data with missing values, evaluates it with cross-validation, then compares two fraud pipelines without touching the test set until the end."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "A Pipeline chains preprocessing and a model into one reusable workflow",
+            "Data leakage happens when test information influences training",
+            "fit() learns from data, transform() applies what was learned",
+            "ColumnTransformer applies different preprocessing to numerical and categorical columns",
+            "OneHotEncoder(handle_unknown=\"ignore\") accepts unseen categories",
+            "Pipelines keep preprocessing inside each cross-validation fold",
+            "class_weight=\"balanced\" shifts the precision/recall trade-off, it does not fix it"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Leakage-Safe Pipeline Workflow",
+    "file": "day20_final.py",
+    "description": "One program combining Day 20: a ColumnTransformer pipeline on mixed customer data with missing values, cross-validation with preprocessing inside each fold, prediction on raw new rows, and two fraud pipelines compared on an untouched test set.",
+    "concepts": [
+      "Pipeline",
+      "ColumnTransformer",
+      "imputation",
+      "OneHotEncoder",
+      "data leakage prevention",
+      "class_weight"
+    ],
+    "code": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.preprocessing import StandardScaler, OneHotEncoder\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score\n\nprint(\"=== ML PIPELINES, COLUMNTRANSFORMER AND LEAKAGE ===\")\n\n# ---------- Part 1: mixed-type customer data ----------\nrng = np.random.RandomState(0)\nn = 200\ncustomers = pd.DataFrame({\n    \"Age\": rng.randint(20, 65, n).astype(float),\n    \"Salary\": rng.randint(20000, 110000, n).astype(float),\n    \"City\": rng.choice([\"Delhi\", \"Mumbai\", \"Pune\"], n),\n    \"Education\": rng.choice([\"Graduate\", \"Postgraduate\"], n)\n})\nscore = (customers[\"Age\"] / 65 + customers[\"Salary\"] / 110000\n         + (customers[\"Education\"] == \"Postgraduate\") * 0.4\n         + rng.normal(0, 0.3, n))\ncustomers[\"Purchased\"] = (score > score.median()).astype(int)\n\n# inject missing values\ncustomers.loc[rng.choice(n, 15, replace=False), \"Salary\"] = np.nan\ncustomers.loc[rng.choice(n, 10, replace=False), \"City\"] = np.nan\n\nX = customers.drop(columns=\"Purchased\")\ny = customers[\"Purchased\"]\nprint(\"\\nCustomers:\", n, \"| Missing values:\", int(X.isna().sum().sum()))\n\nnumeric_features = [\"Age\", \"Salary\"]\ncategorical_features = [\"City\", \"Education\"]\n\npreprocessor = ColumnTransformer([\n    (\"num\", Pipeline([\n        (\"imputer\", SimpleImputer(strategy=\"median\")),\n        (\"scaler\", StandardScaler())\n    ]), numeric_features),\n    (\"cat\", Pipeline([\n        (\"imputer\", SimpleImputer(strategy=\"most_frequent\")),\n        (\"encoder\", OneHotEncoder(handle_unknown=\"ignore\"))\n    ]), categorical_features)\n])\n\npipeline = Pipeline([\n    (\"preprocessing\", preprocessor),\n    (\"model\", LogisticRegression(max_iter=1000))\n])\n\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)\nscores = cross_val_score(pipeline, X, y, cv=cv)\nprint(f\"5-fold CV accuracy (preprocessing inside each fold): \"\n      f\"{scores.mean():.3f} +/- {scores.std():.3f}\")\n\nX_tr, X_te, y_tr, y_te = train_test_split(\n    X, y, test_size=0.25, random_state=42, stratify=y\n)\npipeline.fit(X_tr, y_tr)\nprint(f\"Held-out test accuracy: {pipeline.score(X_te, y_te):.3f}\")\n\nnew = pd.DataFrame({\n    \"Age\": [30, np.nan], \"Salary\": [48000, 70000],\n    \"City\": [\"Delhi\", \"Chennai\"], \"Education\": [\"Graduate\", \"Postgraduate\"]\n})\nprint(\"New customers (missing age, unseen city handled):\",\n      pipeline.predict(new).tolist())\n\n# ---------- Part 2: fraud pipeline ----------\nX_raw, y_raw = make_classification(\n    n_samples=30000, n_features=10, n_informative=6, n_redundant=0,\n    weights=[0.99, 0.01], class_sep=0.8, flip_y=0, random_state=42\n)\ndf = pd.DataFrame(X_raw, columns=[f\"V{i}\" for i in range(1, 11)])\ndf[\"Amount\"] = np.random.RandomState(42).lognormal(3.5, 1.0, len(df)).round(2)\ndf[\"Class\"] = y_raw\n\nXf = df.drop(columns=\"Class\")\nyf = df[\"Class\"]\nXf_train, Xf_test, yf_train, yf_test = train_test_split(\n    Xf, yf, test_size=0.20, random_state=42, stratify=yf\n)\n\nvariants = {\n    \"Default weights\": LogisticRegression(max_iter=1000, random_state=42),\n    \"class_weight balanced\": LogisticRegression(\n        class_weight=\"balanced\", max_iter=1000, random_state=42\n    )\n}\n\nprint(\"\\nFraud pipelines (threshold 0.5, test set used once):\")\nfor name, model in variants.items():\n    pipe = Pipeline([(\"scaler\", StandardScaler()), (\"model\", model)])\n    pipe.fit(Xf_train, yf_train)\n    pred = pipe.predict(Xf_test)\n    tn, fp, fn, tp = confusion_matrix(yf_test, pred, labels=[0, 1]).ravel()\n    print(f\"  {name:<22} precision {precision_score(yf_test, pred, zero_division=0):.3f} | \"\n          f\"recall {recall_score(yf_test, pred):.3f} | \"\n          f\"F1 {f1_score(yf_test, pred):.3f} | TP {tp} FN {fn} FP {fp}\")\n\nscaler = pipe.named_steps[\"scaler\"]\nprint(\"\\nScaler learned from training rows only:\", len(Xf_train), \"rows\")\nprint(\"Amount mean (train):\", round(scaler.mean_[-1], 2))\nprint(\"The test set was never used to fit anything.\")",
+    "output": "=== ML PIPELINES, COLUMNTRANSFORMER AND LEAKAGE ===\n\nCustomers: 200 | Missing values: 25\n5-fold CV accuracy (preprocessing inside each fold): 0.770 +/- 0.056\nHeld-out test accuracy: 0.680\nNew customers (missing age, unseen city handled): [0, 1]\n\nFraud pipelines (threshold 0.5, test set used once):\n  Default weights        precision 0.929 | recall 0.217 | F1 0.351 | TP 13 FN 47 FP 1\n  class_weight balanced  precision 0.037 | recall 0.817 | F1 0.071 | TP 49 FN 11 FP 1277\n\nScaler learned from training rows only: 24000 rows\nAmount mean (train): 54.67\nThe test set was never used to fit anything."
+  },
+  "practice": [
+    {
+      "title": "Employee Attrition Pipeline",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Build a ColumnTransformer pipeline for a dataset with missing values and categorical columns.",
+      "tasks": [
+        "Create X (every column except Left) and y (Left)",
+        "Define numeric_features and categorical_features",
+        "Build a numeric pipeline with a median imputer and StandardScaler",
+        "Build a categorical pipeline with a most_frequent imputer and OneHotEncoder(handle_unknown=\"ignore\")",
+        "Combine them with ColumnTransformer and add LogisticRegression(max_iter=1000) in a Pipeline",
+        "Split 80/20 with random_state=4 and stratify=y, fit, and print the test accuracy",
+        "Predict for a new employee with a missing Salary and a Department unseen in training"
+      ],
+      "hint": "Pipeline([(\"preprocessing\", preprocessor), (\"model\", LogisticRegression(max_iter=1000))]). The new employee is a one-row DataFrame with the same column names.",
+      "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.preprocessing import StandardScaler, OneHotEncoder\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\nrng = np.random.RandomState(4)\nn = 150\ndf = pd.DataFrame({\n    \"Experience\": rng.randint(0, 20, n).astype(float),\n    \"Salary\": rng.randint(25000, 120000, n).astype(float),\n    \"Department\": rng.choice([\"Sales\", \"Tech\", \"HR\"], n),\n    \"Remote\": rng.choice([\"Yes\", \"No\"], n)\n})\nrisk = (20 - df[\"Experience\"]) / 20 + (df[\"Department\"] == \"Sales\") * 0.4 + rng.normal(0, 0.3, n)\ndf[\"Left\"] = (risk > risk.median()).astype(int)\ndf.loc[rng.choice(n, 12, replace=False), \"Salary\"] = np.nan\ndf.loc[rng.choice(n, 8, replace=False), \"Department\"] = np.nan\n\n# TODO 1: X = every column except Left, y = Left\n# TODO 2: numeric_features and categorical_features lists\n# TODO 3: numeric pipeline = median imputer + StandardScaler\n# TODO 4: categorical pipeline = most_frequent imputer + OneHotEncoder(handle_unknown=\"ignore\")\n# TODO 5: combine with ColumnTransformer, then add LogisticRegression(max_iter=1000) in a Pipeline\n# TODO 6: split 80/20 with random_state=4 and stratify=y, fit, print test accuracy\n# TODO 7: predict for one new employee with missing Salary and a Department not seen in training",
+      "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.preprocessing import StandardScaler, OneHotEncoder\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\n\nrng = np.random.RandomState(4)\nn = 150\ndf = pd.DataFrame({\n    \"Experience\": rng.randint(0, 20, n).astype(float),\n    \"Salary\": rng.randint(25000, 120000, n).astype(float),\n    \"Department\": rng.choice([\"Sales\", \"Tech\", \"HR\"], n),\n    \"Remote\": rng.choice([\"Yes\", \"No\"], n)\n})\nrisk = (20 - df[\"Experience\"]) / 20 + (df[\"Department\"] == \"Sales\") * 0.4 + rng.normal(0, 0.3, n)\ndf[\"Left\"] = (risk > risk.median()).astype(int)\ndf.loc[rng.choice(n, 12, replace=False), \"Salary\"] = np.nan\ndf.loc[rng.choice(n, 8, replace=False), \"Department\"] = np.nan\n\nX = df.drop(columns=\"Left\")\ny = df[\"Left\"]\n\nnumeric_features = [\"Experience\", \"Salary\"]\ncategorical_features = [\"Department\", \"Remote\"]\n\npreprocessor = ColumnTransformer([\n    (\"num\", Pipeline([\n        (\"imputer\", SimpleImputer(strategy=\"median\")),\n        (\"scaler\", StandardScaler())\n    ]), numeric_features),\n    (\"cat\", Pipeline([\n        (\"imputer\", SimpleImputer(strategy=\"most_frequent\")),\n        (\"encoder\", OneHotEncoder(handle_unknown=\"ignore\"))\n    ]), categorical_features)\n])\n\npipeline = Pipeline([\n    (\"preprocessing\", preprocessor),\n    (\"model\", LogisticRegression(max_iter=1000))\n])\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=4, stratify=y\n)\npipeline.fit(X_train, y_train)\nprint(\"Test accuracy:\", round(accuracy_score(y_test, pipeline.predict(X_test)), 4))\n\nnew_employee = pd.DataFrame({\n    \"Experience\": [3.0], \"Salary\": [np.nan],\n    \"Department\": [\"Finance\"], \"Remote\": [\"Yes\"]\n})\nprint(\"Prediction:\", \"LEAVES\" if pipeline.predict(new_employee)[0] == 1 else \"STAYS\")",
+      "output": "Test accuracy: 0.7667\nPrediction: LEAVES",
+      "note": "The pipeline handled the missing Salary and the unseen Department \"Finance\" with no extra code."
+    },
+    {
+      "title": "Leakage Experiment",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "See leakage inflate a score on pure noise, then fix it with a Pipeline.",
+      "tasks": [
+        "Leaky way: fit SelectKBest(f_classif, k=20) on all of X, then run cross_val_score with LogisticRegression",
+        "Correct way: put SelectKBest and LogisticRegression in a Pipeline and run cross_val_score",
+        "Print both mean accuracies",
+        "Print which score is unrealistically high and why"
+      ],
+      "hint": "In the correct version the Pipeline refits SelectKBest on the training part of every fold, so the validation rows never influence feature selection.",
+      "starter": "import numpy as np\nfrom sklearn.model_selection import cross_val_score, StratifiedKFold\nfrom sklearn.feature_selection import SelectKBest, f_classif\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.linear_model import LogisticRegression\n\nrng = np.random.RandomState(0)\nX = rng.normal(size=(100, 1000))   # pure noise features\ny = rng.randint(0, 2, 100)         # random labels: no real signal exists\n\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)\n\n# TODO 1: LEAKY way - fit SelectKBest(f_classif, k=20) on ALL of X, then cross_val_score LogisticRegression\n# TODO 2: CORRECT way - Pipeline([(\"select\", SelectKBest(f_classif, k=20)), (\"model\", LogisticRegression())])\n# TODO 3: print both mean accuracies\n# TODO 4: print which one is unrealistically high and why",
+      "solution": "import numpy as np\nfrom sklearn.model_selection import cross_val_score, StratifiedKFold\nfrom sklearn.feature_selection import SelectKBest, f_classif\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.linear_model import LogisticRegression\n\nrng = np.random.RandomState(0)\nX = rng.normal(size=(100, 1000))   # pure noise features\ny = rng.randint(0, 2, 100)         # random labels: no real signal exists\n\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)\n\n# LEAKY: feature selection sees every row, including validation rows\nX_selected = SelectKBest(f_classif, k=20).fit_transform(X, y)\nleaky = cross_val_score(LogisticRegression(), X_selected, y, cv=cv).mean()\n\n# CORRECT: selection is refitted inside each training fold\npipe = Pipeline([\n    (\"select\", SelectKBest(f_classif, k=20)),\n    (\"model\", LogisticRegression())\n])\ncorrect = cross_val_score(pipe, X, y, cv=cv).mean()\n\nprint(f\"Leaky accuracy:   {leaky:.3f}\")\nprint(f\"Correct accuracy: {correct:.3f}\")\nprint(\"Labels are random, so chance level (about 0.50) is the honest answer.\")\nprint(\"The leaky score is inflated because selection saw the validation rows.\")",
+      "output": "Leaky accuracy:   0.810\nCorrect accuracy: 0.430\nLabels are random, so chance level (about 0.50) is the honest answer.\nThe leaky score is inflated because selection saw the validation rows.",
+      "note": "The labels are random, so no model should beat chance. The leaky score of 0.81 is pure leakage; the pipeline's 0.43 is the honest result."
+    }
+  ],
+  "checklist": [
+    "Understood why pipelines are useful",
+    "Built a Pipeline with imputer, scaler and model",
+    "Understood data leakage and fit vs transform",
+    "Used ColumnTransformer with OneHotEncoder",
+    "Predicted on raw new data with missing and unseen values",
+    "Built a fraud detection pipeline",
+    "Kept the test set untouched until the final check"
+  ],
+  "quiz": [
+    {
+      "q": "What is data leakage?",
+      "options": [
+        "Losing rows from the dataset",
+        "Information from outside the training data improperly influencing training",
+        "A model that trains too slowly",
+        "Missing values in the data"
+      ],
+      "answer": 1,
+      "why": "Leakage means the training process received information it should not have, for example test-set statistics from a scaler fitted before splitting."
+    },
+    {
+      "q": "What is the correct order for scaling features?",
+      "options": [
+        "Scale all data, then split",
+        "Split, then fit the scaler on the training data and transform the test data",
+        "Fit a separate scaler on the test data",
+        "Scale only the test data"
+      ],
+      "answer": 1,
+      "why": "Split first, fit preprocessing on training data only, and apply the learned parameters to the test data with transform()."
+    },
+    {
+      "q": "What does ColumnTransformer do?",
+      "options": [
+        "Trains several models at once",
+        "Applies different preprocessing to different columns and combines the results",
+        "Removes categorical columns",
+        "Splits the dataset into folds"
+      ],
+      "answer": 1,
+      "why": "It routes numerical columns through numerical preprocessing and categorical columns through encoding, then joins the outputs."
+    },
+    {
+      "q": "Why use OneHotEncoder(handle_unknown=\"ignore\")?",
+      "options": [
+        "To drop rare categories",
+        "To allow categories not seen in training at prediction time",
+        "To scale categorical values",
+        "To fill missing values"
+      ],
+      "answer": 1,
+      "why": "An unseen category is encoded as all zeros instead of raising an error."
+    },
+    {
+      "q": "Why is a Pipeline useful inside cross-validation?",
+      "options": [
+        "It makes folds larger",
+        "It refits the preprocessing on each training fold so validation rows never leak",
+        "It removes the need for a test set",
+        "It always raises accuracy"
+      ],
+      "answer": 1,
+      "why": "Each fold fits imputers, scalers and selectors only on its own training part, which prevents the inflated scores that leakage causes."
+    }
+  ]
+},
   ]
 };
