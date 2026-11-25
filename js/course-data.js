@@ -9276,5 +9276,418 @@ Average used to fill: 245.0
     }
   ]
 },
+
+// Day 21: End-to-End Fraud Detection Project V1 (add a comma after Day 20's } then paste)
+{
+ "day": 21,
+ "title": "End-to-End Fraud Detection Project V1",
+ "subtitle": "Combine splitting, pipelines, thresholds and saving into one reusable project",
+ "level": "Intermediate",
+ "duration": "90 min",
+ "tags": [
+  "Project",
+  "Pipeline",
+  "Fraud",
+  "Threshold",
+  "joblib"
+ ],
+ "goals": [
+  "Follow the full ML project workflow in order",
+  "Use train / validation / test for two separate decisions",
+  "Build one Pipeline and pick a threshold on validation",
+  "Save a model with its threshold and features"
+ ],
+ "sections": [
+  {
+   "id": "workflow",
+   "icon": "🗺️",
+   "title": "The project workflow",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Today you stop learning single algorithms and build one complete project: a credit card fraud detector. The goal is not to memorise code. It is to learn the **order of decisions** every real ML project follows, so you can repeat it on any dataset."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Stage",
+      "Question you answer",
+      "Tool"
+     ],
+     "rows": [
+      [
+       "1. Load",
+       "What data do I have?",
+       "pandas / OpenML"
+      ],
+      [
+       "2. Explore",
+       "How big, how clean, how imbalanced?",
+       "shape, isnull, value_counts"
+      ],
+      [
+       "3. Split",
+       "How do I keep an honest final exam?",
+       "train / validation / test"
+      ],
+      [
+       "4. Pipeline",
+       "How do I bundle preprocessing + model?",
+       "Pipeline"
+      ],
+      [
+       "5. Train + evaluate",
+       "Is it good at finding fraud?",
+       "confusion matrix, precision, recall"
+      ],
+      [
+       "6. Threshold",
+       "How many alarms am I willing to raise?",
+       "validation set only"
+      ],
+      [
+       "7. Final test",
+       "What will it do on new data?",
+       "test set, once"
+      ],
+      [
+       "8. Save",
+       "How do I reuse it later?",
+       "joblib"
+      ]
+     ]
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "**Folder layout** to create in VS Code: `data/`, `notebooks/`, `models/`, `reports/`, `src/`, plus `requirements.txt` and `README.md`. Today you work in one notebook; the other files are filled in at the end."
+    }
+   ]
+  },
+  {
+   "id": "load",
+   "icon": "📥",
+   "title": "Step 1: Load the data",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The real dataset (Kaggle/OpenML credit card fraud, 284,807 rows) is about 150 MB. It is too big for a browser lesson, so here we use a **synthetic stand-in** with the same shape of problem: a `Time` column, anonymous `V` features, an `Amount`, and a rare `Class` (1 = fraud). Everything you learn transfers unchanged."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Create the stand-in dataset",
+     "code": "import numpy as np\nimport pandas as pd\n\ndef make_fraud_data(n=20000, fraud_rate=0.02, seed=21):\n    rng = np.random.RandomState(seed)\n    is_fraud = rng.rand(n) < fraud_rate\n    X = rng.normal(size=(n, 10))\n    X[is_fraud, 0] -= 2.0\n    X[is_fraud, 2] -= 1.5\n    X[is_fraud, 3] += 1.8\n    X[is_fraud, 6] -= 1.2\n    amount = np.round(np.exp(rng.normal(3.5, 1.1, n) + 0.6 * is_fraud), 2)\n    df = pd.DataFrame(X, columns=[f\"V{i}\" for i in range(1, 11)])\n    df.insert(0, \"Time\", rng.randint(0, 172800, n))\n    df[\"Amount\"] = amount\n    df[\"Class\"] = is_fraud.astype(int)\n    return df\n\ndf = make_fraud_data()\nprint(\"Dataset shape:\", df.shape)\nprint(df[[\"Time\", \"V1\", \"V2\", \"Amount\", \"Class\"]].head(3).round(2).to_string())",
+     "output": "Dataset shape: (20000, 13)\n     Time    V1    V2  Amount  Class\n0   33980 -0.16 -0.56   13.84      0\n1   39709  0.58  0.68   28.77      0\n2  157877  0.02 -1.04  329.54      0"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "**On your own machine or Colab**, load the real data instead. Do not silently swap datasets: if OpenML is down, fix the download first."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Real dataset (Colab only, not run here)",
+     "code": "from sklearn.datasets import fetch_openml\n\ndataset = fetch_openml(data_id=1597, as_frame=True)\ndf = dataset.frame\nprint(\"Dataset shape:\", df.shape)\n# The real target may load as text; convert it:\n# y = df[\"Class\"].astype(int)"
+    }
+   ]
+  },
+  {
+   "id": "explore",
+   "icon": "🔍",
+   "title": "Step 2: Explore before you model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Always inspect first. Four quick checks tell you whether the data is usable and what kind of problem you have."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Quality and imbalance checks",
+     "code": "print(\"Missing values:\", int(df.isnull().sum().sum()))\nprint(\"Duplicate rows:\", int(df.duplicated().sum()))\nprint(\"Class counts:\", df[\"Class\"].value_counts().to_dict())\nprint(\"Fraud %:\", round(df[\"Class\"].mean() * 100, 2))\nprint(\"Accuracy of 'always legitimate':\", round(1 - df[\"Class\"].mean(), 4))",
+     "output": "Missing values: 0\nDuplicate rows: 0\nClass counts: {0: 19591, 1: 409}\nFraud %: 2.04\nAccuracy of 'always legitimate': 0.9796"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "The last line is the whole lesson of this section: a model that never detects fraud still scores about 98% accuracy. **Accuracy is the wrong judge here.** You will use precision and recall instead."
+    }
+   ]
+  },
+  {
+   "id": "split",
+   "icon": "✂️",
+   "title": "Step 3: Train / validation / test",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Fraud needs three sets because you make **two** decisions with data: how the model learns (train) and which threshold to use (validation). The test set must stay untouched until the end."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "64 / 16 / 20 stratified split",
+     "code": "from sklearn.model_selection import train_test_split\n\nX = df.drop(\"Class\", axis=1)\ny = df[\"Class\"]\n\nX_train_full, X_test, y_train_full, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y)\nX_train, X_val, y_train, y_val = train_test_split(\n    X_train_full, y_train_full, test_size=0.20, random_state=42, stratify=y_train_full)\n\nfor name, part in [(\"Train\", y_train), (\"Validation\", y_val), (\"Test\", y_test)]:\n    print(f\"{name}: {len(part)} rows, {int(part.sum())} frauds\")",
+     "output": "Train: 12800 rows, 262 frauds\nValidation: 3200 rows, 65 frauds\nTest: 4000 rows, 82 frauds"
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "`stratify` keeps the fraud ratio the same in every set. Without it, a small split could end up with almost no fraud at all."
+    }
+   ]
+  },
+  {
+   "id": "pipeline",
+   "icon": "🔧",
+   "title": "Step 4: Pipeline and training",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A `Pipeline` bundles scaling and the model into one object. Benefits: the scaler is fitted on training data only (no leakage), and you save and reuse **one** thing later."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Build and train",
+     "code": "from sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\nfraud_pipeline = Pipeline([\n    (\"scaler\", StandardScaler()),\n    (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42)),\n])\nfraud_pipeline.fit(X_train, y_train)\nprint(\"Steps:\", [name for name, _ in fraud_pipeline.steps])\nprint(\"Trained on\", len(X_train), \"transactions\")",
+     "output": "Steps: ['scaler', 'model']\nTrained on 12800 transactions"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "`class_weight=\"balanced\"` makes a missed fraud cost more than a false alarm during training. It helps recall, but it also pushes probabilities upward, so the best threshold often ends up high."
+    }
+   ]
+  },
+  {
+   "id": "evaluate",
+   "icon": "📊",
+   "title": "Step 5: Evaluate at the default 0.5",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Look at the **Fraud row** of the report, not at accuracy. Precision = of the alarms raised, how many were real fraud. Recall = of all real fraud, how much was caught."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Validation confusion matrix and report",
+     "code": "from sklearn.metrics import confusion_matrix, classification_report\n\nval_pred = fraud_pipeline.predict(X_val)\nprint(confusion_matrix(y_val, val_pred))\nprint(classification_report(y_val, val_pred, target_names=[\"Legitimate\", \"Fraud\"], zero_division=0))",
+     "output": "[[2989  146]\n [   5   60]]\n              precision    recall  f1-score   support\n\n  Legitimate       1.00      0.95      0.98      3135\n       Fraud       0.29      0.92      0.44        65\n\n    accuracy                           0.95      3200\n   macro avg       0.64      0.94      0.71      3200\nweighted avg       0.98      0.95      0.96      3200"
+    }
+   ]
+  },
+  {
+   "id": "threshold",
+   "icon": "🎚️",
+   "title": "Step 6: Choose a threshold on validation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A model outputs a fraud **probability**. The threshold turns it into an alarm. A low threshold catches more fraud but raises more false alarms. Pick the rule from the business goal; here: *highest precision while keeping fraud recall at least 80%*."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Scan thresholds",
+     "code": "import numpy as np\nfrom sklearn.metrics import precision_score, recall_score, f1_score\n\nval_proba = fraud_pipeline.predict_proba(X_val)[:, 1]\n\nrows = []\nfor t in np.round(np.arange(0.05, 1.0, 0.01), 2):\n    pred = (val_proba >= t).astype(int)\n    rows.append({\n        \"Threshold\": float(t),\n        \"Precision\": precision_score(y_val, pred, zero_division=0),\n        \"Recall\": recall_score(y_val, pred, zero_division=0),\n        \"F1\": f1_score(y_val, pred, zero_division=0),\n    })\nthreshold_df = pd.DataFrame(rows)\nprint(threshold_df.iloc[::15].round(3).to_string(index=False))",
+     "output": " Threshold  Precision  Recall    F1\n      0.05      0.099   0.985 0.181\n      0.20      0.180   0.954 0.302\n      0.35      0.242   0.923 0.383\n      0.50      0.291   0.923 0.443\n      0.65      0.375   0.923 0.533\n      0.80      0.452   0.877 0.597\n      0.95      0.700   0.754 0.726"
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Apply the rule",
+     "code": "eligible = threshold_df[threshold_df[\"Recall\"] >= 0.80]\n\nif eligible.empty:\n    chosen_threshold = None\n    print(\"No threshold reached 80% recall.\")\nelse:\n    best = eligible.sort_values([\"Precision\", \"Threshold\"],\n                                ascending=[False, False], kind=\"stable\").iloc[0]\n    chosen_threshold = float(best[\"Threshold\"])\n    print(\"Chosen threshold:\", chosen_threshold)\n    print(\"Validation precision:\", round(float(best[\"Precision\"]), 3))\n    print(\"Validation recall:\", round(float(best[\"Recall\"]), 3))",
+     "output": "Chosen threshold: 0.91\nValidation precision: 0.627\nValidation recall: 0.8"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "The validation set holds only about 64 frauds, so one extra caught fraud moves recall by 1.5 points. Treat the chosen threshold as an **estimate**, not a truth. The 80% target is a teaching rule; real banks set it from the cost of missed fraud versus false alarms."
+    }
+   ]
+  },
+  {
+   "id": "final",
+   "icon": "🏁",
+   "title": "Step 7: Final test evaluation (once)",
+   "blocks": [
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Evaluate on the untouched test set",
+     "code": "test_proba = fraud_pipeline.predict_proba(X_test)[:, 1]\ntest_pred = (test_proba >= chosen_threshold).astype(int)\n\nprint(confusion_matrix(y_test, test_pred))\nprint(classification_report(y_test, test_pred, target_names=[\"Legitimate\", \"Fraud\"], zero_division=0))",
+     "output": "[[3878   40]\n [  13   69]]\n              precision    recall  f1-score   support\n\n  Legitimate       1.00      0.99      0.99      3918\n       Fraud       0.63      0.84      0.72        82\n\n    accuracy                           0.99      4000\n   macro avg       0.81      0.92      0.86      4000\nweighted avg       0.99      0.99      0.99      4000"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "Never change the threshold after seeing these numbers. If you do, the test set has become a second validation set and you no longer have an honest estimate."
+    }
+   ]
+  },
+  {
+   "id": "save",
+   "icon": "💾",
+   "title": "Step 8: Save and reload the model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Save the **pipeline, the threshold and the feature names together**. A model without its threshold and column order cannot be used correctly later."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Save with joblib, reload, predict",
+     "code": "import os\nimport joblib\n\nos.makedirs(\"models\", exist_ok=True)\nartifact = {\"pipeline\": fraud_pipeline, \"threshold\": chosen_threshold, \"features\": list(X.columns)}\njoblib.dump(artifact, \"models/fraud_detection_v1.joblib\")\n\nloaded = joblib.load(\"models/fraud_detection_v1.joblib\")\nfraud_idx = y_test[y_test == 1].index[0]\nlegit_idx = y_test[y_test == 0].index[0]\nfor label, idx in [(\"fraud row\", fraud_idx), (\"legit row\", legit_idx)]:\n    row = X_test.loc[[idx]][loaded[\"features\"]]\n    proba = float(loaded[\"pipeline\"].predict_proba(row)[0, 1])\n    verdict = \"Fraud\" if proba >= loaded[\"threshold\"] else \"Legitimate\"\n    print(f\"{label}: probability={proba:.3f} -> {verdict}\")",
+     "output": "fraud row: probability=0.998 -> Fraud\nlegit row: probability=0.000 -> Legitimate"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "A `.joblib` file only loads safely with the **same scikit-learn version** that saved it. Write the version in `requirements.txt`. Also: only load joblib files you created yourself, since they can run code."
+    }
+   ]
+  },
+  {
+   "id": "files",
+   "icon": "📁",
+   "title": "Step 9: Finish the project folder",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Your folder promised more than a notebook. Even short versions of these files make the project reusable."
+    },
+    {
+     "type": "table",
+     "head": [
+      "File",
+      "What goes in it"
+     ],
+     "rows": [
+      [
+       "`reports/evaluation.txt`",
+       "Chosen threshold, test precision, recall, F1"
+      ],
+      [
+       "`requirements.txt`",
+       "scikit-learn, pandas, numpy, joblib with versions"
+      ],
+      [
+       "`src/train.py`",
+       "The whole workflow as a script: load, split, fit, pick threshold, save"
+      ],
+      [
+       "`README.md`",
+       "Problem, dataset, how to run, results, limits"
+      ]
+     ]
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "Next lesson idea: load the saved file in a small API. Today's habit is the important part: **one script that reproduces the model from raw data**."
+    }
+   ]
+  }
+ ],
+ "finalProgram": {
+  "title": "Fraud Detection Project V1 (end to end)",
+  "file": "fraud_project_v1.py",
+  "description": "One script that goes from raw transactions to a saved, threshold-aware fraud model and an honest test report.",
+  "concepts": [
+   "stratified 3-way split",
+   "Pipeline",
+   "class_weight",
+   "validation threshold",
+   "joblib artifact"
+  ],
+  "code": "import numpy as np\nimport pandas as pd\n\ndef make_fraud_data(n=20000, fraud_rate=0.02, seed=21):\n    rng = np.random.RandomState(seed)\n    is_fraud = rng.rand(n) < fraud_rate\n    X = rng.normal(size=(n, 10))\n    X[is_fraud, 0] -= 2.0\n    X[is_fraud, 2] -= 1.5\n    X[is_fraud, 3] += 1.8\n    X[is_fraud, 6] -= 1.2\n    amount = np.round(np.exp(rng.normal(3.5, 1.1, n) + 0.6 * is_fraud), 2)\n    df = pd.DataFrame(X, columns=[f\"V{i}\" for i in range(1, 11)])\n    df.insert(0, \"Time\", rng.randint(0, 172800, n))\n    df[\"Amount\"] = amount\n    df[\"Class\"] = is_fraud.astype(int)\n    return df\n\nimport os, joblib\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score, f1_score\n\ndef pick_threshold(y_true, proba, min_recall=0.80):\n    best_t, best_p = None, -1.0\n    for t in np.round(np.arange(0.05, 1.0, 0.01), 2):\n        pred = (proba >= t).astype(int)\n        if recall_score(y_true, pred, zero_division=0) >= min_recall:\n            prec = precision_score(y_true, pred, zero_division=0)\n            if prec >= best_p:\n                best_t, best_p = float(t), prec\n    return best_t\n\ndf = make_fraud_data()\nX, y = df.drop(\"Class\", axis=1), df[\"Class\"]\nX_tf, X_test, y_tf, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\nX_train, X_val, y_train, y_val = train_test_split(X_tf, y_tf, test_size=0.20, random_state=42, stratify=y_tf)\n\npipe = Pipeline([(\"scaler\", StandardScaler()),\n                 (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))])\npipe.fit(X_train, y_train)\n\nthreshold = pick_threshold(y_val, pipe.predict_proba(X_val)[:, 1])\ntest_pred = (pipe.predict_proba(X_test)[:, 1] >= threshold).astype(int)\nreport = {\n    \"threshold\": threshold,\n    \"precision\": round(precision_score(y_test, test_pred, zero_division=0), 3),\n    \"recall\": round(recall_score(y_test, test_pred, zero_division=0), 3),\n    \"f1\": round(f1_score(y_test, test_pred, zero_division=0), 3),\n}\nos.makedirs(\"models\", exist_ok=True)\njoblib.dump({\"pipeline\": pipe, \"threshold\": threshold, \"features\": list(X.columns)}, \"models/fraud_v1.joblib\")\nsaved = joblib.load(\"models/fraud_v1.joblib\")\nsame = (saved[\"pipeline\"].predict_proba(X_test) == pipe.predict_proba(X_test)).all()\n\nprint(\"Test report:\", report)\nprint(\"Reloaded model gives identical probabilities:\", bool(same))",
+  "output": "Test report: {'threshold': 0.91, 'precision': 0.633, 'recall': 0.841, 'f1': 0.723}\nReloaded model gives identical probabilities: True"
+ },
+ "practice": [
+  {
+   "title": "Accuracy Trap Checker",
+   "level": "Easy",
+   "file": "practice1_accuracy_trap.py",
+   "description": "Prove that accuracy hides fraud, then measure real fraud recall.",
+   "tasks": [
+    "Split 80/20 with stratify",
+    "Print the always-0 accuracy",
+    "Train the balanced pipeline",
+    "Print accuracy and fraud recall at 0.5"
+   ],
+   "hint": "Always-0 accuracy is 1 minus the fraud share of y_test. Use recall_score(y_test, pred).",
+   "starter": "import numpy as np\nimport pandas as pd\n\ndef make_fraud_data(n=20000, fraud_rate=0.03, seed=7):\n    rng = np.random.RandomState(seed)\n    is_fraud = rng.rand(n) < fraud_rate\n    X = rng.normal(size=(n, 10))\n    X[is_fraud, 0] -= 2.0\n    X[is_fraud, 2] -= 1.5\n    X[is_fraud, 3] += 1.8\n    X[is_fraud, 6] -= 1.2\n    amount = np.round(np.exp(rng.normal(3.5, 1.1, n) + 0.6 * is_fraud), 2)\n    df = pd.DataFrame(X, columns=[f\"V{i}\" for i in range(1, 11)])\n    df.insert(0, \"Time\", rng.randint(0, 172800, n))\n    df[\"Amount\"] = amount\n    df[\"Class\"] = is_fraud.astype(int)\n    return df\n\ndf = make_fraud_data()\nX = df.drop(\"Class\", axis=1)\ny = df[\"Class\"]\n\n# TODO 1: stratified 80/20 split (random_state=42)\n\n# TODO 2: print the accuracy of always predicting 0 on the test set (4 decimals)\n\n# TODO 3: Pipeline(StandardScaler + LogisticRegression with class_weight=\"balanced\"), fit on train\n\n# TODO 4: print the model's accuracy and fraud recall at the default 0.5 (4 decimals)",
+   "solution": "import numpy as np\nimport pandas as pd\n\ndef make_fraud_data(n=20000, fraud_rate=0.03, seed=7):\n    rng = np.random.RandomState(seed)\n    is_fraud = rng.rand(n) < fraud_rate\n    X = rng.normal(size=(n, 10))\n    X[is_fraud, 0] -= 2.0\n    X[is_fraud, 2] -= 1.5\n    X[is_fraud, 3] += 1.8\n    X[is_fraud, 6] -= 1.2\n    amount = np.round(np.exp(rng.normal(3.5, 1.1, n) + 0.6 * is_fraud), 2)\n    df = pd.DataFrame(X, columns=[f\"V{i}\" for i in range(1, 11)])\n    df.insert(0, \"Time\", rng.randint(0, 172800, n))\n    df[\"Amount\"] = amount\n    df[\"Class\"] = is_fraud.astype(int)\n    return df\n\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, recall_score\n\ndf = make_fraud_data()\nX = df.drop(\"Class\", axis=1)\ny = df[\"Class\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y)\n\nprint(\"Always-0 accuracy:\", round(1 - y_test.mean(), 4))\n\npipe = Pipeline([(\"scaler\", StandardScaler()),\n                 (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))])\npipe.fit(X_train, y_train)\n\npred = pipe.predict(X_test)\nprint(\"Model accuracy:\", round(accuracy_score(y_test, pred), 4))\nprint(\"Model fraud recall:\", round(recall_score(y_test, pred), 4))",
+   "output": "Always-0 accuracy: 0.97\nModel accuracy: 0.951\nModel fraud recall: 0.9333"
+  },
+  {
+   "title": "Pick the F1 Threshold",
+   "level": "Medium",
+   "file": "practice2_f1_threshold.py",
+   "description": "Choose a threshold with a different business rule, test it once, and save the artifact.",
+   "tasks": [
+    "Two-step 64/16/20 split",
+    "Fit the pipeline on train",
+    "Scan thresholds on validation for best F1",
+    "Report test metrics once",
+    "Save and reload with joblib in memory"
+   ],
+   "hint": "Keep best_t when f1 >= best_f1 so ties go to the higher threshold. io.BytesIO needs seek(0) before loading.",
+   "starter": "import numpy as np\nimport pandas as pd\n\ndef make_fraud_data(n=20000, fraud_rate=0.025, seed=11):\n    rng = np.random.RandomState(seed)\n    is_fraud = rng.rand(n) < fraud_rate\n    X = rng.normal(size=(n, 10))\n    X[is_fraud, 0] -= 2.0\n    X[is_fraud, 2] -= 1.5\n    X[is_fraud, 3] += 1.8\n    X[is_fraud, 6] -= 1.2\n    amount = np.round(np.exp(rng.normal(3.5, 1.1, n) + 0.6 * is_fraud), 2)\n    df = pd.DataFrame(X, columns=[f\"V{i}\" for i in range(1, 11)])\n    df.insert(0, \"Time\", rng.randint(0, 172800, n))\n    df[\"Amount\"] = amount\n    df[\"Class\"] = is_fraud.astype(int)\n    return df\n\ndf = make_fraud_data()\nX = df.drop(\"Class\", axis=1)\ny = df[\"Class\"]\n\n# TODO 1: 64/16/20 stratified split (random_state=42), same two-step method as the lesson\n\n# TODO 2: Pipeline (StandardScaler + balanced LogisticRegression), fit on train only\n\n# TODO 3: on validation, scan thresholds 0.05..0.99 (step 0.01, rounded) and pick the one\n#         with the highest F1 (on ties, take the higher threshold)\n\n# TODO 4: apply it to the test set and print threshold, precision, recall, F1 (3 decimals)\n\n# TODO 5: save {\"pipeline\", \"threshold\"} to an io.BytesIO with joblib, reload it,\n#         and print whether test predictions are identical",
+   "solution": "import numpy as np\nimport pandas as pd\n\ndef make_fraud_data(n=20000, fraud_rate=0.025, seed=11):\n    rng = np.random.RandomState(seed)\n    is_fraud = rng.rand(n) < fraud_rate\n    X = rng.normal(size=(n, 10))\n    X[is_fraud, 0] -= 2.0\n    X[is_fraud, 2] -= 1.5\n    X[is_fraud, 3] += 1.8\n    X[is_fraud, 6] -= 1.2\n    amount = np.round(np.exp(rng.normal(3.5, 1.1, n) + 0.6 * is_fraud), 2)\n    df = pd.DataFrame(X, columns=[f\"V{i}\" for i in range(1, 11)])\n    df.insert(0, \"Time\", rng.randint(0, 172800, n))\n    df[\"Amount\"] = amount\n    df[\"Class\"] = is_fraud.astype(int)\n    return df\n\nimport io, joblib\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score, f1_score\n\ndf = make_fraud_data()\nX = df.drop(\"Class\", axis=1)\ny = df[\"Class\"]\n\nX_tf, X_test, y_tf, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\nX_train, X_val, y_train, y_val = train_test_split(X_tf, y_tf, test_size=0.20, random_state=42, stratify=y_tf)\n\npipe = Pipeline([(\"scaler\", StandardScaler()),\n                 (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))])\npipe.fit(X_train, y_train)\n\nval_proba = pipe.predict_proba(X_val)[:, 1]\nbest_t, best_f1 = None, -1.0\nfor t in np.round(np.arange(0.05, 1.0, 0.01), 2):\n    f1 = f1_score(y_val, (val_proba >= t).astype(int), zero_division=0)\n    if f1 >= best_f1:\n        best_t, best_f1 = float(t), f1\n\ntest_pred = (pipe.predict_proba(X_test)[:, 1] >= best_t).astype(int)\nprint(\"Threshold:\", best_t)\nprint(\"Test precision:\", round(precision_score(y_test, test_pred, zero_division=0), 3))\nprint(\"Test recall:\", round(recall_score(y_test, test_pred, zero_division=0), 3))\nprint(\"Test F1:\", round(f1_score(y_test, test_pred, zero_division=0), 3))\n\nbuf = io.BytesIO()\njoblib.dump({\"pipeline\": pipe, \"threshold\": best_t}, buf)\nbuf.seek(0)\nsaved = joblib.load(buf)\nagain = (saved[\"pipeline\"].predict_proba(X_test)[:, 1] >= saved[\"threshold\"]).astype(int)\nprint(\"Reloaded predictions identical:\", bool((again == test_pred).all()))",
+   "output": "Threshold: 0.98\nTest precision: 0.849\nTest recall: 0.723\nTest F1: 0.781\nReloaded predictions identical: True",
+   "note": "Different rules give different thresholds. F1 treats precision and recall equally; the lesson's rule protected recall first."
+  }
+ ],
+ "checklist": [
+  "I can list the 8 stages of an ML project",
+  "I explain why accuracy fails on imbalanced data",
+  "I split data three ways with stratify",
+  "I fit the scaler on training data only via a Pipeline",
+  "I choose a threshold on validation, not test",
+  "I evaluate on the test set once",
+  "I save pipeline, threshold and features together"
+ ],
+ "quiz": [
+  {
+   "q": "Why do we need a separate validation set?",
+   "options": [
+    "To make training faster",
+    "To choose the threshold without touching the test set",
+    "To increase the fraud rate",
+    "To avoid scaling"
+   ],
+   "answer": 1,
+   "why": "Validation guides decisions; the test set stays an honest final exam."
+  },
+  {
+   "q": "A model predicts every transaction as legitimate with 98% accuracy. What is its fraud recall?",
+   "options": [
+    "98%",
+    "50%",
+    "0%",
+    "Cannot be known"
+   ],
+   "answer": 2,
+   "why": "It catches no fraud, so recall is 0 even though accuracy looks great."
+  },
+  {
+   "q": "What does lowering the threshold usually do?",
+   "options": [
+    "Raises recall, lowers precision",
+    "Raises precision, lowers recall",
+    "Changes nothing",
+    "Removes false negatives and false positives"
+   ],
+   "answer": 0,
+   "why": "More transactions are flagged: more fraud caught, but more false alarms."
+  },
+ ]
+}
   ]
 };

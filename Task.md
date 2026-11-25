@@ -1,214 +1,258 @@
-🚀 Day 20 — ML Pipelines, ColumnTransformer & Data Leakage Prevention
-Day 19 completed
-Day 20 started
-Week 3
+🚀 Day 21 — End-to-End Fraud Detection Project V1
+Days 1–19 completed
+Day 21 started
 
-Today we're moving from training individual ML models to building professional, reusable machine learning workflows.
+Today is a major milestone. Instead of learning another isolated ML algorithm, we're going to combine the skills you've learned into one complete, practical machine learning project.
+Today's project
+Credit Card Fraud Detection System
 
-Your main project context remains our Credit Card Fraud Detection dataset.
-Today's learning objectives
-By the end of Day 20, you'll understand:
-1. Why preprocessing is necessary.
-2. What an ML Pipeline is.
-3. How ColumnTransformer works.
-4. How to handle numerical and categorical columns.
-5. What data leakage is and how to prevent it.
-6. How to combine preprocessing and model training into one workflow.
-Today's time plan: 2–3 hours, with most of the time spent coding.
 
-1. The problem: Why do we need pipelines?
-Imagine your ML workflow looks like this:
-Without a Pipeline
-Load Dataset
 
-Handle Missing Values
 
-Scale Features
 
-Encode Categories
 
-Train Model
-Every step is managed separately. It's easier to make mistakes or forget preprocessing during prediction.
-A Pipeline combines preprocessing and model training into one organized workflow.
-With a Pipeline
-Single ML Pipeline
 
-Imputation → Scaling → Model
 
+h2o.ai
 
-Train / Predict
 
-Preprocessing and model execution are handled consistently.
-Think of a Pipeline as an automated assembly line for your ML model.
-2. First practical: Build your first Pipeline
-Let's use a small dataset so you understand the concept before applying it to fraud detection.
-Step 1 — Import libraries
-Run this in Google Colab or Jupyter Notebook.
-import pandas as pdimport numpy as npfrom sklearn.model_selection import train_test_splitfrom sklearn.pipeline import Pipelinefrom sklearn.preprocessing import StandardScalerfrom sklearn.impute import SimpleImputerfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import classification_report
+Goal: Build a reusable fraud detection model that can process transaction data, predict fraud, and evaluate its performance.
 
+1. What you'll build today
+Our project will have this workflow:
+01
 
+Load dataset
 
-Step 2 — Create a sample dataset
-data = {    "Age": [22, 25, 47, 52, 46, 56, 23, 40, 35, 60],    "Salary": [        25000, 30000, 60000, 80000, 55000,        90000, 28000, 50000, 45000, 100000    ],    "Purchased": [0, 0, 1, 1, 1, 1, 0, 1, 0, 1]}df = pd.DataFrame(data)print(df)
+Load the Credit Card Fraud Detection dataset
 
 
+02
 
-Our objective: predict whether a customer purchases a product.
-Step 3 — Separate X and y
-X = df[["Age", "Salary"]]y = df["Purchased"]X_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.3,    random_state=42,    stratify=y)
+Explore data
 
+Inspect rows, columns, missing values and class imbalance
 
 
-Step 4 — Create the Pipeline
-pipeline = Pipeline([    ("imputer", SimpleImputer(strategy="mean")),    ("scaler", StandardScaler()),    ("model", LogisticRegression())])
+03
 
+Prepare data
 
+Separate features and target; create train, validation and test sets
 
-Understand the three steps:
-Step	Purpose
-imputer	Fills missing numerical values
-scaler	Standardizes numerical features
-model	Trains Logistic Regression
 
-Step 5 — Train and evaluate
-pipeline.fit(X_train, y_train)predictions = pipeline.predict(X_test)print(classification_report(    y_test,    predictions,    zero_division=0))
+04
 
+Build pipeline
 
+StandardScaler + Logistic Regression with class weights
 
-That's your first complete ML Pipeline!
 
-Important: This tiny dataset is only for learning the workflow. Its test metrics aren't reliable evidence of real-world performance.
+05
 
-3. Data Leakage — one of the most important ML concepts
-Before learning ColumnTransformer, understand this problem.
+Train model
 
-Data leakage happens when information from outside the training data improperly influences model training.
+Fit the pipeline using training data
 
-For example, suppose you have 10,000 records:
-- 8,000 training records
-- 2,000 test records
-You calculate the average salary using all 10,000 records, fill missing values, and then split the data.
-Incorrect workflow
-# WRONG: preprocessing before splittingX_scaled = StandardScaler().fit_transform(X)X_train, X_test, y_train, y_test = train_test_split(    X_scaled, y, test_size=0.2, random_state=42)
 
+06
 
+Evaluate model
 
-Why is this wrong?
+Confusion matrix, precision, recall, F1 and classification report
 
-Because the scaler calculated its mean and standard deviation using both training and test data.
 
-The model's training process has indirectly received information from the test set.
-Correct workflow
-# Split firstX_train, X_test, y_train, y_test = train_test_split(    X, y, test_size=0.2, random_state=42)# Fit preprocessing only on training datascaler = StandardScaler()X_train_scaled = scaler.fit_transform(X_train)# Only transform test dataX_test_scaled = scaler.transform(X_test)
+07
 
+Threshold selection
 
+Choose a threshold using validation data
 
-Remember these two methods:
-Method	Meaning
-fit()	Learn parameters from data
-transform()	Apply learned parameters to data
-fit_transform()	Learn and apply
 
-A Pipeline handles this correctly when you call fit() on training data. During prediction, it only applies the already-learned transformations.
+08
 
-4. ColumnTransformer — handle different column types
-Real-world datasets often contain different types of features.
+Save project
 
-Example:
-Age	Salary	City	Education
-25	30000	Delhi	Graduate
-35	60000	Mumbai	Postgraduate
-42	80000	Pune	Graduate
+Organize code and results for future deployment
 
-Problem:
-- Age and Salary are numerical.
-- City and Education are categorical.
-- Numerical features need numerical preprocessing.
-- Categorical features need encoding.
-This is where ColumnTransformer helps.
-ColumnTransformer workflow
-Input Dataset
 
-Age · Salary · City · Education
 
-Numerical
+2. Project folder structure
+Create this structure in VS Code or your project directory:
+Fraud_Detection_Project/
+│
+├── data/
+│   └── README.md
+│
+├── notebooks/
+│   └── fraud_detection.ipynb
+│
+├── models/
+│
+├── reports/
+│   └── evaluation.txt
+│
+├── src/
+│   └── train.py
+│
+├── requirements.txt
+└── README.md
 
-Age, Salary
 
-Imputer + Scaler
+For today, we'll primarily work in fraud_detection.ipynb. Later, we'll turn it into a more deployable project.
 
+3. Step 1 — Load the dataset
+We're continuing with the same Credit Card Fraud Detection dataset you used on Day 18 and Day 19.
 
-Categorical
+If you're using Google Colab:
+!pip install -q scikit-learn pandas numpy matplotlib seaborn joblib
 
-City, Education
 
-Imputer + Encoder
 
+Now load the dataset:
+from sklearn.datasets import fetch_openmldataset = fetch_openml(    data_id=1597,    as_frame=True)df = dataset.frameprint("Dataset Shape:", df.shape)display(df.head())
 
 
 
-Combined processed data
+Expected dataset characteristics:
+- Approximately 284,807 transactions.
+- 31 columns.
+- Class is the target column.
+- 0 means legitimate.
+- 1 means fraudulent.
+If OpenML is temporarily unavailable, don't silently substitute a different dataset; we can troubleshoot the download.
+4. Step 2 — Explore the dataset
+Before training, inspect the data.
+print("Shape:", df.shape)print("\nColumn information:")print(df.info())print("\nMissing values:")print(df.isnull().sum().sum())print("\nDuplicate rows:")print(df.duplicated().sum())print("\nClass distribution:")print(df["Class"].value_counts())print("\nClass percentages:")print(    df["Class"].value_counts(normalize=True) * 100)
 
 
-Machine Learning Model
 
+Visualize the imbalance:
+import matplotlib.pyplot as pltimport seaborn as snssns.countplot(data=df, x="Class")plt.title("Legitimate vs Fraud Transactions")plt.xlabel("Class (0 = Legitimate, 1 = Fraud)")plt.ylabel("Number of Transactions")plt.show()
 
-Step 1 — Create a mixed dataset
-data = {    "Age": [22, 25, 47, 52, 46, 56, 23, 40, 35, 60,            28, 32, 45, 50, 29, 38, 42, 55, 31, 48],    "Salary": [25000, 30000, 60000, 80000, 55000,               90000, 28000, 50000, 45000, 100000,               32000, 40000, 70000, 85000, 35000,               52000, 65000, 95000, 42000, 75000],    "City": ["Delhi", "Mumbai", "Pune", "Delhi", "Pune",             "Mumbai", "Delhi", "Pune", "Mumbai", "Delhi",             "Pune", "Mumbai", "Delhi", "Pune", "Mumbai",             "Delhi", "Pune", "Mumbai", "Delhi", "Pune"],    "Education": ["Graduate", "Postgraduate", "Graduate",                  "Postgraduate", "Graduate", "Postgraduate",                  "Graduate", "Graduate", "Postgraduate",                  "Postgraduate", "Graduate", "Graduate",                  "Postgraduate", "Graduate", "Graduate",                  "Postgraduate", "Graduate", "Postgraduate",                  "Graduate", "Postgraduate"],    "Purchased": [0, 0, 1, 1, 1, 1, 0, 1, 0, 1,                  0, 0, 1, 1, 0, 1, 1, 1, 0, 1]}df = pd.DataFrame(data)X = df.drop("Purchased", axis=1)y = df["Purchased"]
 
 
+Remember: Fraud is the minority class. A model that predicts every transaction as legitimate could still achieve very high accuracy, while detecting zero fraud.
+5. Step 3 — Prepare features and split the data
+Separate the input features from the target:
+X = df.drop("Class", axis=1)y = df["Class"].astype(int)print("Features:", X.shape)print("Target:", y.shape)
 
-Step 2 — Identify numerical and categorical columns
-numeric_features = ["Age", "Salary"]categorical_features = ["City", "Education"]
 
 
+We'll create three datasets:
+- Training set: 64% — model learning.
+- Validation set: 16% — threshold selection.
+- Test set: 20% — final evaluation.
+from sklearn.model_selection import train_test_split# First: separate the final test setX_train_full, X_test, y_train_full, y_test = train_test_split(    X,    y,    test_size=0.20,    random_state=42,    stratify=y)# Second: create training and validation setsX_train, X_val, y_train, y_val = train_test_split(    X_train_full,    y_train_full,    test_size=0.20,    random_state=42,    stratify=y_train_full)print("Training:", X_train.shape)print("Validation:", X_val.shape)print("Testing:", X_test.shape)
 
-Step 3 — Create preprocessing pipelines
-from sklearn.compose import ColumnTransformerfrom sklearn.preprocessing import OneHotEncodernumeric_transformer = Pipeline([    ("imputer", SimpleImputer(strategy="median")),    ("scaler", StandardScaler())])categorical_transformer = Pipeline([    ("imputer", SimpleImputer(strategy="most_frequent")),    ("encoder", OneHotEncoder(handle_unknown="ignore"))])
 
 
+Our data split
 
-What's OneHotEncoder?
 
-It converts categories into numerical columns.
 
-For example:
-City	Delhi	Mumbai	Pune
-Delhi	1	0	0
-Mumbai	0	1	0
-Pune	0	0	1
 
-Step 4 — Combine using ColumnTransformer
-preprocessor = ColumnTransformer([    ("num", numeric_transformer, numeric_features),    ("cat", categorical_transformer, categorical_features)])
+Training 64%Validation 16%Test 20%
 
+Why three sets? We train on training data, select a threshold using validation data, and reserve test data for one final evaluation.
+6. Step 4 — Build the complete ML Pipeline
+Now combine preprocessing and Logistic Regression.
+from sklearn.pipeline import Pipelinefrom sklearn.preprocessing import StandardScalerfrom sklearn.linear_model import LogisticRegressionfraud_pipeline = Pipeline([    ("scaler", StandardScaler()),    ("model", LogisticRegression(        class_weight="balanced",        max_iter=1000,        random_state=42    ))])print(fraud_pipeline)
 
 
-This tells Scikit-learn:
-- Apply numerical preprocessing to Age and Salary.
-- Apply categorical preprocessing to City and Education.
-- Combine the resulting features.
-Step 5 — Create the complete ML Pipeline
-full_pipeline = Pipeline([    ("preprocessing", preprocessor),    ("model", LogisticRegression(max_iter=1000))])
 
+What happens here?
+1. StandardScaler scales the features.
+2. LogisticRegression learns to classify transactions.
+3. class_weight="balanced" gives more importance to the minority class during training.
+7. Step 5 — Train the model
+fraud_pipeline.fit(X_train, y_train)print("Fraud detection model trained successfully!")
 
 
-Step 6 — Train and evaluate
-X_train, X_test, y_train, y_test = train_test_split(    X, y,    test_size=0.25,    random_state=42,    stratify=y)full_pipeline.fit(X_train, y_train)predictions = full_pipeline.predict(X_test)print(classification_report(    y_test, predictions, zero_division=0))
 
+That's it. Your complete pipeline is now trained.
+8. Step 6 — Evaluate at the default threshold
+First, understand the model's performance at the standard probability threshold of 0.5.
+from sklearn.metrics import (    confusion_matrix,    classification_report,    accuracy_score)val_predictions = fraud_pipeline.predict(X_val)print("Validation Accuracy:")print(accuracy_score(y_val, val_predictions))print("\nConfusion Matrix:")print(confusion_matrix(y_val, val_predictions))print("\nClassification Report:")print(classification_report(    y_val,    val_predictions,    target_names=["Legitimate", "Fraud"],    zero_division=0))
 
 
-You have now built a complete preprocessing and model-training workflow.
 
-5. Apply today's learning to your Fraud Detection project
-Your Credit Card Fraud Detection dataset contains numerical features (V1–V28, Time, Amount).
+Pay special attention to the Fraud row:
+- Precision
+- Recall
+- F1-score
+Don't focus on accuracy alone.
+9. Step 7 — Select the best threshold
+Remember Day 19? We learned that a threshold controls the trade-off between fraud precision and fraud recall.
 
-Therefore, you don't need categorical encoding for this dataset.
+Now we'll apply that knowledge to our project.
 
-You can create a clean pipeline like this:
-from sklearn.pipeline import Pipelinefrom sklearn.preprocessing import StandardScalerfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import classification_report, confusion_matrixfraud_pipeline = Pipeline([    ("scaler", StandardScaler()),    ("model", LogisticRegression(        class_weight="balanced",        max_iter=1000,        random_state=42    ))])# Fit only on training datafraud_pipeline.fit(X_train, y_train)# Predict on test datafraud_predictions = fraud_pipeline.predict(X_test)print("Confusion Matrix:")print(confusion_matrix(y_test, fraud_predictions))print("\nClassification Report:")print(classification_report(    y_test,    fraud_predictions,    target_names=["Legitimate", "Fraud"],    zero_division=0))
+Get fraud probabilities:
+import numpy as npimport pandas as pdval_probabilities = fraud_pipeline.predict_proba(X_val)[:, 1]
 
 
 
-This gives you a reusable model that automatically scales incoming data before prediction.
+Test multiple thresholds:
+from sklearn.metrics import precision_score, recall_score, f1_scorethreshold_results = []for threshold in np.arange(0.05, 0.96, 0.01):    predictions = (        val_probabilities >= threshold    ).astype(int)    threshold_results.append({        "Threshold": threshold,        "Precision": precision_score(            y_val, predictions, zero_division=0        ),        "Recall": recall_score(            y_val, predictions, zero_division=0        ),        "F1": f1_score(            y_val, predictions, zero_division=0        )    })threshold_df = pd.DataFrame(threshold_results)display(threshold_df.round(4))
 
-Important: This example uses the default classification threshold of 0.5. It is a new baseline, not a replacement for your Day 19 threshold experiment. Keep your original test set untouched when comparing models; use validation data for model and threshold selection.
+
+
+Select the threshold that gives the highest precision while maintaining at least 80% fraud recall:
+eligible = threshold_df[    threshold_df["Recall"] >= 0.80]if not eligible.empty:    best_row = eligible.sort_values(        "Precision",        ascending=False    ).iloc[0]    chosen_threshold = best_row["Threshold"]    print("Selected Threshold:", chosen_threshold)    print("Validation Precision:", best_row["Precision"])    print("Validation Recall:", best_row["Recall"])    print("Validation F1:", best_row["F1"])else:    chosen_threshold = None    print("No threshold achieved 80% recall.")
+
+
+
+The 80% recall target is an educational target, not a universal banking requirement. A real fraud system needs business-defined costs for missed fraud and false alarms.
+10. Step 8 — Final test evaluation
+Important: Final independent evaluation
+Only do this if a suitable validation threshold was found.
+from sklearn.metrics import confusion_matrix, classification_reportif chosen_threshold is not None:    test_probabilities = fraud_pipeline.predict_proba(X_test)[:, 1]    test_predictions = (        test_probabilities >= chosen_threshold    ).astype(int)    print("FINAL TEST CONFUSION MATRIX")    print(confusion_matrix(y_test, test_predictions))    print("\nFINAL TEST CLASSIFICATION REPORT")    print(classification_report(        y_test,        test_predictions,        target_names=["Legitimate", "Fraud"],        zero_division=0    ))
+
+
+
+This is your final evaluation for this project version. Don't keep changing the threshold based on test results.
+11. Step 9 — Save your trained model
+A trained model shouldn't disappear when your notebook closes.
+
+We'll use Joblib to save it.
+import joblibif chosen_threshold is not None:    model_artifact = {        "pipeline": fraud_pipeline,        "threshold": float(chosen_threshold),        "features": list(X.columns)    }    joblib.dump(        model_artifact,        "fraud_detection_v1.joblib"    )    print("Model saved successfully!")
+
+
+
+Later, we'll learn to load this model and build an API around it.
+
+To test loading:
+loaded_artifact = joblib.load(    "fraud_detection_v1.joblib")loaded_pipeline = loaded_artifact["pipeline"]loaded_threshold = loaded_artifact["threshold"]print("Loaded threshold:", loaded_threshold)
+
+
+
+Try predicting one transaction from your test dataset:
+sample = X_test.iloc[[0]]probability = loaded_pipeline.predict_proba(sample)[0, 1]prediction = int(probability >= loaded_threshold)print("Fraud Probability:", probability)print("Prediction:", "Fraud" if prediction == 1 else "Legitimate")
+
+
+
+
+12. Today's project deliverables
+Your folder should now look like this:
+Fraud_Detection_Project/
+│
+├── data/
+│   └── README.md
+│
+├── notebooks/
+│   └── fraud_detection.ipynb
+│
+├── models/
+│   └── fraud_detection_v1.joblib
+│
+├── reports/
+│   └── evaluation.txt
+│
+├── src/
+│   └── train.py
+│
+├── requirements.txt
+└── README.md
+
+
+For now, saving the notebook and model is enough. We will organize the training script and documentation more thoroughly as part of our deployment work.
