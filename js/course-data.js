@@ -9688,6 +9688,414 @@ Average used to fill: 245.0
    "why": "More transactions are flagged: more fraud caught, but more false alarms."
   },
  ]
+},
+
+// DAY 22 snippet. In course-data.js: after the previous day's closing }, paste this object (keep the comma). No images needed for this day.
+{
+  "day": 22,
+  "title": "Model Saving, Loading & Making Predictions",
+  "subtitle": "Practical ML engineering: load a saved fraud model with Joblib and predict on new transactions without retraining.",
+  "level": "Intermediate",
+  "duration": "60-90 min",
+  "tags": [
+    "Joblib",
+    "Model Persistence",
+    "Inference",
+    "Model Artifact",
+    "Versioning"
+  ],
+  "goals": [
+    "Load a saved model artifact without retraining",
+    "Understand the difference between training and inference",
+    "Use the saved threshold and feature list for predictions",
+    "Validate new data before predicting"
+  ],
+  "sections": [
+    {
+      "id": "workflow",
+      "icon": "🧠",
+      "title": "Step 1: Understand the Workflow",
+      "meta": "Train once, predict many times",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Yesterday you trained a Credit Card Fraud Detection model and saved it as models/fraud_detection_v1.joblib. Today you use that saved model without training it again."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Day",
+            "What happens",
+            "Result"
+          ],
+          "rows": [
+            [
+              "Day 21 - Train",
+              "Learn patterns from historical data, then save the model with Joblib",
+              "fraud_detection_v1.joblib"
+            ],
+            [
+              "Day 22 - Load",
+              "Load the saved model (no retraining) and predict on new transactions",
+              "Fraud or legitimate"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Think of a real application: training is expensive and happens occasionally. The trained model is saved. An application loads it, new data comes in, and the model predicts the result."
+        }
+      ]
+    },
+    {
+      "id": "concepts",
+      "icon": "📚",
+      "title": "Step 2: Important Concepts",
+      "meta": "Persistence and inference",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Concept",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "Model persistence",
+              "Saving a trained model"
+            ],
+            [
+              "Joblib",
+              "Python library for saving/loading objects"
+            ],
+            [
+              "Inference",
+              "Using a trained model to make predictions"
+            ],
+            [
+              "Model artifact",
+              "Saved model plus required configuration"
+            ],
+            [
+              "Versioning",
+              "Keeping track of model versions"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "fit() trains the model. predict() uses the trained model. You do not need fit() every time you want a prediction."
+        }
+      ]
+    },
+    {
+      "id": "structure",
+      "icon": "🗂️",
+      "title": "Step 3: Project Structure",
+      "meta": "Create src/predict.py",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Fraud_Detection_Project",
+          "code": "Fraud_Detection_Project/\n|\n|-- models/\n|   `-- fraud_detection_v1.joblib\n|\n|-- src/\n|   |-- train.py\n|   `-- predict.py       <- CREATE THIS\n|\n|-- reports/\n|   `-- evaluation.txt\n|\n`-- requirements.txt"
+        },
+        {
+          "type": "p",
+          "text": "We create a separate prediction script, src/predict.py, that loads your Day 21 model."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "No Day 21 model yet, or want to follow along with a safe demo? Run the setup script below once from the project root (python src/train.py). It trains a small synthetic model and saves the artifact with the pipeline, the 0.95 threshold and the feature list, plus data/new_transactions.csv for practice. The numbers in this lesson come from that demo model, so your own results will differ."
+        }
+      ]
+    },
+    {
+      "id": "setup",
+      "icon": "🛠️",
+      "title": "Step 4: Demo Model Setup (optional)",
+      "meta": "Skip if you have your Day 21 model",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/train.py",
+          "code": "import os\nimport numpy as np\nimport pandas as pd\nimport joblib\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import precision_score, recall_score\n\nPROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n\n# Synthetic fraud data (stand-in for your real dataset)\nX_raw, y_raw = make_classification(\n    n_samples=30000, n_features=10, n_informative=6, n_redundant=0,\n    weights=[0.99, 0.01], class_sep=0.8, flip_y=0, random_state=42\n)\ndf = pd.DataFrame(X_raw, columns=[f\"V{i}\" for i in range(1, 11)])\nrng = np.random.RandomState(42)\ndf[\"Time\"] = rng.randint(0, 172800, len(df)).astype(float)\ndf[\"Amount\"] = rng.lognormal(mean=3.5, sigma=1.0, size=len(df)).round(2)\ndf[\"Class\"] = y_raw\n\nfeatures = [c for c in df.columns if c != \"Class\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    df[features], df[\"Class\"], test_size=0.20, random_state=42, stratify=df[\"Class\"]\n)\n\npipeline = Pipeline([\n    (\"scaler\", StandardScaler()),\n    (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))\n])\npipeline.fit(X_train, y_train)\n\nthreshold = 0.95\nproba = pipeline.predict_proba(X_test)[:, 1]\npred = (proba >= threshold).astype(int)\nprint(f\"Test precision at {threshold:.0%}: {precision_score(y_test, pred, zero_division=0):.3f}\")\nprint(f\"Test recall at {threshold:.0%}: {recall_score(y_test, pred):.3f}\")\n\nartifact = {\"pipeline\": pipeline, \"threshold\": threshold, \"features\": features}\nmodel_path = os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\")\njoblib.dump(artifact, model_path)\nprint(\"Model saved to:\", os.path.relpath(model_path, PROJECT_ROOT))\n\n# A few unseen transactions to practice inference on\nnew_tx = pd.concat([X_test[y_test == 1].head(3), X_test[y_test == 0].head(3)])\nnew_tx = new_tx.assign(Class=pd.concat([y_test[y_test == 1].head(3), y_test[y_test == 0].head(3)]))\nnew_tx.round(4).to_csv(os.path.join(PROJECT_ROOT, \"data\", \"new_transactions.csv\"), index=False)\nprint(\"Sample transactions saved to: data/new_transactions.csv\")",
+          "output": "Test precision at 95%: 0.323\nTest recall at 95%: 0.167\nModel saved to: models/fraud_detection_v1.joblib\nSample transactions saved to: data/new_transactions.csv"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The 0.95 threshold is illustrative. On this demo it catches few frauds (recall 0.167). Your real threshold comes from your own validation work."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "🔥",
+      "title": "Step 5: Write predict.py",
+      "meta": "Most important step",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Create src/predict.py and paste this code. It loads the artifact, builds one transaction, predicts a probability and compares it with the saved threshold."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/predict.py",
+          "code": "import os\nimport joblib\nimport pandas as pd\n\n# 1. Locate the project root and the saved model\nPROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n\nMODEL_PATH = os.path.join(\n    PROJECT_ROOT,\n    \"models\",\n    \"fraud_detection_v1.joblib\"\n)\n\n# 2. Load the saved model artifact\nprint(\"Loading saved model...\")\nartifact = joblib.load(MODEL_PATH)\n\npipeline = artifact[\"pipeline\"]\nthreshold = artifact[\"threshold\"]\nfeatures = artifact[\"features\"]\n\nprint(\"Model loaded successfully!\")\nprint(\"Model threshold:\", threshold)\n\n# 3. Create sample transaction data\n# Values here are illustrative, not real transaction records.\nsample_data = {\n    feature: [0.0] for feature in features\n}\n\nsample_data[\"Amount\"] = [100.0]\nsample_data[\"Time\"] = [10000.0]\n\nnew_transaction = pd.DataFrame(sample_data)\n\n# Ensure correct feature order\nnew_transaction = new_transaction[features]\n\n# 4. Make prediction\nfraud_probability = pipeline.predict_proba(\n    new_transaction\n)[0, 1]\n\nprediction = int(\n    fraud_probability >= threshold\n)\n\n# 5. Display result\nprint(\"\\nTRANSACTION ANALYSIS\")\nprint(\"--------------------\")\nprint(\n    f\"Fraud Probability: {fraud_probability:.4%}\"\n)\nprint(\n    f\"Decision Threshold: {threshold:.2%}\"\n)\n\nif prediction == 1:\n    print(\"RESULT: FRAUD DETECTED\")\nelse:\n    print(\"RESULT: LEGITIMATE TRANSACTION\")"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "This sample uses zero-filled illustrative feature values. It demonstrates the inference workflow, not a realistic fraud prediction. In a real application the input must contain correctly prepared transaction features."
+        }
+      ]
+    },
+    {
+      "id": "run",
+      "icon": "▶️",
+      "title": "Step 6: Run the Project",
+      "meta": "From the project root",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Open your VS Code terminal in the project root and run:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Terminal",
+          "code": "python src/predict.py",
+          "output": "Loading saved model...\nModel loaded successfully!\nModel threshold: 0.95\n\nTRANSACTION ANALYSIS\n--------------------\nFraud Probability: 36.6589%\nDecision Threshold: 95.00%\nRESULT: LEGITIMATE TRANSACTION"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Your actual probability and result may differ if you change the sample values. The probability is 36.66%, below the 95% threshold, so the decision is LEGITIMATE."
+        }
+      ]
+    },
+    {
+      "id": "inspect",
+      "icon": "🔎",
+      "title": "Step 7: Inspect the Model Artifact",
+      "meta": "What is inside the file",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/inspect_model.py",
+          "code": "import os\nimport joblib\n\nPROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\nMODEL_PATH = os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\")\n\nartifact = joblib.load(MODEL_PATH)\n\nprint(\"Artifact keys:\", list(artifact.keys()))\nprint(\"Pipeline steps:\", [name for name, _ in artifact[\"pipeline\"].steps])\nprint(\"Threshold:\", artifact[\"threshold\"])\nprint(\"Number of features:\", len(artifact[\"features\"]))\nprint(\"Features:\", artifact[\"features\"])\nprint(\"File size:\", round(os.path.getsize(MODEL_PATH) / 1024, 1), \"KB\")",
+          "output": "Artifact keys: ['pipeline', 'threshold', 'features']\nPipeline steps: ['scaler', 'model']\nThreshold: 0.95\nNumber of features: 12\nFeatures: ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'Time', 'Amount']\nFile size: 2.1 KB"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The artifact is a dictionary: the pipeline (scaler + model), the threshold and the feature list. Saving the threshold and features with the model means the application never has to guess them."
+        }
+      ]
+    },
+    {
+      "id": "features",
+      "icon": "⚠️",
+      "title": "Step 8: Same Feature Names and Order",
+      "meta": "Avoid silent mistakes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/feature_check.py",
+          "code": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\nartifact = joblib.load(os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\"))\npipeline = artifact[\"pipeline\"]\nfeatures = artifact[\"features\"]\n\nrow = pd.read_csv(os.path.join(PROJECT_ROOT, \"data\", \"new_transactions.csv\")).head(1)[features]\nshuffled = row[list(reversed(features))]   # same values, wrong column order\n\nprint(\"Correct order            ->\", round(pipeline.predict_proba(row)[0, 1], 4))\nprint(\"Reordered by name        ->\", round(pipeline.predict_proba(shuffled[features])[0, 1], 4))\nprint(\"Wrong order, raw values  ->\", round(pipeline.predict_proba(shuffled.values)[0, 1], 4), \"(silently wrong!)\")\n\ntry:\n    pipeline.predict_proba(shuffled)\nexcept ValueError:\n    print(\"Wrong order, DataFrame   -> ValueError\")\n\ntry:\n    pipeline.predict_proba(row.drop(columns=[\"Amount\"]))\nexcept ValueError:\n    print(\"Missing 'Amount'         -> ValueError\")\n\ntry:\n    pipeline.predict_proba(row.rename(columns={\"Amount\": \"amount\"}))\nexcept ValueError:\n    print(\"Renamed column           -> ValueError\")",
+          "output": "Correct order            -> 0.5235\nReordered by name        -> 0.5235\nWrong order, raw values  -> 1.0 (silently wrong!)\nWrong order, DataFrame   -> ValueError\nMissing 'Amount'         -> ValueError\nRenamed column           -> ValueError"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "With raw values in the wrong order, the model returned 1.0 without any error. A DataFrame with the wrong order, a missing column or a renamed column raises a ValueError. Always select new_transaction[features] before predicting."
+        }
+      ]
+    },
+    {
+      "id": "batch",
+      "icon": "📦",
+      "title": "Step 9: Predict a Batch",
+      "meta": "Real application style",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An application usually scores many transactions at once. This script loads data/new_transactions.csv (3 actual frauds and 3 legitimate transactions) and applies the saved threshold."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/predict_batch.py",
+          "code": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n\nartifact = joblib.load(os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\"))\npipeline = artifact[\"pipeline\"]\nthreshold = artifact[\"threshold\"]\nfeatures = artifact[\"features\"]\n\ntransactions = pd.read_csv(os.path.join(PROJECT_ROOT, \"data\", \"new_transactions.csv\"))\nX_new = transactions[features]\n\nprobabilities = pipeline.predict_proba(X_new)[:, 1]\n\nreport = pd.DataFrame({\n    \"Amount\": transactions[\"Amount\"],\n    \"Fraud Probability\": probabilities.round(4),\n    \"Decision\": [\"FRAUD\" if p >= threshold else \"LEGITIMATE\" for p in probabilities],\n    \"Actual\": transactions[\"Class\"].map({0: \"LEGITIMATE\", 1: \"FRAUD\"})\n})\n\nprint(f\"Threshold: {threshold:.0%}\\n\")\nprint(report.to_string(index=False))\n\nprint(\"\\nSame probabilities, different thresholds:\")\nfor t in [0.50, 0.80, 0.95]:\n    flagged = int((probabilities >= t).sum())\n    print(f\"  threshold {t:.0%}: {flagged} of {len(probabilities)} flagged as fraud\")",
+          "output": "Threshold: 95%\n\n Amount  Fraud Probability   Decision     Actual\n 257.16             0.5235 LEGITIMATE      FRAUD\n  31.71             0.9922      FRAUD      FRAUD\n  26.88             0.5109 LEGITIMATE      FRAUD\n  65.18             0.0671 LEGITIMATE LEGITIMATE\n 287.45             0.3721 LEGITIMATE LEGITIMATE\n  10.45             0.3306 LEGITIMATE LEGITIMATE\n\nSame probabilities, different thresholds:\n  threshold 50%: 3 of 6 flagged as fraud\n  threshold 80%: 1 of 6 flagged as fraud\n  threshold 95%: 1 of 6 flagged as fraud"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "At the saved threshold of 95% only 1 of the 3 actual frauds is flagged. Two have probabilities near 0.51 and 0.52. Lowering the threshold flags more transactions: 3 of 6 at 50%, 1 of 6 at 80% and at 95%."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "A lower threshold catches more fraud but creates more false alarms. That is why the threshold is saved with the model and chosen carefully."
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🏁",
+      "title": "Mini Project: Fraud Inference Module",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Final Program below wraps loading, validation and scoring in small reusable functions, scores the sample transactions, rejects bad input and never retrains the model."
+        }
+      ]
+    },
+    {
+      "id": "understand",
+      "icon": "🎓",
+      "title": "What You Should Understand Today",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Why do we save a trained ML model? Training is expensive and occasional, so we save the result and reuse it.",
+            "Training vs inference? Training (fit) learns from historical data. Inference (predict) applies the learned model to new data.",
+            "Why save the threshold with the model? The decision rule is part of the model, so every application uses the same one.",
+            "Why the same feature names and order? The model learned from specific columns. Different names or order cause errors or silently wrong predictions.",
+            "Why avoid retraining at every startup? It is slow and costly, and it can change the model's behavior without review."
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Fraud Inference Module",
+    "file": "src/predict_final.py",
+    "description": "One program combining Day 22: loading the saved artifact, validating input features, scoring a batch of transactions with the saved threshold, rejecting bad input and reporting results, all without retraining.",
+    "concepts": [
+      "Joblib",
+      "model artifact",
+      "inference",
+      "saved threshold",
+      "feature validation",
+      "batch prediction"
+    ],
+    "code": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\nMODEL_PATH = os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\")\nDATA_PATH = os.path.join(PROJECT_ROOT, \"data\", \"new_transactions.csv\")\n\n\ndef load_artifact(path=MODEL_PATH):\n    \"\"\"Load the saved model artifact (no retraining).\"\"\"\n    if not os.path.exists(path):\n        raise FileNotFoundError(f\"Model not found: {path}. Run src/train.py first.\")\n    artifact = joblib.load(path)\n    for key in (\"pipeline\", \"threshold\", \"features\"):\n        if key not in artifact:\n            raise KeyError(f\"Artifact is missing '{key}'\")\n    return artifact\n\n\ndef prepare_features(df, features):\n    \"\"\"Check the columns and return them in training order.\"\"\"\n    missing = [f for f in features if f not in df.columns]\n    if missing:\n        raise ValueError(f\"Missing required features: {missing}\")\n    return df[features]\n\n\ndef score_transactions(df, artifact):\n    \"\"\"Return fraud probability and decision for every transaction.\"\"\"\n    X_new = prepare_features(df, artifact[\"features\"])\n    proba = artifact[\"pipeline\"].predict_proba(X_new)[:, 1]\n    result = pd.DataFrame({\n        \"Fraud Probability\": proba.round(4),\n        \"Decision\": [\"FRAUD\" if p >= artifact[\"threshold\"] else \"LEGITIMATE\" for p in proba]\n    }, index=df.index)\n    return result\n\n\nprint(\"=== FRAUD DETECTION: INFERENCE ===\")\nartifact = load_artifact()\nprint(\"Model loaded | threshold:\", artifact[\"threshold\"],\n      \"| features:\", len(artifact[\"features\"]))\n\ntransactions = pd.read_csv(DATA_PATH)\nresults = score_transactions(transactions, artifact)\nresults.insert(0, \"Amount\", transactions[\"Amount\"])\nresults[\"Actual\"] = transactions[\"Class\"].map({0: \"LEGITIMATE\", 1: \"FRAUD\"})\n\nprint(\"\\nScored\", len(results), \"transactions without retraining:\")\nprint(results.to_string(index=False))\n\nflagged = int((results[\"Decision\"] == \"FRAUD\").sum())\ncaught = int(((results[\"Decision\"] == \"FRAUD\") & (results[\"Actual\"] == \"FRAUD\")).sum())\nactual_fraud = int((results[\"Actual\"] == \"FRAUD\").sum())\nprint(f\"\\nFlagged: {flagged} | Fraud caught: {caught} of {actual_fraud}\")\n\nprint(\"\\nValidation check:\")\ntry:\n    score_transactions(transactions.drop(columns=[\"Amount\"]), artifact)\nexcept ValueError as e:\n    print(\"  Rejected bad input ->\", e)\n\nprint(\"\\nThe model was loaded, never retrained.\")",
+    "output": "=== FRAUD DETECTION: INFERENCE ===\nModel loaded | threshold: 0.95 | features: 12\n\nScored 6 transactions without retraining:\n Amount  Fraud Probability   Decision     Actual\n 257.16             0.5235 LEGITIMATE      FRAUD\n  31.71             0.9922      FRAUD      FRAUD\n  26.88             0.5109 LEGITIMATE      FRAUD\n  65.18             0.0671 LEGITIMATE LEGITIMATE\n 287.45             0.3721 LEGITIMATE LEGITIMATE\n  10.45             0.3306 LEGITIMATE LEGITIMATE\n\nFlagged: 1 | Fraud caught: 1 of 3\n\nValidation check:\n  Rejected bad input -> Missing required features: ['Amount']\n\nThe model was loaded, never retrained."
+  },
+  "practice": [
+    {
+      "title": "Predict Your Own Transaction",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Load the saved artifact and score a transaction you build yourself.",
+      "tasks": [
+        "Pull pipeline, threshold and features out of the artifact",
+        "Build a transaction dictionary with every feature set to 0.0",
+        "Set Amount = 5000, Time = 50000, V1 = 2.0 and V2 = -1.5",
+        "Create a one-row DataFrame and keep the training column order",
+        "Print the fraud probability as a percentage",
+        "Print FRAUD or LEGITIMATE for the saved threshold and for a threshold of 0.50"
+      ],
+      "hint": "pd.DataFrame(transaction)[features] keeps the training order. Use pipeline.predict_proba(...)[0, 1] for the fraud probability.",
+      "starter": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.getcwd()   # run this file from the project root\nartifact = joblib.load(os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\"))\n\n# TODO 1: pull pipeline, threshold and features out of the artifact\n# TODO 2: build a transaction dict with every feature set to 0.0\n# TODO 3: set Amount = 5000, Time = 50000, V1 = 2.0, V2 = -1.5\n# TODO 4: make a one-row DataFrame and keep the training column order\n# TODO 5: print the fraud probability as a percentage\n# TODO 6: print FRAUD or LEGITIMATE for the saved threshold and for a threshold of 0.50",
+      "solution": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.getcwd()\nartifact = joblib.load(os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\"))\n\npipeline = artifact[\"pipeline\"]\nthreshold = artifact[\"threshold\"]\nfeatures = artifact[\"features\"]\n\ntransaction = {feature: [0.0] for feature in features}\ntransaction[\"Amount\"] = [5000.0]\ntransaction[\"Time\"] = [50000.0]\ntransaction[\"V1\"] = [2.0]\ntransaction[\"V2\"] = [-1.5]\n\nnew_transaction = pd.DataFrame(transaction)[features]\n\nprobability = pipeline.predict_proba(new_transaction)[0, 1]\nprint(f\"Fraud probability: {probability:.2%}\")\n\nfor t in [threshold, 0.50]:\n    decision = \"FRAUD\" if probability >= t else \"LEGITIMATE\"\n    print(f\"Threshold {t:.0%}: {decision}\")",
+      "output": "Fraud probability: 12.56%\nThreshold 95%: LEGITIMATE\nThreshold 50%: LEGITIMATE",
+      "note": "Both thresholds give LEGITIMATE here because the probability (12.56%) is below 50%. Try other values to see where the decision flips."
+    },
+    {
+      "title": "Input Validation Before Prediction",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Write a validation function and use it to accept or reject incoming batches.",
+      "tasks": [
+        "Write check_features(df, features) that raises ValueError for missing columns and returns the extra columns",
+        "Load data/new_transactions.csv and build 3 batches: complete (drop Class), missing Amount, renamed Time",
+        "Call check_features for each batch inside try/except and print OK or REJECTED",
+        "For the complete batch, print how many transactions are flagged at thresholds 0.50 and 0.95"
+      ],
+      "hint": "missing = [f for f in features if f not in df.columns]. Select df[features] before predict_proba.",
+      "starter": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.getcwd()   # run this file from the project root\nartifact = joblib.load(os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\"))\npipeline = artifact[\"pipeline\"]\nfeatures = artifact[\"features\"]\n\n# TODO 1: write check_features(df, features): raise ValueError listing missing columns,\n#         and return the list of extra columns\n# TODO 2: load data/new_transactions.csv and build 3 batches:\n#         \"complete\" (drop Class), \"missing Amount\", \"renamed Time\" (rename Time to time)\n# TODO 3: for each batch, call check_features inside try/except\n#         print OK with the number of rows scored, or REJECTED with the message\n# TODO 4: for the complete batch print how many transactions are flagged at thresholds 0.50 and 0.95",
+      "solution": "import os\nimport joblib\nimport pandas as pd\n\nPROJECT_ROOT = os.getcwd()\nartifact = joblib.load(os.path.join(PROJECT_ROOT, \"models\", \"fraud_detection_v1.joblib\"))\npipeline = artifact[\"pipeline\"]\nfeatures = artifact[\"features\"]\n\n\ndef check_features(df, features):\n    missing = [f for f in features if f not in df.columns]\n    extra = [c for c in df.columns if c not in features]\n    if missing:\n        raise ValueError(f\"Missing columns: {missing}\")\n    return extra\n\n\nbase = pd.read_csv(os.path.join(PROJECT_ROOT, \"data\", \"new_transactions.csv\"))\n\nbatches = {\n    \"complete\": base.drop(columns=[\"Class\"]),\n    \"missing Amount\": base.drop(columns=[\"Class\", \"Amount\"]),\n    \"renamed Time\": base.drop(columns=[\"Class\"]).rename(columns={\"Time\": \"time\"})\n}\n\nfor name, df in batches.items():\n    try:\n        extra = check_features(df, features)\n        probabilities = pipeline.predict_proba(df[features])[:, 1]\n        print(f\"{name:<15} OK | scored {len(df)} rows | extra columns: {extra}\")\n    except ValueError as e:\n        print(f\"{name:<15} REJECTED | {e}\")\n\nfull = batches[\"complete\"]\nproba = pipeline.predict_proba(full[features])[:, 1]\nfor t in [0.50, 0.95]:\n    print(f\"Threshold {t:.0%}: {int((proba >= t).sum())} of {len(proba)} flagged\")",
+      "output": "complete        OK | scored 6 rows | extra columns: []\nmissing Amount  REJECTED | Missing columns: ['Amount']\nrenamed Time    REJECTED | Missing columns: ['Time']\nThreshold 50%: 3 of 6 flagged\nThreshold 95%: 1 of 6 flagged",
+      "note": "Validating columns before predicting turns silent or confusing failures into a clear message. The threshold comparison shows why the decision rule matters: 3 flagged at 50% versus 1 at 95%."
+    }
+  ],
+  "checklist": [
+    "Understood why we save a trained model",
+    "Loaded a Joblib artifact without retraining",
+    "Used the saved threshold and feature list",
+    "Predicted a probability and a decision",
+    "Understood why feature names and order must match",
+    "Scored a batch of transactions",
+    "Validated input before predicting"
+  ],
+  "quiz": [
+    {
+      "q": "Which method trains a model and which uses a trained model?",
+      "options": [
+        "predict() trains, fit() uses",
+        "fit() trains, predict() uses",
+        "Both train",
+        "Neither needs data"
+      ],
+      "answer": 1,
+      "why": "fit() learns from data. predict() and predict_proba() apply the already-trained model, so no fit() is needed at prediction time."
+    },
+    {
+      "q": "What is a model artifact?",
+      "options": [
+        "Only the training data",
+        "The saved model plus the configuration it needs",
+        "A prediction result",
+        "A Python library"
+      ],
+      "answer": 1,
+      "why": "Here the artifact holds the pipeline, the decision threshold and the feature list, everything an application needs to predict consistently."
+    },
+    {
+      "q": "Why is the threshold saved together with the model?",
+      "options": [
+        "It makes the file smaller",
+        "So every application uses the same decision rule",
+        "Joblib requires it",
+        "It improves accuracy automatically"
+      ],
+      "answer": 1,
+      "why": "The threshold turns a probability into a decision. Saving it with the model prevents each application from choosing a different rule."
+    },
+    {
+      "q": "A model receives raw values in the wrong column order. What can happen?",
+      "options": [
+        "Always a clear error",
+        "Silently wrong predictions",
+        "The model retrains itself",
+        "Nothing, order never matters"
+      ],
+      "answer": 1,
+      "why": "With raw arrays there are no names to check, so the model may return a prediction without any error. Select columns by name in the training order."
+    },
+    {
+      "q": "Why avoid retraining every time an application starts?",
+      "options": [
+        "Retraining is illegal",
+        "It is slow and costly and can change behavior unexpectedly",
+        "Models cannot be retrained",
+        "predict() requires old data"
+      ],
+      "answer": 1,
+      "why": "Training is expensive and should happen occasionally under control. Loading a saved, versioned model gives fast and consistent predictions."
+    }
+  ]
 }
   ]
 };
