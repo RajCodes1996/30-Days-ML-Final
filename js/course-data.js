@@ -10096,6 +10096,737 @@ Average used to fill: 245.0
       "why": "Training is expensive and should happen occasionally under control. Loading a saved, versioned model gives fast and consistent predictions."
     }
   ]
+},
+
+// Day 23: ML Prediction API with FastAPI (add a comma after the previous day's } then paste)
+{
+ "day": 23,
+ "title": "Build an ML Prediction API with FastAPI",
+ "subtitle": "Expose your saved fraud model through a validated JSON endpoint",
+ "level": "Intermediate",
+ "duration": "75 min",
+ "tags": [
+  "FastAPI",
+  "Pydantic",
+  "API",
+  "Deployment",
+  "JSON"
+ ],
+ "goals": [
+  "Explain what an inference API is",
+  "Validate input with Pydantic",
+  "Load a saved pipeline once and serve /predict",
+  "Test with Swagger UI and read 422 errors"
+ ],
+ "sections": [
+  {
+   "id": "why",
+   "icon": "🌐",
+   "title": "Why an API?",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A saved model is only usable from Python. An **API** lets any app (website, mobile app, another service) send data over HTTP and get a prediction back. The key idea to learn: **the model stays in one place; everyone talks to it through a small, validated door.**"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Concept",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "Endpoint",
+       "A URL for one operation, e.g. `/predict`"
+      ],
+      [
+       "POST",
+       "Sends data to the API"
+      ],
+      [
+       "JSON",
+       "Text format for the data both ways"
+      ],
+      [
+       "Pydantic",
+       "Checks incoming data before it reaches the model"
+      ],
+      [
+       "Inference API",
+       "An API that returns predictions from a trained model"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Flow",
+     "code": "Client -> JSON -> FastAPI endpoint -> Pydantic validation -> saved Pipeline -> JSON response"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "**FastAPI needs a running server, so it cannot run in this browser lesson.** The server code below is shown, not runnable here. Validation (Pydantic) is runnable, so you practise that part live and run the server on your own machine."
+    }
+   ]
+  },
+  {
+   "id": "setup",
+   "icon": "🛠️",
+   "title": "Setup",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Keep your Day 21 project. **Do not retrain or modify the model.** Only add one new file: `src/app.py`."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Install (VS Code terminal, project root)",
+     "code": "python -m pip install fastapi \"uvicorn[standard]\" pydantic"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Add to requirements.txt",
+     "code": "fastapi\nuvicorn[standard]\npydantic"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "Pin versions (`pip freeze`) once it works. The `.joblib` model also needs the **same scikit-learn version** that saved it."
+    }
+   ]
+  },
+  {
+   "id": "pydantic",
+   "icon": "✅",
+   "title": "Validation with Pydantic (runnable)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Pydantic turns a class with typed fields into a **gatekeeper**. Valid data passes (and is converted); invalid data raises an error that lists exactly what is wrong."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "A typed input model",
+     "code": "from pydantic import BaseModel, ValidationError\n\nclass Tx(BaseModel):\n    Amount: float\n    V1: float\n\nok = Tx(Amount=\"12.5\", V1=0.3)\nprint(ok.model_dump())",
+     "output": "{'Amount': 12.5, 'V1': 0.3}"
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Catch invalid data",
+     "code": "def check(payload):\n    try:\n        Tx(**payload)\n        return \"ok\"\n    except ValidationError as e:\n        return [(err[\"loc\"][0], err[\"type\"]) for err in e.errors()]\n\nprint(check({\"Amount\": \"hello\", \"V1\": 0.3}))\nprint(check({\"Amount\": 5}))",
+     "output": "[('Amount', 'float_parsing')]\n[('V1', 'missing')]"
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "FastAPI does this for you: bad request data becomes an automatic **HTTP 422 Unprocessable Entity** response; the model never sees it."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Reject unexpected fields",
+     "code": "from pydantic import ConfigDict\n\nclass StrictTx(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")\n    Amount: float\n    V1: float\n\ntry:\n    StrictTx(Amount=1, V1=2, Colour=\"red\")\nexcept ValidationError as e:\n    print([err[\"type\"] for err in e.errors()])",
+     "output": "['extra_forbidden']"
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Build the schema from feature names",
+     "code": "from pydantic import create_model\n\nfeatures = [\"Time\", \"V1\", \"Amount\"]\nDynamic = create_model(\"Dynamic\", __config__=ConfigDict(extra=\"forbid\"),\n                       **{f: (float, ...) for f in features})\nprint(list(Dynamic.model_fields))",
+     "output": "['Time', 'V1', 'Amount']"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "`create_model` is why the API never hardcodes feature names: it reads them from the saved artifact, so schema and model cannot drift apart."
+    }
+   ]
+  },
+  {
+   "id": "app",
+   "icon": "🧩",
+   "title": "The API code (src/app.py)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Four parts: load the artifact **once at startup**, build the schema from saved feature names, then define the endpoints. `/predict` converts the validated input to a one-row DataFrame **with the same column order**, gets the probability and applies the saved threshold."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "src/app.py",
+     "code": "from pathlib import Path\n\nimport joblib\nimport pandas as pd\nfrom fastapi import FastAPI\nfrom pydantic import ConfigDict, create_model\n\n# 1. Load the Day 21 artifact once, at startup\nMODEL_PATH = Path(__file__).resolve().parent.parent / \"models\" / \"fraud_detection_v1.joblib\"\nartifact = joblib.load(MODEL_PATH)\npipeline = artifact[\"pipeline\"]\nthreshold = artifact[\"threshold\"]\nfeatures = artifact[\"features\"]\n\n# 2. Build the input schema from the saved feature names\nTransactionInput = create_model(\n    \"TransactionInput\",\n    __config__=ConfigDict(extra=\"forbid\"),\n    **{feature: (float, ...) for feature in features},\n)\n\n# 3. Create the app\napp = FastAPI(title=\"Credit Card Fraud Detection API\", version=\"1.0.0\")\n\n\n@app.get(\"/\")\ndef home():\n    return {\"message\": \"Credit Card Fraud Detection API is running!\", \"version\": \"1.0.0\"}\n\n\n@app.get(\"/health\")\ndef health_check():\n    return {\"status\": \"healthy\", \"model_loaded\": True}\n\n\n@app.post(\"/predict\")\ndef predict(transaction: TransactionInput):\n    input_df = pd.DataFrame([transaction.model_dump()], columns=features)\n    probability = float(pipeline.predict_proba(input_df)[0, 1])\n    result = \"Fraud\" if probability >= threshold else \"Legitimate\"\n    return {\"fraud_probability\": round(probability, 6), \"threshold\": threshold, \"prediction\": result}"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "`extra=\"forbid\"` is what rejects unexpected fields; Pydantic's default would silently ignore them. The original task text claimed rejection without enabling it."
+    }
+   ]
+  },
+  {
+   "id": "run",
+   "icon": "▶️",
+   "title": "Run and test it",
+   "blocks": [
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Start the server (project root)",
+     "code": "python -m uvicorn src.app:app --reload"
+    },
+    {
+     "type": "p",
+     "text": "Expect `Uvicorn running on http://127.0.0.1:8000` and `Application startup complete`. Keep this terminal open, then open **http://127.0.0.1:8000/docs** (Swagger UI): try `GET /health`, then `POST /predict` with every feature set to `0`."
+    },
+    {
+     "type": "code",
+     "lang": "json",
+     "title": "Example response (zero-filled smoke test)",
+     "code": "{\n  \"fraud_probability\": 0.00262,\n  \"threshold\": 0.91,\n  \"prediction\": \"Legitimate\"\n}"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "Zero-filled input only proves the API works; it is not a realistic transaction. Your numbers depend on your own saved model and threshold. Test a real fraud row and a real legitimate row from your test set too."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Request",
+      "Status",
+      "Why"
+     ],
+     "rows": [
+      [
+       "All features numeric",
+       "200",
+       "Valid"
+      ],
+      [
+       "`\"Amount\": \"hello\"`",
+       "422",
+       "Not a float"
+      ],
+      [
+       "A feature missing",
+       "422",
+       "Required field"
+      ],
+      [
+       "Extra field",
+       "422",
+       "`extra=\"forbid\"`"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "next",
+   "icon": "🚀",
+   "title": "Good habits and limits",
+   "blocks": [
+    {
+     "type": "list",
+     "items": [
+      "Load the model **once**, not inside the endpoint (it would reload on every request).",
+      "Return the threshold and decision, not only the probability.",
+      "Never expose `/docs` and a raw model publicly without authentication.",
+      "An API serves a model; it does not make it correct. Monitor it with real data later."
+     ]
+    }
+   ]
+  }
+ ],
+ "finalProgram": {
+  "title": "Mini Inference API (logic without the server)",
+  "file": "mini_api.py",
+  "description": "The same validate -> predict -> respond logic as src/app.py, runnable in the browser. FastAPI only adds the HTTP layer around it.",
+  "concepts": [
+   "create_model",
+   "extra=forbid",
+   "422 vs 200",
+   "predict_proba + threshold"
+  ],
+  "code": "import numpy as np\nimport pandas as pd\nfrom pydantic import ConfigDict, ValidationError, create_model\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\n# Stand-in \"Day 21 artifact\": a small trained pipeline\nrng = np.random.RandomState(23)\nfeatures = [\"V1\", \"V2\", \"Amount\"]\ny = (rng.rand(3000) < 0.05).astype(int)\nX = pd.DataFrame(rng.normal(size=(3000, 3)), columns=features)\nX.loc[y == 1, \"V1\"] -= 2.5\npipeline = Pipeline([(\"scaler\", StandardScaler()),\n                     (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))])\npipeline.fit(X, y)\nthreshold = 0.9\n\n# The API logic, without the web server\nTransactionInput = create_model(\"TransactionInput\", __config__=ConfigDict(extra=\"forbid\"),\n                                **{f: (float, ...) for f in features})\n\ndef predict_endpoint(payload):\n    try:\n        tx = TransactionInput(**payload)\n    except ValidationError as e:\n        return 422, [(err[\"loc\"][0], err[\"type\"]) for err in e.errors()]\n    row = pd.DataFrame([tx.model_dump()], columns=features)\n    prob = float(pipeline.predict_proba(row)[0, 1])\n    return 200, {\"fraud_probability\": round(prob, 3), \"threshold\": threshold,\n                 \"prediction\": \"Fraud\" if prob >= threshold else \"Legitimate\"}\n\nrequests = {\n    \"normal\": {\"V1\": 0.1, \"V2\": 0.0, \"Amount\": 0.2},\n    \"suspicious\": {\"V1\": -4.0, \"V2\": 0.0, \"Amount\": 0.2},\n    \"bad type\": {\"V1\": \"x\", \"V2\": 0.0, \"Amount\": 0.2},\n    \"missing\": {\"V1\": 0.1, \"V2\": 0.0},\n    \"extra field\": {\"V1\": 0.1, \"V2\": 0.0, \"Amount\": 0.2, \"Colour\": 1},\n}\nfor name, payload in requests.items():\n    print(name, predict_endpoint(payload))",
+  "output": "normal (200, {'fraud_probability': 0.026, 'threshold': 0.9, 'prediction': 'Legitimate'})\nsuspicious (200, {'fraud_probability': 0.999, 'threshold': 0.9, 'prediction': 'Fraud'})\nbad type (422, [('V1', 'float_parsing')])\nmissing (422, [('Amount', 'missing')])\nextra field (422, [('Colour', 'extra_forbidden')])"
+ },
+ "practice": [
+  {
+   "title": "Payment Validator",
+   "level": "Easy",
+   "file": "practice1_payment_validator.py",
+   "description": "Write a Pydantic model and report exactly what is wrong with bad payloads.",
+   "tasks": [
+    "Define the model",
+    "Return ok or (field, error type) pairs"
+   ],
+   "hint": "Use e.errors(); each item has 'loc' (a tuple) and 'type'.",
+   "starter": "from pydantic import BaseModel, ValidationError\n\n# TODO 1: class Payment(BaseModel) with fields Amount (float) and Merchant (str)\n\ndef check(payload):\n    # TODO 2: return \"ok\" if valid, else a list of (field, error type) pairs\n    pass\n\ntests = [{\"Amount\": 10, \"Merchant\": \"Shop\"}, {\"Amount\": \"ten\", \"Merchant\": \"Shop\"}, {\"Merchant\": \"Shop\"}]\nfor t in tests:\n    print(check(t))",
+   "solution": "from pydantic import BaseModel, ValidationError\n\nclass Payment(BaseModel):\n    Amount: float\n    Merchant: str\n\ndef check(payload):\n    try:\n        Payment(**payload)\n        return \"ok\"\n    except ValidationError as e:\n        return [(err[\"loc\"][0], err[\"type\"]) for err in e.errors()]\n\ntests = [{\"Amount\": 10, \"Merchant\": \"Shop\"}, {\"Amount\": \"ten\", \"Merchant\": \"Shop\"}, {\"Merchant\": \"Shop\"}]\nfor t in tests:\n    print(check(t))",
+   "output": "ok\n[('Amount', 'float_parsing')]\n[('Amount', 'missing')]"
+  },
+  {
+   "title": "Strict Dynamic Schema",
+   "level": "Medium",
+   "file": "practice2_strict_schema.py",
+   "description": "Generate a strict schema from a feature list, with a value rule.",
+   "tasks": [
+    "create_model from a feature list",
+    "Forbid extra fields",
+    "Amount >= 0 with Field(ge=0)"
+   ],
+   "hint": "Pass (float, Field(..., ge=0)) for Amount; set __config__=ConfigDict(extra=\"forbid\").",
+   "starter": "from pydantic import ConfigDict, Field, ValidationError, create_model\n\nfeatures = [\"Time\", \"V1\", \"Amount\"]\n\n# TODO 1: build Schema with create_model: every feature is a required float,\n#         extra fields are forbidden, and Amount must be >= 0 (use Field(ge=0))\n\ndef check(payload):\n    # TODO 2: return \"ok\" or a sorted list of (field, error type) pairs\n    pass\n\ntests = [\n    {\"Time\": 1, \"V1\": 0.5, \"Amount\": 20},\n    {\"Time\": 1, \"V1\": 0.5, \"Amount\": -5},\n    {\"Time\": 1, \"V1\": 0.5, \"Amount\": 20, \"Colour\": \"red\"},\n    {\"Time\": 1, \"Amount\": 20},\n]\nfor t in tests:\n    print(check(t))",
+   "solution": "from pydantic import ConfigDict, Field, ValidationError, create_model\n\nfeatures = [\"Time\", \"V1\", \"Amount\"]\n\nfields = {f: (float, ...) for f in features}\nfields[\"Amount\"] = (float, Field(..., ge=0))\nSchema = create_model(\"Schema\", __config__=ConfigDict(extra=\"forbid\"), **fields)\n\ndef check(payload):\n    try:\n        Schema(**payload)\n        return \"ok\"\n    except ValidationError as e:\n        return sorted((err[\"loc\"][0], err[\"type\"]) for err in e.errors())\n\ntests = [\n    {\"Time\": 1, \"V1\": 0.5, \"Amount\": 20},\n    {\"Time\": 1, \"V1\": 0.5, \"Amount\": -5},\n    {\"Time\": 1, \"V1\": 0.5, \"Amount\": 20, \"Colour\": \"red\"},\n    {\"Time\": 1, \"Amount\": 20},\n]\nfor t in tests:\n    print(check(t))",
+   "output": "ok\n[('Amount', 'greater_than_equal')]\n[('Colour', 'extra_forbidden')]\n[('V1', 'missing')]",
+   "note": "Real APIs often add range rules like this so impossible values never reach the model."
+  }
+ ],
+ "checklist": [
+  "I can explain endpoint, POST and JSON",
+  "I installed fastapi and uvicorn",
+  "I know Pydantic rejects bad input before the model",
+  "I used extra=\"forbid\" to reject unexpected fields",
+  "I load the model once at startup",
+  "I ran uvicorn and opened /docs",
+  "I tested valid and invalid requests"
+ ],
+ "quiz": [
+  {
+   "q": "What does FastAPI return when request data fails validation?",
+   "options": [
+    "200 with an empty result",
+    "422 Unprocessable Entity",
+    "500 crash",
+    "404"
+   ],
+   "answer": 1,
+   "why": "Pydantic errors become an automatic 422 response."
+  },
+  {
+   "q": "Why build the input schema from the saved feature names?",
+   "options": [
+    "It is faster",
+    "Schema and model cannot drift apart",
+    "Pydantic requires it",
+    "It removes the threshold"
+   ],
+   "answer": 1,
+   "why": "The model's feature list is the single source of truth."
+  },
+  {
+   "q": "Where should the model be loaded?",
+   "options": [
+    "Inside /predict on every request",
+    "Once at startup",
+    "In the client app",
+    "In Swagger UI"
+   ],
+   "answer": 1,
+   "why": "Reloading per request is slow and wasteful."
+  },
+  {
+   "q": "A zero-filled /predict call returns 200. What does that prove?",
+   "options": [
+    "The model is accurate",
+    "The API works end to end",
+    "Zero is a realistic transaction",
+    "The threshold is correct"
+   ],
+   "answer": 1,
+   "why": "It is only a smoke test, not a quality check."
+  }
+ ]
+},
+// Day 24: API Testing, Error Handling & Docker (add a comma after the previous day's } then paste)
+// Day 24: API Testing, Error Handling & Docker (add a comma after the previous day's } then paste)
+{
+ "day": 24,
+ "title": "API Testing, Error Handling & Docker",
+ "subtitle": "Make the fraud API testable, safe when it fails, and portable",
+ "level": "Intermediate",
+ "duration": "90 min",
+ "tags": [
+  "pytest",
+  "TestClient",
+  "HTTPException",
+  "Docker",
+  "MLOps"
+ ],
+ "goals": [
+  "Write automated API tests with pytest",
+  "Return controlled 500 errors and log the real cause",
+  "Explain Dockerfile, image and container",
+  "Keep Python and scikit-learn versions consistent in Docker"
+ ],
+ "sections": [
+  {
+   "id": "why",
+   "icon": "🧱",
+   "title": "From working to reliable",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Yesterday's API works when you click Execute. A reliable API also **proves** it works (tests), **fails gracefully** (error handling) and **runs anywhere** (Docker). The skill to learn is the habit: *never trust code you have only run by hand.*"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Goal",
+      "Tool",
+      "Answers the question"
+     ],
+     "rows": [
+      [
+       "Test",
+       "pytest + TestClient",
+       "Does it still work after my change?"
+      ],
+      [
+       "Handle errors",
+       "try/except + HTTPException",
+       "What does the client see when it breaks?"
+      ],
+      [
+       "Package",
+       "Dockerfile",
+       "Will it run on another machine?"
+      ]
+     ]
+    },
+    {
+     "type": "image",
+     "src": "images/day24/api-request-flow.png",
+     "alt": "Request flow through the fraud API",
+     "caption": "Every request ends as 200, 422 or 500."
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "pytest, FastAPI and Docker cannot run in this browser lesson. The runnable blocks teach the **ideas** (tests, controlled errors) in plain Python; the real files are shown for your own machine."
+    }
+   ]
+  },
+  {
+   "id": "testidea",
+   "icon": "🧪",
+   "title": "What an automated test is (runnable)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A test is a small function that makes a claim with `assert`. If the claim is false the test fails. pytest simply finds functions named `test_*`, runs them and reports. Here is a tiny runner doing the same thing."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Tests and a mini runner",
+     "code": "def add_vat(price, rate=0.18):\n    return round(price * (1 + rate), 2)\n\ndef test_normal_price():\n    assert add_vat(100) == 118.0\n\ndef test_zero_price():\n    assert add_vat(0) == 0\n\ndef test_deliberately_wrong():\n    assert add_vat(100) == 120\n\ndef run_tests(tests):\n    for t in tests:\n        try:\n            t()\n            print(t.__name__, \"PASSED\")\n        except AssertionError:\n            print(t.__name__, \"FAILED\")\n\nrun_tests([test_normal_price, test_zero_price, test_deliberately_wrong])",
+     "output": "test_normal_price PASSED\ntest_zero_price PASSED\ntest_deliberately_wrong FAILED"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "A failing test is useful news: it found a bug before a user did. Test the **behaviour** (status codes, response keys), not the model's accuracy; zero-filled inputs prove the API works, not that predictions are good."
+    }
+   ]
+  },
+  {
+   "id": "tests",
+   "icon": "✅",
+   "title": "Testing the real API (tests/test_app.py)",
+   "blocks": [
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Install",
+     "code": "python -m pip install pytest httpx"
+    },
+    {
+     "type": "p",
+     "text": "`TestClient` calls your FastAPI app directly, with no server running. The original task showed only 2 of the 4 tests and no checks on the response, so here is the full file, plus a fifth test for the 500 error you add below."
+    },
+    {
+     "type": "image",
+     "src": "images/day24/testing-flow.png",
+     "alt": "pytest and TestClient testing the API",
+     "caption": "What the five tests check and the status each expects."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "tests/test_app.py",
+     "code": "from fastapi.testclient import TestClient\n\nfrom src.app import app, features\n\nclient = TestClient(app)\n\n\ndef zero_sample():\n    return {feature: 0.0 for feature in features}\n\n\ndef test_health_check():\n    response = client.get(\"/health\")\n    assert response.status_code == 200\n    assert response.json()[\"status\"] == \"healthy\"\n\n\ndef test_prediction():\n    response = client.post(\"/predict\", json=zero_sample())\n    assert response.status_code == 200\n    result = response.json()\n    assert set(result) == {\"fraud_probability\", \"threshold\", \"prediction\"}\n    assert 0.0 <= result[\"fraud_probability\"] <= 1.0\n    assert result[\"prediction\"] in {\"Fraud\", \"Legitimate\"}\n\n\ndef test_missing_feature():\n    sample = zero_sample()\n    sample.pop(features[0])\n    assert client.post(\"/predict\", json=sample).status_code == 422\n\n\ndef test_extra_feature():\n    sample = zero_sample()\n    sample[\"unexpected_field\"] = 1.0\n    assert client.post(\"/predict\", json=sample).status_code == 422\n\n\ndef test_internal_error_returns_500(monkeypatch):\n    class BrokenPipeline:\n        def predict_proba(self, X):\n            raise RuntimeError(\"boom\")\n\n    monkeypatch.setattr(\"src.app.pipeline\", BrokenPipeline())\n    response = client.post(\"/predict\", json=zero_sample())\n    assert response.status_code == 500\n    assert response.json() == {\"detail\": \"Prediction failed due to an internal server error.\"}"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Run (stop uvicorn first)",
+     "code": "python -m pytest -v"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Expected result",
+     "code": "tests/test_app.py::test_health_check PASSED\ntests/test_app.py::test_prediction PASSED\ntests/test_app.py::test_missing_feature PASSED\ntests/test_app.py::test_extra_feature PASSED\ntests/test_app.py::test_internal_error_returns_500 PASSED\n\n5 passed"
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "Run from the **project root** so `from src.app import ...` works. `monkeypatch` swaps the real pipeline for a broken one only during that test, which is how you test failure paths safely."
+    }
+   ]
+  },
+  {
+   "id": "errors",
+   "icon": "🛡️",
+   "title": "Error handling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Pydantic already turns bad input into **422**. For unexpected problems inside your code, catch the exception, **log the details on the server**, and give the client a short safe message with status **500**."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Status",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "200",
+       "Success"
+      ],
+      [
+       "422",
+       "Client sent invalid data"
+      ],
+      [
+       "500",
+       "Unexpected problem inside the app"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "First, see the bug the original task would have created: the `except` block only logged, so the function returned nothing."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "A handler that swallows the error",
+     "code": "def broken_model(x):\n    raise RuntimeError(\"model file corrupted\")\n\ndef predict_buggy(x):\n    try:\n        return {\"probability\": broken_model(x)}\n    except Exception:\n        print(\"log: prediction failed\")\n\nprint(predict_buggy(1))",
+     "output": "log: prediction failed\nNone"
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "The fix: log, then raise a controlled error",
+     "code": "class HTTPException(Exception):\n    def __init__(self, status_code, detail):\n        self.status_code, self.detail = status_code, detail\n\ndef predict_safe(x):\n    try:\n        return {\"probability\": broken_model(x)}\n    except Exception:\n        print(\"log: prediction failed\")\n        raise HTTPException(500, \"Prediction failed due to an internal server error.\")\n\ntry:\n    predict_safe(1)\nexcept HTTPException as e:\n    print(e.status_code, e.detail)",
+     "output": "log: prediction failed\n500 Prediction failed due to an internal server error."
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "The client gets a generic message; the real cause (`model file corrupted`) stays in the server log. Never send internal error text to users: it can leak paths and implementation details."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Replace /predict in src/app.py",
+     "code": "@app.post(\"/predict\")\ndef predict(transaction: TransactionInput):\n    try:\n        input_df = pd.DataFrame([transaction.model_dump()], columns=features)\n        probability = float(pipeline.predict_proba(input_df)[0, 1])\n        result = \"Fraud\" if probability >= threshold else \"Legitimate\"\n        return {\"fraud_probability\": round(probability, 6), \"threshold\": threshold, \"prediction\": result}\n    except Exception:\n        logger.exception(\"Prediction failed\")  # full details stay on the server\n        raise HTTPException(status_code=500, detail=\"Prediction failed due to an internal server error.\")"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "Also add `import logging` and `from fastapi import FastAPI, HTTPException` at the top, and `logger = logging.getLogger(__name__)` once. Re-run pytest: the 500 test now passes."
+    }
+   ]
+  },
+  {
+   "id": "docker",
+   "icon": "🐳",
+   "title": "Docker fundamentals",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Docker packages the app **and** its environment so it behaves the same everywhere."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Term",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "Dockerfile",
+       "Recipe of instructions"
+      ],
+      [
+       "Image",
+       "Packaged blueprint built from the recipe"
+      ],
+      [
+       "Container",
+       "A running instance of an image"
+      ]
+     ]
+    },
+    {
+     "type": "image",
+     "src": "images/day24/docker-concepts.png",
+     "alt": "Dockerfile, image and container",
+     "caption": "Build once, run the same way anywhere."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Dockerfile (project root)",
+     "code": "FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY src/ ./src/\nCOPY models/ ./models/\nEXPOSE 8000\nCMD [\"uvicorn\", \"src.app:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": ".dockerignore",
+     "code": ".venv/\nvenv/\n__pycache__/\n.pytest_cache/\n.git/\n.vscode/\n*.pyc"
+    },
+    {
+     "type": "image",
+     "src": "images/day24/docker-layers.png",
+     "alt": "Dockerfile layers and caching",
+     "caption": "Slow, rarely-changing steps go first so builds stay fast."
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "**Version match matters.** A `.joblib` model loads reliably only with the scikit-learn (and ideally Python) version that saved it. Check with `python --version` and `python -c \"import sklearn; print(sklearn.__version__)\"`, set the base image to match, and pin `scikit-learn==<that version>` in `requirements.txt`."
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "Layer order is a speed trick: copying `requirements.txt` and installing **before** copying `src/` means code edits do not reinstall every library. pytest and httpx are only needed for testing; a separate `requirements-dev.txt` keeps the image smaller."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Build, run, inspect",
+     "code": "docker build -t fraud-detection-api:v1 .\ndocker images\ndocker run -d --name fraud-api -p 8000:8000 fraud-detection-api:v1\ndocker ps\ndocker logs fraud-api\ndocker stop fraud-api\ndocker start fraud-api\ndocker rm -f fraud-api"
+    },
+    {
+     "type": "p",
+     "text": "Open `http://127.0.0.1:8000/docs`; `/health` should return `{\"status\": \"healthy\", \"model_loaded\": true}`. Stop your local uvicorn first, or both fight for port 8000. If the container exits, `docker logs fraud-api` shows why. In `-p 8000:8000`, the left number is your computer's port and the right one is the container's."
+    }
+   ]
+  }
+ ],
+ "finalProgram": {
+  "title": "Reliable Mini API: validate, handle errors, test",
+  "file": "reliable_api.py",
+  "description": "The Day 23 logic plus a controlled 500 error and five automated tests, all runnable without a server.",
+  "concepts": [
+   "assert tests",
+   "422 vs 500",
+   "hidden internal errors",
+   "server log"
+  ],
+  "code": "import numpy as np\nimport pandas as pd\nfrom pydantic import ConfigDict, ValidationError, create_model\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\nclass HTTPException(Exception):\n    def __init__(self, status_code, detail):\n        self.status_code, self.detail = status_code, detail\n\nrng = np.random.RandomState(24)\nfeatures = [\"V1\", \"V2\", \"Amount\"]\ny = (rng.rand(3000) < 0.05).astype(int)\nX = pd.DataFrame(rng.normal(size=(3000, 3)), columns=features)\nX.loc[y == 1, \"V1\"] -= 2.5\npipeline = Pipeline([(\"scaler\", StandardScaler()),\n                     (\"model\", LogisticRegression(class_weight=\"balanced\", max_iter=1000, random_state=42))])\npipeline.fit(X, y)\nthreshold = 0.9\nTx = create_model(\"Tx\", __config__=ConfigDict(extra=\"forbid\"), **{f: (float, ...) for f in features})\nserver_log = []\n\ndef predict(payload):\n    try:\n        tx = Tx(**payload)\n    except ValidationError:\n        return 422, \"invalid input\"\n    try:\n        row = pd.DataFrame([tx.model_dump()], columns=features)\n        prob = float(pipeline.predict_proba(row)[0, 1])\n        return 200, {\"prediction\": \"Fraud\" if prob >= threshold else \"Legitimate\"}\n    except Exception as err:\n        server_log.append(repr(err))\n        raise HTTPException(500, \"Prediction failed due to an internal server error.\")\n\ndef call(payload):\n    try:\n        return predict(payload)\n    except HTTPException as e:\n        return e.status_code, e.detail\n\nok = {\"V1\": 0.1, \"V2\": 0.0, \"Amount\": 0.2}\n\ndef test_valid_request():\n    assert call(ok)[0] == 200\n\ndef test_missing_feature():\n    assert call({\"V1\": 0.1, \"V2\": 0.0})[0] == 422\n\ndef test_extra_feature():\n    assert call(dict(ok, Colour=1))[0] == 422\n\ndef test_fraud_detected():\n    assert call(dict(ok, V1=-4.0))[1][\"prediction\"] == \"Fraud\"\n\ndef test_internal_error_is_hidden():\n    global pipeline\n    good, pipeline = pipeline, None\n    try:\n        status, detail = call(ok)\n    finally:\n        pipeline = good\n    assert status == 500 and \"NoneType\" not in detail and len(server_log) == 1\n\ntests = [test_valid_request, test_missing_feature, test_extra_feature, test_fraud_detected, test_internal_error_is_hidden]\nfor t in tests:\n    try:\n        t(); print(t.__name__, \"PASSED\")\n    except AssertionError:\n        print(t.__name__, \"FAILED\")\nprint(len(tests), \"tests run\")",
+  "output": "test_valid_request PASSED\ntest_missing_feature PASSED\ntest_extra_feature PASSED\ntest_fraud_detected PASSED\ntest_internal_error_is_hidden PASSED\n5 tests run"
+ },
+ "practice": [
+  {
+   "title": "Threshold Test Suite",
+   "level": "Easy",
+   "file": "practice1_threshold_tests.py",
+   "description": "Write four tests, including the edge case exactly on the threshold.",
+   "tasks": [
+    "Write 4 test functions",
+    "Run them with the runner"
+   ],
+   "hint": "Each test is one assert comparing decide(...) with the expected string.",
+   "starter": "def decide(probability, threshold):\n    return \"Fraud\" if probability >= threshold else \"Legitimate\"\n\ndef run_tests(tests):\n    for t in tests:\n        try:\n            t()\n            print(t.__name__, \"PASSED\")\n        except AssertionError:\n            print(t.__name__, \"FAILED\")\n\n# TODO 1: test_below_threshold: 0.2 vs 0.5 -> \"Legitimate\"\n# TODO 2: test_above_threshold: 0.9 vs 0.5 -> \"Fraud\"\n# TODO 3: test_exactly_on_threshold: 0.5 vs 0.5 -> \"Fraud\"\n# TODO 4: test_stricter_threshold: 0.9 vs 0.95 -> \"Legitimate\"\n\n# TODO 5: call run_tests with your four tests",
+   "solution": "def decide(probability, threshold):\n    return \"Fraud\" if probability >= threshold else \"Legitimate\"\n\ndef run_tests(tests):\n    for t in tests:\n        try:\n            t()\n            print(t.__name__, \"PASSED\")\n        except AssertionError:\n            print(t.__name__, \"FAILED\")\n\ndef test_below_threshold():\n    assert decide(0.2, 0.5) == \"Legitimate\"\n\ndef test_above_threshold():\n    assert decide(0.9, 0.5) == \"Fraud\"\n\ndef test_exactly_on_threshold():\n    assert decide(0.5, 0.5) == \"Fraud\"\n\ndef test_stricter_threshold():\n    assert decide(0.9, 0.95) == \"Legitimate\"\n\nrun_tests([test_below_threshold, test_above_threshold, test_exactly_on_threshold, test_stricter_threshold])",
+   "output": "test_below_threshold PASSED\ntest_above_threshold PASSED\ntest_exactly_on_threshold PASSED\ntest_stricter_threshold PASSED"
+  },
+  {
+   "title": "Safe Predict Wrapper",
+   "level": "Medium",
+   "file": "practice2_safe_predict.py",
+   "description": "Hide internal errors from the client but keep them in the server log.",
+   "tasks": [
+    "Return the fraud probability on success",
+    "Log and raise a 500 HTTPException on failure",
+    "Print the server log"
+   ],
+   "hint": "Catch Exception as error; log repr(error); raise HTTPException(500, ...).",
+   "starter": "class HTTPException(Exception):\n    def __init__(self, status_code, detail):\n        self.status_code, self.detail = status_code, detail\n\nclass BrokenModel:\n    def predict_proba(self, rows):\n        raise RuntimeError(\"secret internal failure\")\n\nclass GoodModel:\n    def predict_proba(self, rows):\n        return [[0.3, 0.7]]\n\nserver_log = []\n\ndef safe_predict(model, row):\n    # TODO 1: try model.predict_proba([row]) and return the fraud probability (index [0][1])\n    # TODO 2: on any Exception, append repr(error) to server_log and\n    #         raise HTTPException(500, \"Prediction failed due to an internal server error.\")\n    pass\n\nfor model in [GoodModel(), BrokenModel()]:\n    try:\n        print(\"OK:\", safe_predict(model, [0.0]))\n    except HTTPException as e:\n        print(\"ERROR:\", e.status_code, e.detail)\n\n# TODO 3: print the server log (it must contain the real error)\nprint(server_log)",
+   "solution": "class HTTPException(Exception):\n    def __init__(self, status_code, detail):\n        self.status_code, self.detail = status_code, detail\n\nclass BrokenModel:\n    def predict_proba(self, rows):\n        raise RuntimeError(\"secret internal failure\")\n\nclass GoodModel:\n    def predict_proba(self, rows):\n        return [[0.3, 0.7]]\n\nserver_log = []\n\ndef safe_predict(model, row):\n    try:\n        return model.predict_proba([row])[0][1]\n    except Exception as error:\n        server_log.append(repr(error))\n        raise HTTPException(500, \"Prediction failed due to an internal server error.\")\n\nfor model in [GoodModel(), BrokenModel()]:\n    try:\n        print(\"OK:\", safe_predict(model, [0.0]))\n    except HTTPException as e:\n        print(\"ERROR:\", e.status_code, e.detail)\n\nprint(server_log)",
+   "output": "OK: 0.7\nERROR: 500 Prediction failed due to an internal server error.\n[\"RuntimeError('secret internal failure')\"]",
+   "note": "The client sees a generic message; only the server log holds the real cause."
+  }
+ ],
+ "checklist": [
+  "I can explain what an automated test is",
+  "I wrote the 4 API tests plus the 500 test",
+  "I run pytest from the project root",
+  "I know 200, 422 and 500",
+  "My /predict raises HTTPException(500) after logging",
+  "I pinned scikit-learn to the training version",
+  "I built and ran the Docker container"
+ ],
+ "quiz": [
+  {
+   "q": "A user sends a payload missing a feature. What status does the API return?",
+   "options": [
+    "200",
+    "422",
+    "500",
+    "404"
+   ],
+   "answer": 1,
+   "why": "Pydantic rejects invalid input with 422 before the model runs."
+  },
+  {
+   "q": "Why must the except block raise HTTPException instead of only logging?",
+   "options": [
+    "Logging is not allowed",
+    "Otherwise the client gets an empty success response",
+    "It speeds up the model",
+    "Docker requires it"
+   ],
+   "answer": 1,
+   "why": "Without raising, the function returns None and the client sees a misleading 200."
+  },
+  {
+   "q": "Why copy requirements.txt and install before copying src/?",
+   "options": [
+    "Docker demands the order",
+    "Code edits will not reinstall all libraries",
+    "It shrinks the model",
+    "It enables port 8000"
+   ],
+   "answer": 1,
+   "why": "Docker caches layers; unchanged dependency layers are reused."
+  },
+  {
+   "q": "Why match scikit-learn versions between training and Docker?",
+   "options": [
+    "For prettier logs",
+    "A joblib model may fail or behave differently on another version",
+    "To change the threshold",
+    "pytest requires it"
+   ],
+   "answer": 1,
+   "why": "Pickled models depend on the library version that created them."
+  }
+ ]
 }
+ 
   ]
 };
