@@ -11444,5 +11444,1579 @@ Average used to fill: 245.0
     }
   ]
 },
+
+// Day 26: Artificial Neural Networks (ANN) (add a comma after the previous day's } then paste)
+{
+ "day": 26,
+ "title": "Artificial Neural Networks (ANN)",
+ "subtitle": "Understand how a neural network learns, then build one for breast cancer prediction",
+ "level": "Intermediate",
+ "duration": "100 min",
+ "tags": [
+  "ANN",
+  "PyTorch",
+  "ReLU",
+  "Sigmoid",
+  "BCE",
+  "Deep Learning"
+ ],
+ "goals": [
+  "Explain layers, weights, biases and logits",
+  "Explain ReLU, sigmoid and why activations matter",
+  "Run the forward, loss, backward, update loop",
+  "Evaluate against a simple baseline and save model + scaler"
+ ],
+ "sections": [
+  {
+   "id": "what",
+   "icon": "🧠",
+   "title": "What is an artificial neural network?",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An ANN is a stack of **layers**. Each layer takes numbers in, mixes them with learned **weights**, adds a **bias**, and passes the result on. Training means nudging those weights and biases until predictions get better. The idea to keep: *a neural network is just a chain of simple, adjustable calculations.*"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Layer",
+      "Job",
+      "In our project"
+     ],
+     "rows": [
+      [
+       "Input",
+       "Receives the features",
+       "30 tumor measurements"
+      ],
+      [
+       "Hidden 1",
+       "Learns patterns",
+       "16 neurons + ReLU"
+      ],
+      [
+       "Hidden 2",
+       "Combines patterns",
+       "8 neurons + ReLU"
+      ],
+      [
+       "Output",
+       "Final score",
+       "1 neuron (a raw logit)"
+      ]
+     ]
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "**PyTorch cannot run in this browser lesson.** The runnable blocks build the same network from scratch with NumPy so you see exactly what PyTorch automates. The real PyTorch script is in the last sections for your own machine."
+    }
+   ]
+  },
+  {
+   "id": "neuron",
+   "icon": "⚙️",
+   "title": "One neuron: weights and bias (runnable)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A neuron computes `z = x1*w1 + x2*w2 + b`: a weighted sum of the inputs plus a bias. Weights say how much each input matters; the bias shifts the result."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "A single neuron",
+     "code": "import numpy as np\n\nx = np.array([15.0, 20.0])    # tumor size, texture\nw = np.array([0.4, -0.1])     # weights (learned during training)\nb = 0.5                       # bias\n\nz = float(x @ w + b)\nprint(\"z =\", z)",
+     "output": "z = 4.5"
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "You never pick weights by hand. Training starts them at small random values and improves them step by step."
+    }
+   ]
+  },
+  {
+   "id": "activation",
+   "icon": "📈",
+   "title": "Activation functions (runnable)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "**ReLU** keeps positives and zeros negatives (hidden layers). **Sigmoid** squeezes any number into 0..1 so it reads as a probability."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "ReLU and sigmoid",
+     "code": "def relu(z):\n    return np.maximum(0, z)\n\ndef sigmoid(z):\n    return 1 / (1 + np.exp(-z))\n\nz = np.array([-3.0, -1.0, 0.0, 2.0, 4.5])\nprint(\"ReLU:   \", relu(z).tolist())\nprint(\"Sigmoid:\", np.round(sigmoid(z), 3).tolist())",
+     "output": "ReLU:    [0.0, 0.0, 0.0, 2.0, 4.5]\nSigmoid: [0.047, 0.269, 0.5, 0.881, 0.989]"
+    },
+    {
+     "type": "p",
+     "text": "Why bother? Without an activation between them, two linear layers collapse into **one** linear layer, so depth would add nothing."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Linear layers collapse; ReLU prevents it",
+     "code": "rng = np.random.RandomState(0)\nW1, W2, x = rng.randn(3, 4), rng.randn(4, 2), rng.randn(5, 3)\n\ntwo_layers = x @ W1 @ W2\none_layer = x @ (W1 @ W2)\nwith_relu = relu(x @ W1) @ W2\n\nprint(\"Two linear layers == one linear layer:\", bool(np.allclose(two_layers, one_layer)))\nprint(\"ReLU in between breaks that:\", not bool(np.allclose(with_relu, one_layer)))",
+     "output": "Two linear layers == one linear layer: True\nReLU in between breaks that: True"
+    }
+   ]
+  },
+  {
+   "id": "arch",
+   "icon": "🏗️",
+   "title": "Architecture: 30 - 16 - 8 - 1",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each layer has `n_in * n_out` weights plus `n_out` biases. Counting them shows how small this network is."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Count trainable parameters",
+     "code": "sizes = [30, 16, 8, 1]\ntotal = 0\nfor n_in, n_out in zip(sizes[:-1], sizes[1:]):\n    n = n_in * n_out + n_out\n    print(f\"{n_in} -> {n_out}: {n_in * n_out} weights + {n_out} biases = {n}\")\n    total += n\nprint(\"Total trainable parameters:\", total)",
+     "output": "30 -> 16: 480 weights + 16 biases = 496\n16 -> 8: 128 weights + 8 biases = 136\n8 -> 1: 8 weights + 1 biases = 9\nTotal trainable parameters: 641"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "The output layer returns a raw score (a **logit**), not a probability. Sigmoid turns it into a probability only when you need one."
+    }
+   ]
+  },
+  {
+   "id": "loss",
+   "icon": "🎯",
+   "title": "Loss: how wrong is the prediction? (runnable)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Binary cross-entropy punishes **confident wrong** answers hardest. PyTorch's `BCEWithLogitsLoss` applies sigmoid and the loss together, which is why the model outputs logits."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "BCE from a logit",
+     "code": "def bce_from_logit(logit, y):\n    return float(np.logaddexp(0, logit) - y * logit)\n\nfor logit, y in [(3.0, 1), (3.0, 0), (-2.0, 0), (0.0, 1)]:\n    print(f\"logit={logit:5.1f}  true={y}  loss={bce_from_logit(logit, y):.3f}\")",
+     "output": "logit=  3.0  true=1  loss=0.049\nlogit=  3.0  true=0  loss=3.049\nlogit= -2.0  true=0  loss=0.127\nlogit=  0.0  true=1  loss=0.693"
+    }
+   ]
+  },
+  {
+   "id": "data",
+   "icon": "🧬",
+   "title": "Prepare the Breast Cancer data (runnable)",
+   "blocks": [
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Load, split, scale",
+     "code": "from sklearn.datasets import load_breast_cancer\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\n\ndataset = load_breast_cancer()\nX, y = dataset.data, dataset.target\nprint(\"Features:\", X.shape[1], \"| rows:\", X.shape[0])\nprint(\"Class names:\", [str(n) for n in dataset.target_names])\nprint(\"Counts:\", {str(n): int((y == i).sum()) for i, n in enumerate(dataset.target_names)})\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\nscaler = StandardScaler()\nX_train = scaler.fit_transform(X_train)\nX_test = scaler.transform(X_test)\nprint(\"Train / test:\", len(X_train), \"/\", len(X_test))\nprint(\"Largest |mean| of scaled train features:\", round(float(np.abs(X_train.mean(axis=0)).max()), 4))",
+     "output": "Features: 30 | rows: 569\nClass names: ['malignant', 'benign']\nCounts: {'malignant': 212, 'benign': 357}\nTrain / test: 455 / 114\nLargest |mean| of scaled train features: 0.0"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "**Label trap:** in scikit-learn's breast cancer data, `0 = malignant` and `1 = benign`. Our model's output is P(benign). Always read names from `dataset.target_names`; never hardcode them."
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "Scale after splitting, fit on training data only, so no test information leaks in. Neural networks train poorly on unscaled features."
+    }
+   ]
+  },
+  {
+   "id": "train",
+   "icon": "🔁",
+   "title": "Train the network (runnable, from scratch)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The loop is the same as in PyTorch: **forward pass, loss, backward pass (gradients), update weights**, repeated over mini-batches of 32 for several epochs. PyTorch does the backward pass for you with `loss.backward()`; here we write it out once so it is not magic."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "A 30-16-8-1 network in NumPy",
+     "code": "def init_params(sizes, seed=42):\n    rng = np.random.RandomState(seed)\n    return [(rng.randn(i, o) * np.sqrt(2 / i), np.zeros(o)) for i, o in zip(sizes[:-1], sizes[1:])]\n\ndef forward(params, X):\n    acts = [X]\n    for i, (W, b) in enumerate(params):\n        z = acts[-1] @ W + b\n        acts.append(relu(z) if i < len(params) - 1 else z)\n    return acts                                   # last item = logits\n\ndef backward(params, acts, y):\n    dz = (sigmoid(acts[-1]) - y) / len(y)         # gradient of BCE w.r.t. logits\n    grads = [None] * len(params)\n    for i in reversed(range(len(params))):\n        W, b = params[i]\n        grads[i] = (acts[i].T @ dz, dz.sum(axis=0))\n        if i > 0:\n            dz = (dz @ W.T) * (acts[i] > 0)       # pass back through ReLU\n    return grads\n\ndef loss_fn(logits, y):\n    return float(np.mean(np.logaddexp(0, logits) - y * logits))\n\nyt = y_train.astype(float).reshape(-1, 1)\nparams = init_params([30, 16, 8, 1])\nrng = np.random.RandomState(42)\nepochs, batch_size, lr = 50, 32, 0.05\n\nfor epoch in range(1, epochs + 1):\n    order = rng.permutation(len(X_train))\n    for start in range(0, len(order), batch_size):\n        idx = order[start:start + batch_size]\n        acts = forward(params, X_train[idx])\n        grads = backward(params, acts, yt[idx])\n        params = [(W - lr * dW, b - lr * db) for (W, b), (dW, db) in zip(params, grads)]\n    if epoch % 10 == 0:\n        print(f\"Epoch {epoch:2d}/{epochs}  loss: {loss_fn(forward(params, X_train)[-1], yt):.4f}\")",
+     "output": "Epoch 10/50  loss: 0.0857\nEpoch 20/50  loss: 0.0581\nEpoch 30/50  loss: 0.0446\nEpoch 40/50  loss: 0.0361\nEpoch 50/50  loss: 0.0291"
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "Decreasing loss means learning is working. If it stays flat or explodes, check scaling and the learning rate first."
+    }
+   ]
+  },
+  {
+   "id": "eval",
+   "icon": "📊",
+   "title": "Evaluate honestly (runnable)",
+   "blocks": [
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "Test accuracy, confusion matrix, sample, baseline",
+     "code": "from sklearn.metrics import accuracy_score, confusion_matrix, classification_report\nfrom sklearn.linear_model import LogisticRegression\n\nprobs = sigmoid(forward(params, X_test)[-1]).ravel()\npreds = (probs >= 0.5).astype(int)\nprint(\"Test accuracy:\", round(accuracy_score(y_test, preds), 4))\nprint(confusion_matrix(y_test, preds))\nprint(classification_report(y_test, preds, target_names=dataset.target_names))\n\nlabel = dataset.target_names[int(probs[0] >= 0.5)]\nprint(f\"Sample: P(benign)={probs[0]:.3f} -> {label} (true: {dataset.target_names[y_test[0]]})\")\n\nbaseline = LogisticRegression(max_iter=1000).fit(X_train, y_train)\nprint(\"Logistic Regression baseline accuracy:\", round(baseline.score(X_test, y_test), 4))",
+     "output": "Test accuracy: 0.9649\n[[41  1]\n [ 3 69]]\n              precision    recall  f1-score   support\n\n   malignant       0.93      0.98      0.95        42\n      benign       0.99      0.96      0.97        72\n\n    accuracy                           0.96       114\n   macro avg       0.96      0.97      0.96       114\nweighted avg       0.97      0.96      0.97       114\n\nSample: P(benign)=0.000 -> malignant (true: malignant)\nLogistic Regression baseline accuracy: 0.9825"
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "Only **114 test rows**: one extra mistake moves accuracy by about 0.9 points. On this small, clean dataset a plain Logistic Regression is often as good as the neural network. Neural networks pay off with large, complex data; always compare against a simple baseline."
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "In medicine a missed malignant tumor (false negative) costs far more than a false alarm. Check **recall for malignant**, not just accuracy. This is a learning project, not a diagnostic tool."
+    }
+   ]
+  },
+  {
+   "id": "torch",
+   "icon": "🔥",
+   "title": "The PyTorch version (src/day26_ann.py)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Same network, same loop; PyTorch gives you `nn.Linear`, `loss.backward()` and `optimizer.step()` instead of hand-written gradients. The original task showed only fragments of this file, so here is a complete version."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "title": "src/day26_ann.py",
+     "code": "import os\n\nimport joblib\nimport numpy as np\nimport torch\nfrom sklearn.datasets import load_breast_cancer\nfrom sklearn.metrics import accuracy_score, classification_report, confusion_matrix\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\ntorch.manual_seed(42)\nnp.random.seed(42)\n\n# 1. Load data (sklearn: 0 = malignant, 1 = benign)\ndataset = load_breast_cancer()\nX, y = dataset.data, dataset.target\nprint(\"Dataset Shape:\", X.shape)\nprint(\"Class Names:\", dataset.target_names)\n\n# 2. Split, then scale (fit the scaler on training data only)\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.20, random_state=42, stratify=y)\nscaler = StandardScaler()\nX_train = scaler.fit_transform(X_train)\nX_test = scaler.transform(X_test)\n\n# 3. Tensors and DataLoader\nX_train_t = torch.tensor(X_train, dtype=torch.float32)\nX_test_t = torch.tensor(X_test, dtype=torch.float32)\ny_train_t = torch.tensor(y_train, dtype=torch.float32).reshape(-1, 1)\ntrain_dataset = TensorDataset(X_train_t, y_train_t)\ntrain_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)\n\n# 4. Model: 30 -> 16 -> 8 -> 1 (raw logit out)\nmodel = nn.Sequential(\n    nn.Linear(30, 16), nn.ReLU(),\n    nn.Linear(16, 8), nn.ReLU(),\n    nn.Linear(8, 1),\n)\ncriterion = nn.BCEWithLogitsLoss()\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\n\n# 5. Training loop\nepochs = 50\nfor epoch in range(epochs):\n    model.train()\n    running_loss = 0.0\n    for xb, yb in train_loader:\n        optimizer.zero_grad()\n        loss = criterion(model(xb), yb)\n        loss.backward()\n        optimizer.step()\n        running_loss += loss.item() * len(xb)\n    if (epoch + 1) % 5 == 0:\n        print(f\"Epoch {epoch + 1:2d}/{epochs}  loss: {running_loss / len(train_dataset):.4f}\")\n\n# 6. Evaluation\nmodel.eval()\nwith torch.no_grad():\n    probabilities = torch.sigmoid(model(X_test_t)).numpy().ravel()\npredictions = (probabilities >= 0.5).astype(int)\nprint(\"Test accuracy:\", round(accuracy_score(y_test, predictions), 4))\nprint(confusion_matrix(y_test, predictions))\nprint(classification_report(y_test, predictions, target_names=dataset.target_names))\n\n# 7. Sample prediction (use target_names, do not hardcode labels)\np = probabilities[0]\nprint(f\"Sample: P(benign)={p:.3f} -> {dataset.target_names[int(p >= 0.5)]} (true: {dataset.target_names[y_test[0]]})\")\n\n# 8. Save weights AND the scaler (both are needed for inference)\nos.makedirs(\"models\", exist_ok=True)\ntorch.save({\"state_dict\": model.state_dict(), \"layer_sizes\": [30, 16, 8, 1]}, \"models/day26_ann.pt\")\njoblib.dump(scaler, \"models/day26_scaler.joblib\")\n\n# 9. Reload check\nreloaded = nn.Sequential(nn.Linear(30, 16), nn.ReLU(), nn.Linear(16, 8), nn.ReLU(), nn.Linear(8, 1))\nreloaded.load_state_dict(torch.load(\"models/day26_ann.pt\")[\"state_dict\"])\nreloaded.eval()\nwith torch.no_grad():\n    same = torch.allclose(torch.sigmoid(reloaded(X_test_t)).flatten(), torch.tensor(probabilities))\nprint(\"Reloaded model matches:\", bool(same))"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "title": "Output from a real run (yours will differ slightly)",
+     "code": "Dataset Shape: (569, 30)\nClass Names: ['malignant' 'benign']\nEpoch  5/50  loss: 0.4191\nEpoch 10/50  loss: 0.1618\nEpoch 15/50  loss: 0.0965\nEpoch 20/50  loss: 0.0713\nEpoch 25/50  loss: 0.0582\nEpoch 30/50  loss: 0.0501\nEpoch 35/50  loss: 0.0448\nEpoch 40/50  loss: 0.0408\nEpoch 45/50  loss: 0.0377\nEpoch 50/50  loss: 0.0350\nTest accuracy: 0.9561\n[[41  1]\n [ 4 68]]\n              precision    recall  f1-score   support\n\n   malignant       0.91      0.98      0.94        42\n      benign       0.99      0.94      0.96        72\n\n    accuracy                           0.96       114\n   macro avg       0.95      0.96      0.95       114\nweighted avg       0.96      0.96      0.96       114\n\nSample: P(benign)=0.000 -> malignant (true: malignant)\nReloaded model matches: True"
+    },
+    {
+     "type": "table",
+     "head": [
+      "PyTorch",
+      "What it does",
+      "NumPy equivalent above"
+     ],
+     "rows": [
+      [
+       "`nn.Linear(30, 16)`",
+       "Weights + bias layer",
+       "`X @ W + b`"
+      ],
+      [
+       "`nn.ReLU()`",
+       "Nonlinearity",
+       "`relu(z)`"
+      ],
+      [
+       "`BCEWithLogitsLoss`",
+       "Sigmoid + BCE",
+       "`loss_fn`"
+      ],
+      [
+       "`loss.backward()`",
+       "Gradients",
+       "`backward()`"
+      ],
+      [
+       "`optimizer.step()` (Adam)",
+       "Update weights",
+       "`W - lr * dW` (plain SGD)"
+      ],
+      [
+       "`torch.sigmoid`",
+       "Logit to probability",
+       "`sigmoid`"
+      ]
+     ]
+    },
+    {
+     "type": "callout",
+     "tone": "tip",
+     "text": "`torch.no_grad()` skips gradient tracking during prediction. `model.eval()` matters once you add layers like Dropout; this network has none, but it is a good habit."
+    },
+    {
+     "type": "callout",
+     "tone": "warn",
+     "text": "Run `python src/day26_ann.py` from the project root. Install with `python -m pip install torch scikit-learn numpy joblib`. Set `torch.manual_seed` for repeatable runs; exact numbers still vary across PyTorch versions and hardware."
+    }
+   ]
+  },
+  {
+   "id": "save",
+   "icon": "💾",
+   "title": "Saving the model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Save the **weights (`state_dict`)** and the **scaler**. A neural network without its scaler gives wrong predictions on new data, because inputs must be scaled exactly as in training."
+    },
+    {
+     "type": "table",
+     "head": [
+      "File",
+      "Contains"
+     ],
+     "rows": [
+      [
+       "`models/day26_ann.pt`",
+       "`state_dict` + layer sizes"
+      ],
+      [
+       "`models/day26_scaler.joblib`",
+       "The fitted StandardScaler"
+      ]
+     ]
+    },
+    {
+     "type": "callout",
+     "tone": "info",
+     "text": "Saving only the state_dict (not the whole model object) is the recommended PyTorch habit: to reload, rebuild the same architecture and call `load_state_dict`. Keep this ANN separate from your fraud API, as the task says."
+    }
+   ]
+  }
+ ],
+ "finalProgram": {
+  "title": "ANN from scratch + baseline + save/load",
+  "file": "ann_project.py",
+  "description": "A reusable 30-16-8-1 network class trained on Breast Cancer, compared with Logistic Regression, saved with its scaler and reloaded.",
+  "concepts": [
+   "forward and backward pass",
+   "mini-batch training",
+   "baseline comparison",
+   "save weights + scaler"
+  ],
+  "code": "import io\nimport joblib\nimport numpy as np\nfrom sklearn.datasets import load_breast_cancer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\n\nclass NumpyANN:\n    def __init__(self, sizes=(30, 16, 8, 1), lr=0.05, epochs=50, batch_size=32, seed=42):\n        self.sizes, self.lr, self.epochs, self.batch_size, self.seed = sizes, lr, epochs, batch_size, seed\n        rng = np.random.RandomState(seed)\n        self.params = [(rng.randn(i, o) * np.sqrt(2 / i), np.zeros(o)) for i, o in zip(sizes[:-1], sizes[1:])]\n\n    def _forward(self, X):\n        acts = [X]\n        for i, (W, b) in enumerate(self.params):\n            z = acts[-1] @ W + b\n            acts.append(np.maximum(0, z) if i < len(self.params) - 1 else z)\n        return acts\n\n    def fit(self, X, y):\n        y = y.astype(float).reshape(-1, 1)\n        rng = np.random.RandomState(self.seed)\n        for epoch in range(self.epochs):\n            order = rng.permutation(len(X))\n            for s in range(0, len(X), self.batch_size):\n                idx = order[s:s + self.batch_size]\n                acts = self._forward(X[idx])\n                dz = (1 / (1 + np.exp(-acts[-1])) - y[idx]) / len(idx)\n                new = list(self.params)\n                for i in reversed(range(len(self.params))):\n                    W, b = self.params[i]\n                    new[i] = (W - self.lr * (acts[i].T @ dz), b - self.lr * dz.sum(axis=0))\n                    if i > 0:\n                        dz = (dz @ W.T) * (acts[i] > 0)\n                self.params = new\n        return self\n\n    def predict_proba(self, X):\n        return (1 / (1 + np.exp(-self._forward(X)[-1]))).ravel()\n\ndata = load_breast_cancer()\nX_train, X_test, y_train, y_test = train_test_split(data.data, data.target, test_size=0.20, random_state=42, stratify=data.target)\nscaler = StandardScaler().fit(X_train)\nX_train_s, X_test_s = scaler.transform(X_train), scaler.transform(X_test)\n\nann = NumpyANN().fit(X_train_s, y_train)\nann_acc = float(((ann.predict_proba(X_test_s) >= 0.5).astype(int) == y_test).mean())\nlr_acc = LogisticRegression(max_iter=1000).fit(X_train_s, y_train).score(X_test_s, y_test)\nprint(\"ANN test accuracy:\", round(ann_acc, 4))\nprint(\"Logistic Regression accuracy:\", round(lr_acc, 4))\n\n# Save the learned weights + scaler (plain data), rebuild the network on load\nbuf = io.BytesIO()\njoblib.dump({\"params\": ann.params, \"scaler\": scaler, \"class_names\": list(data.target_names)}, buf)\nbuf.seek(0)\nsaved = joblib.load(buf)\nreloaded = NumpyANN()\nreloaded.params = saved[\"params\"]\nprob = float(reloaded.predict_proba(saved[\"scaler\"].transform(X_test[:1]))[0])\nprint(\"Reloaded model sample:\", saved[\"class_names\"][int(prob >= 0.5)], \"| true:\", saved[\"class_names\"][y_test[0]])",
+  "output": "ANN test accuracy: 0.9649\nLogistic Regression accuracy: 0.9825\nReloaded model sample: malignant | true: malignant"
+ },
+ "practice": [
+  {
+   "title": "Neuron by Hand",
+   "level": "Easy",
+   "file": "practice1_neuron.py",
+   "description": "Compute a neuron's z, ReLU and sigmoid for three tumors.",
+   "tasks": [
+    "Weighted sum plus bias",
+    "ReLU",
+    "Sigmoid",
+    "Decision at 0.5"
+   ],
+   "hint": "X @ w + b gives one z per row; np.maximum(0, z) is ReLU.",
+   "starter": "import numpy as np\n\nX = np.array([[15.0, 20.0], [5.0, 8.0], [12.0, 30.0]])   # 3 tumors: size, texture\nw = np.array([0.4, -0.3])\nb = 0.5\n\n# TODO 1: z = weighted sum + bias for every row (one number per tumor)\n\n# TODO 2: apply ReLU to z\n\n# TODO 3: apply sigmoid to z and round to 3 decimals\n\n# TODO 4: print z, relu and probabilities as lists, then the decision (1 if probability >= 0.5 else 0)",
+   "solution": "import numpy as np\n\nX = np.array([[15.0, 20.0], [5.0, 8.0], [12.0, 30.0]])\nw = np.array([0.4, -0.3])\nb = 0.5\n\nz = X @ w + b\nrelu_z = np.maximum(0, z)\nprob = np.round(1 / (1 + np.exp(-z)), 3)\n\nprint(\"z:\", np.round(z, 2).tolist())\nprint(\"relu:\", np.round(relu_z, 2).tolist())\nprint(\"probability:\", prob.tolist())\nprint(\"decision:\", (prob >= 0.5).astype(int).tolist())",
+   "output": "z: [0.5, 0.1, -3.7]\nrelu: [0.5, 0.1, 0.0]\nprobability: [0.622, 0.525, 0.024]\ndecision: [1, 1, 0]"
+  },
+  {
+   "title": "Train One Neuron",
+   "level": "Medium",
+   "file": "practice2_one_neuron.py",
+   "description": "Train a single sigmoid neuron with gradient descent and watch the loss fall.",
+   "tasks": [
+    "Forward pass",
+    "Gradient (sigmoid(logit) - y) / n",
+    "Update w and b",
+    "Print loss and accuracy"
+   ],
+   "hint": "w -= lr * X.T @ dz ; b -= lr * dz.sum(). Loss should fall each time you print.",
+   "starter": "import numpy as np\n\nrng = np.random.RandomState(26)\nX = rng.randn(300, 2)\ny = ((X[:, 0] + X[:, 1] + 0.3 * rng.randn(300)) > 0).astype(float).reshape(-1, 1)\n\nw = np.zeros((2, 1))\nb = 0.0\nlr = 0.5\n\ndef sigmoid(z):\n    return 1 / (1 + np.exp(-z))\n\ndef loss_fn(logit, y):\n    return float(np.mean(np.logaddexp(0, logit) - y * logit))\n\nfor epoch in range(1, 101):\n    # TODO 1: logit = X @ w + b\n    # TODO 2: gradient of the loss w.r.t. the logit is (sigmoid(logit) - y) / len(y)\n    # TODO 3: update w with X.T @ gradient and b with the gradient's sum\n    if epoch in (1, 50, 100):\n        pass  # TODO 4: print the epoch and the loss (4 decimals)\n\n# TODO 5: print the final accuracy (decision: logit >= 0)",
+   "solution": "import numpy as np\n\nrng = np.random.RandomState(26)\nX = rng.randn(300, 2)\ny = ((X[:, 0] + X[:, 1] + 0.3 * rng.randn(300)) > 0).astype(float).reshape(-1, 1)\n\nw = np.zeros((2, 1))\nb = 0.0\nlr = 0.5\n\ndef sigmoid(z):\n    return 1 / (1 + np.exp(-z))\n\ndef loss_fn(logit, y):\n    return float(np.mean(np.logaddexp(0, logit) - y * logit))\n\nfor epoch in range(1, 101):\n    logit = X @ w + b\n    dz = (sigmoid(logit) - y) / len(y)\n    w = w - lr * (X.T @ dz)\n    b = b - lr * float(dz.sum())\n    if epoch in (1, 50, 100):\n        print(f\"Epoch {epoch:3d}  loss: {loss_fn(logit, y):.4f}\")\n\naccuracy = float((((X @ w + b) >= 0).astype(float) == y).mean())\nprint(\"Final accuracy:\", round(accuracy, 4))",
+   "output": "Epoch   1  loss: 0.6931\nEpoch  50  loss: 0.2300\nEpoch 100  loss: 0.1925\nFinal accuracy: 0.9333",
+   "note": "This is a network with no hidden layers. Hidden layers + ReLU let it learn curved boundaries."
+  }
+ ],
+ "checklist": [
+  "I can describe input, hidden and output layers",
+  "I can compute a neuron's z by hand",
+  "I know why ReLU is needed",
+  "I know the model outputs logits and sigmoid gives probability",
+  "I scale after splitting (fit on train only)",
+  "I know 0 = malignant, 1 = benign in this dataset",
+  "I compared the ANN with a Logistic Regression baseline"
+ ],
+ "quiz": [
+  {
+   "q": "Why do hidden layers need an activation function like ReLU?",
+   "options": [
+    "To speed up the CPU",
+    "Without it, stacked linear layers collapse into one linear layer",
+    "To scale the data",
+    "To save the model"
+   ],
+   "answer": 1,
+   "why": "Nonlinearity is what lets depth learn complex patterns."
+  },
+  {
+   "q": "What does the model return before sigmoid is applied?",
+   "options": [
+    "A probability",
+    "A class name",
+    "A raw logit",
+    "The accuracy"
+   ],
+   "answer": 2,
+   "why": "BCEWithLogitsLoss expects logits and applies sigmoid internally."
+  },
+  {
+   "q": "In scikit-learn's breast cancer data, which label means malignant?",
+   "options": [
+    "1",
+    "0",
+    "2",
+    "-1"
+   ],
+   "answer": 1,
+   "why": "0 = malignant, 1 = benign. Read target_names instead of guessing."
+  },
+  {
+   "q": "Why save the scaler along with the network weights?",
+   "options": [
+    "It makes the file smaller",
+    "New data must be scaled exactly as in training",
+    "PyTorch requires it",
+    "It raises accuracy"
+   ],
+   "answer": 1,
+   "why": "Without the scaler, new inputs are on the wrong scale and predictions break."
+  },
+  {
+ "q": "Why use a non-linear activation function like ReLU between hidden layers in an ANN?",
+ "options": [
+  "It prevents overfitting automatically",
+  "It allows stacking layers to model non-linear patterns",
+  "It replaces gradient descent during training",
+  "It guarantees zero training loss"
+ ],
+ "answer": 1,
+ "why": "Without non-linear activations, stacked linear layers collapse into a single linear transformation."
+}
+ ]
+},
+
+{
+  "day": 27,
+  "title": "NLP & Hugging Face Transformers",
+  "subtitle": "Understand tokenization, self-attention and pretrained Transformers, then build an interactive sentiment analyzer.",
+  "level": "Intermediate",
+  "duration": "90-120 min",
+  "tags": [
+    "NLP",
+    "Transformers",
+    "Hugging Face",
+    "Tokenization",
+    "Sentiment Analysis",
+    "DistilBERT"
+  ],
+  "goals": [
+    "Understand core NLP tasks, tokenization and Transformer self-attention",
+    "Use Hugging Face pretrained models and pipelines without training from scratch",
+    "Build and test an interactive English sentiment analysis script"
+  ],
+  "sections": [
+    {
+      "id": "what-is-nlp",
+      "icon": "💬",
+      "title": "Step 1: What is NLP?",
+      "meta": "Processing human language",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Natural Language Processing (NLP) is a field of AI that enables computers to understand, interpret and process human language."
+        },
+        {
+          "type": "list",
+          "items": [
+            "AI assistants and conversational chat",
+            "Text summarization and question answering",
+            "Sentiment analysis (positive vs. negative tone)",
+            "Language translation, spam detection and text classification"
+          ]
+        },
+        {
+          "type": "table",
+          "head": [
+            "Example input",
+            "Expected sentiment"
+          ],
+          "rows": [
+            [
+              "\"I absolutely love this product!\"",
+              "POSITIVE"
+            ],
+            [
+              "\"This product is terrible.\"",
+              "NEGATIVE"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tokenization",
+      "icon": "✂️",
+      "title": "Step 2: Tokenization & Model Inputs",
+      "meta": "Turning text into numbers",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Models do not read raw sentences directly. A tokenizer splits text into smaller units (tokens) and maps them to numerical token IDs."
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Tokenization flow (illustrative IDs)",
+          "code": "Original text : \"I love Machine Learning\"\nTokens        : [\"I\", \"love\", \"Machine\", \"Learning\"]\nToken IDs     : [101, ..., ..., ...]   # illustrative IDs, not exact tokenizer output"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Term",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "Token",
+              "A piece of text (word, subword or symbol) processed by the model"
+            ],
+            [
+              "Tokenizer",
+              "Converts raw text into tokens, token IDs and model inputs"
+            ],
+            [
+              "Token ID",
+              "Numerical ID representing a token in the model's vocabulary"
+            ],
+            [
+              "Attention mask",
+              "Indicates which tokens are real input versus padding"
+            ],
+            [
+              "Embedding",
+              "Numerical vector representing a token's meaning/features"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transformers",
+      "icon": "🧠",
+      "title": "Step 3: Transformers & Self-Attention",
+      "meta": "Context across sequences",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Transformer models use self-attention to weigh relationships between tokens across a sequence, helping capture context even across longer sentences."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Context example: In \"The animal didn't cross the road because it was tired\", self-attention helps connect \"it\" to the surrounding context rather than treating words in isolation."
+        },
+        {
+          "type": "p",
+          "text": "Instead of building a Transformer from scratch today, you will load an already-trained model."
+        }
+      ]
+    },
+    {
+      "id": "hugging-face",
+      "icon": "🤗",
+      "title": "Step 4: Hugging Face & Pretrained Models",
+      "meta": "Model Hub + transformers library",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Hugging Face provides tools, datasets and pretrained models via the transformers library so you can solve NLP tasks quickly."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Popular pretrained architectures: BERT, DistilBERT, RoBERTa, GPT and T5",
+            "Today's model: distilbert/distilbert-base-uncased-finetuned-sst-2-english for English positive/negative sentiment"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "The first run downloads the model weights (requiring internet), and Hugging Face caches them locally for faster subsequent runs."
+        }
+      ]
+    },
+    {
+      "id": "setup-project",
+      "icon": "🛠️",
+      "title": "Step 5: Install Dependencies & Project Structure",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Install transformers and torch in your terminal:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Terminal",
+          "code": "python -m pip install transformers torch"
+        },
+        {
+          "type": "p",
+          "text": "Add transformers and torch to requirements.txt (keeping your existing dependencies) and create src/day27_sentiment.py:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Project layout",
+          "code": "Fraud_Detection_Project/\n├── src/\n│   ├── day25_pytorch.py\n│   ├── day25_training.py\n│   ├── day26_ann.py\n│   └── day27_sentiment.py       <- NEW\n├── models/\n├── reports/\n└── requirements.txt"
+        }
+      ]
+    },
+    {
+      "id": "build-analyzer",
+      "icon": "⚡",
+      "title": "Step 6: Build & Run the Sentiment Analyzer",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Load the tokenizer and sentiment-analysis pipeline, tokenize user input with truncation up to 512 tokens, and print the sentiment label and percentage confidence:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/day27_sentiment.py",
+          "code": "from transformers import AutoTokenizer, pipeline\n\nMODEL_NAME = \"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"\n\nprint(\"Loading pretrained NLP model...\")\ntokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)\nsentiment_analyzer = pipeline(\"sentiment-analysis\", model=MODEL_NAME)\nprint(\"Model loaded successfully!\")\n\nprint(\"\\n================================\")\nprint(\"AI SENTIMENT ANALYZER\")\nprint(\"================================\")\n\nwhile True:\n    text = input(\"\\nEnter a sentence (or type exit): \").strip()\n    if text.lower() == \"exit\":\n        print(\"Application closed.\")\n        break\n    if not text:\n        print(\"Please enter some text.\")\n        continue\n\n    tokens = tokenizer(text, truncation=True, max_length=512)\n    print(\"\\nToken IDs:\")\n    print(tokens[\"input_ids\"])\n\n    result = sentiment_analyzer(text)\n    label = result[0][\"label\"]\n    score = result[0][\"score\"]\n\n    print(\"\\nPrediction Results\")\n    print(\"------------------\")\n    print(\"Sentiment:\", label)\n    print(\"Confidence:\", round(score * 100, 2), \"%\")"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Run from project root",
+          "code": "python src/day27_sentiment.py",
+          "output": "AI SENTIMENT ANALYZER\n\nEnter a sentence (or type exit): I absolutely love learning Artificial Intelligence!\n\nToken IDs:\n[101, 1045, 7078, 2293, 4083, 7336, 4454, 999, 102]\n\nPrediction Results\n------------------\nSentiment: POSITIVE\nConfidence: 99.96 %"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Sample input",
+            "Expected sentiment"
+          ],
+          "rows": [
+            [
+              "\"I absolutely love learning Artificial Intelligence!\"",
+              "POSITIVE"
+            ],
+            [
+              "\"This application is terrible and completely useless.\"",
+              "NEGATIVE"
+            ],
+            [
+              "\"The product is amazing and works perfectly.\"",
+              "POSITIVE"
+            ],
+            [
+              "\"I am disappointed with the quality.\"",
+              "NEGATIVE"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "behind-the-scenes",
+      "icon": "🔍",
+      "title": "Step 7: Behind the Scenes & Confidence Limits",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "When you pass a sentence in, the tokenizer produces token IDs and an attention mask, DistilBERT computes contextual representations, and the classification head returns a label and score (such as {\"label\": \"POSITIVE\", \"score\": 0.998})."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "A high confidence score reflects the model's output probability—not an objective guarantee of truth. This checkpoint is trained for binary English sentiment (POSITIVE or NEGATIVE), so neutral statements, sarcasm, or non-English text may behave unpredictably."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Covered Today",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "NLP tasks, tokenization, token IDs, attention masks and embeddings",
+            "Transformer self-attention and using Hugging Face pretrained models",
+            "Building and running an interactive sentiment analysis CLI tool"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Interactive AI Sentiment Analyzer",
+    "file": "src/day27_sentiment.py",
+    "description": "Runnable sentiment analysis application using distilbert/distilbert-base-uncased-finetuned-sst-2-english to inspect token IDs and classify user sentences.",
+    "concepts": [
+      "AutoTokenizer",
+      "pipeline('sentiment-analysis')",
+      "truncation & max_length",
+      "input_ids",
+      "label & confidence score"
+    ],
+    "code": "from transformers import AutoTokenizer, pipeline\n\nMODEL_NAME = \"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"\n\nprint(\"Loading pretrained NLP model...\")\ntokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)\nsentiment_analyzer = pipeline(\"sentiment-analysis\", model=MODEL_NAME)\nprint(\"Model loaded successfully!\")\n\nprint(\"\\n================================\")\nprint(\"AI SENTIMENT ANALYZER\")\nprint(\"================================\")\n\nwhile True:\n    text = input(\"\\nEnter a sentence (or type exit): \").strip()\n    if text.lower() == \"exit\":\n        print(\"Application closed.\")\n        break\n    if not text:\n        print(\"Please enter some text.\")\n        continue\n\n    tokens = tokenizer(text, truncation=True, max_length=512)\n    print(\"\\nToken IDs:\")\n    print(tokens[\"input_ids\"])\n\n    result = sentiment_analyzer(text)\n    label = result[0][\"label\"]\n    score = result[0][\"score\"]\n\n    print(\"\\nPrediction Results\")\n    print(\"------------------\")\n    print(\"Sentiment:\", label)\n    print(\"Confidence:\", round(score * 100, 2), \"%\")\n\nprint(\"Analysis completed!\")",
+    "output": "Loading pretrained NLP model...\nModel loaded successfully!\n\n================================\nAI SENTIMENT ANALYZER\n================================\n\nEnter a sentence (or type exit): The product is amazing and works perfectly.\n\nToken IDs:\n[101, 1996, 4031, 2003, 6429, 1998, 2573, 6647, 1012, 102]\n\nPrediction Results\n------------------\nSentiment: POSITIVE\nConfidence: 99.99 %\n\nAnalysis completed!"
+  },
+  "practice": [
+    {
+      "title": "Batch Review Classifier",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Run sentiment analysis on a fixed list of product reviews and print each review's label and rounded percentage score.",
+      "tasks": [
+        "Load the sentiment-analysis pipeline with distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+        "Pass a list of 4 sample reviews (2 positive, 2 negative)",
+        "Print each review with its predicted label and confidence percentage"
+      ],
+      "hint": "Passing a list of strings to sentiment_analyzer(reviews) returns a list of dicts in the same order.",
+      "starter": "from transformers import pipeline\n\nMODEL_NAME = \"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"\nreviews = [\n    \"I absolutely love learning Artificial Intelligence!\",\n    \"This application is terrible and completely useless.\",\n    \"The product is amazing and works perfectly.\",\n    \"I am disappointed with the quality.\"\n]\n\n# TODO: load pipeline and print sentiment + confidence % for each review",
+      "solution": "from transformers import pipeline\n\nMODEL_NAME = \"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"\nreviews = [\n    \"I absolutely love learning Artificial Intelligence!\",\n    \"This application is terrible and completely useless.\",\n    \"The product is amazing and works perfectly.\",\n    \"I am disappointed with the quality.\"\n]\n\nsentiment_analyzer = pipeline(\"sentiment-analysis\", model=MODEL_NAME)\nresults = sentiment_analyzer(reviews)\n\nfor review, res in zip(reviews, results):\n    conf = round(res[\"score\"] * 100, 2)\n    print(f\"{review} -> {res['label']} ({conf}%)\")",
+      "output": "I absolutely love learning Artificial Intelligence! -> POSITIVE (99.96%)\nThis application is terrible and completely useless. -> NEGATIVE (99.98%)\nThe product is amazing and works perfectly. -> POSITIVE (99.99%)\nI am disappointed with the quality. -> NEGATIVE (99.97%)"
+    },
+    {
+      "title": "Token & Attention Mask Inspector",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Inspect token count, token IDs and attention mask values for two sentences of different lengths.",
+      "tasks": [
+        "Load AutoTokenizer for distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+        "Tokenize two sentences with padding=True and truncation=True",
+        "Print the input_ids and attention_mask for both sentences"
+      ],
+      "hint": "Call tokenizer([s1, s2], padding=True, truncation=True) and inspect encoded[\"input_ids\"] and encoded[\"attention_mask\"].",
+      "starter": "from transformers import AutoTokenizer\n\nMODEL_NAME = \"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"\nsentences = [\"Great!\", \"This model makes text classification much faster.\"]\n\n# TODO: tokenize with padding=True, truncation=True and print input_ids + attention_mask",
+      "solution": "from transformers import AutoTokenizer\n\nMODEL_NAME = \"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"\nsentences = [\"Great!\", \"This model makes text classification much faster.\"]\n\ntokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)\nencoded = tokenizer(sentences, padding=True, truncation=True)\n\nfor s, ids, mask in zip(sentences, encoded[\"input_ids\"], encoded[\"attention_mask\"]):\n    print(\"Text          :\", s)\n    print(\"Token IDs     :\", ids)\n    print(\"Attention mask:\", mask)\n    print()",
+      "output": "Text          : Great!\nToken IDs     : [101, 2307, 999, 102, 0, 0, 0, 0, 0, 0]\nAttention mask: [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]\n\nText          : This model makes text classification much faster.\nToken IDs     : [101, 2023, 2944, 3084, 2023, 5579, 2172, 5514, 1012, 102]\nAttention mask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]"
+    }
+  ],
+  "checklist": [
+    "Understood NLP tasks and tokenization",
+    "Learned what token IDs, attention masks and embeddings represent",
+    "Understood Transformer self-attention and Hugging Face pretrained models",
+    "Installed transformers and torch and updated requirements.txt",
+    "Built and tested src/day27_sentiment.py"
+  ],
+  "quiz": [
+    {
+      "q": "What is the role of an attention mask in NLP models?",
+      "options": [
+        "It translates text into another language",
+        "It shows which tokens are real input versus padding",
+        "It deletes punctuation automatically",
+        "It sets the learning rate"
+      ],
+      "answer": 1,
+      "why": "Attention masks tell the model which positions contain real tokens (1) and which are padding (0)."
+    },
+    {
+      "q": "Which mechanism helps Transformers capture relationships between words across a sequence?",
+      "options": [
+        "Self-attention",
+        "CSV sorting",
+        "K-means clustering",
+        "Label encoding"
+      ],
+      "answer": 0,
+      "why": "Self-attention lets tokens attend to other relevant tokens in the sequence for context."
+    },
+    {
+      "q": "What does a confidence score of 0.998 for POSITIVE mean in sentiment analysis?",
+      "options": [
+        "The sentence is 99.8% grammatically correct",
+        "The model assigned ~99.8% classification score to POSITIVE",
+        "The model has 99.8 million parameters",
+        "The sentence contains 998 words"
+      ],
+      "answer": 1,
+      "why": "It is the model's predicted score for the POSITIVE class, not an absolute guarantee of truth."
+    },
+    {
+      "q": "Why do we set truncation=True and max_length=512 when tokenizing for this model?",
+      "options": [
+        "To cap sequence length within the model's 512-token limit",
+        "To convert floats to integers",
+        "To disable GPU usage",
+        "To save output to a CSV file"
+      ],
+      "answer": 0,
+      "why": "Truncating at max_length=512 prevents oversized inputs from exceeding the model's maximum sequence length."
+    }
   ]
+},
+
+{
+  "day": 28,
+  "title": "Embeddings, Vector Databases & RAG",
+  "subtitle": "Turn text into semantic vectors, index knowledge in ChromaDB and build a local RAG question-answering assistant.",
+  "level": "Intermediate",
+  "duration": "90-120 min",
+  "tags": [
+    "Embeddings",
+    "Vector Database",
+    "ChromaDB",
+    "RAG",
+    "Sentence Transformers",
+    "FLAN-T5"
+  ],
+  "goals": [
+    "Understand how embeddings capture semantic meaning and how semantic search differs from keyword search",
+    "Index document chunks into a persistent ChromaDB vector store using Sentence Transformers",
+    "Build a local RAG CLI assistant that retrieves relevant context and generates answers with FLAN-T5"
+  ],
+  "sections": [
+    {
+      "id": "what-are-embeddings",
+      "icon": "📐",
+      "title": "Step 1: What Are Embeddings?",
+      "meta": "Semantic meaning as vectors",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An embedding converts text into a numerical vector that captures semantic meaning so related ideas sit closer together than unrelated ones."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Keyword search matches exact words or substrings",
+            "Semantic search finds passages with similar meaning even when phrasing differs (for example, \"I love machine learning.\" and \"Artificial intelligence is fascinating.\")"
+          ]
+        },
+        {
+          "type": "image",
+          "src": "images/day28/vector-space.png",
+          "alt": "Diagram showing input words mapped through an embedding model into vector space where related concepts group together",
+          "caption": "Input text mapped by an embedding model into vector space where related concepts cluster together."
+        }
+      ]
+    },
+    {
+      "id": "vector-databases",
+      "icon": "🗄️",
+      "title": "Step 2: Vector Databases & ChromaDB",
+      "meta": "Storing and querying vectors",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A vector database stores embeddings and retrieves the closest matching vectors for a query embedding."
+        },
+        {
+          "type": "list",
+          "items": [
+            "1. Collect source documents",
+            "2. Split documents into smaller chunks",
+            "3. Convert chunks into embeddings",
+            "4. Store embeddings and chunks in ChromaDB",
+            "5. Convert the user's question into an embedding",
+            "6. Retrieve the most relevant chunks via similarity search"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "what-is-rag",
+      "icon": "🔗",
+      "title": "Step 3: What Is RAG?",
+      "meta": "Retrieval-Augmented Generation",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Retrieval-Augmented Generation (RAG) first retrieves relevant passages from your knowledge base and passes them as context to a language model so answers are grounded in your documents."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Indexing stage: chunk documents, generate embeddings and store them in the vector database",
+            "Retrieval & generation stage: embed the question, fetch top matching chunks and generate an answer from that context"
+          ]
+        },
+        {
+          "type": "image",
+          "src": "images/day28/rag-architecture.jpg",
+          "alt": "RAG architecture diagram showing knowledge base indexing, query embedding, similarity search, prompt context, and LLM answer generation",
+          "caption": "End-to-end RAG flow connecting document indexing, vector similarity search, and grounded answer generation."
+        },
+    
+      ]
+    },
+    {
+      "id": "project-setup",
+      "icon": "📁",
+      "title": "Step 4: Dependencies, Folder Layout & Knowledge Base",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Install the required packages locally (no OpenAI API key needed; first run downloads model weights):"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Terminal",
+          "code": "python -m pip install sentence-transformers chromadb transformers torch sentencepiece"
+        },
+        {
+          "type": "p",
+          "text": "Create a dedicated project folder with data/knowledge.txt, chroma_db/, src/index_documents.py, src/ask_question.py and requirements.txt:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Project layout",
+          "code": "My_AI_Projects/\n└── Day28_RAG_Assistant/\n    ├── data/\n    │   └── knowledge.txt\n    ├── chroma_db/\n    ├── src/\n    │   ├── index_documents.py\n    │   └── ask_question.py\n    └── requirements.txt"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "data/knowledge.txt",
+          "code": "MACHINE LEARNING\n\nMachine learning is a branch of artificial intelligence.\nIt enables computers to learn patterns from data.\nCommon machine learning algorithms include linear regression,\ndecision trees, random forests, and logistic regression.\n\nDEEP LEARNING\n\nDeep learning is a subset of machine learning.\nIt uses artificial neural networks with multiple layers.\nPyTorch and TensorFlow are popular deep learning frameworks.\n\nNATURAL LANGUAGE PROCESSING\n\nNatural Language Processing enables computers to process\nand understand human language.\nCommon applications include sentiment analysis,\ntext classification, translation, and chatbots.\n\nRETRIEVAL AUGMENTED GENERATION\n\nRAG stands for Retrieval-Augmented Generation.\nIt combines information retrieval with language generation.\nA RAG application retrieves relevant information from\nexternal documents and provides it as context to a language model.\n\nEMBEDDINGS\n\nEmbeddings represent text, images, or other information\nas numerical vectors.\nSimilar meanings are generally represented by vectors\nthat are close together in the embedding space.\n\nVECTOR DATABASES\n\nVector databases store and retrieve vector embeddings.\nThey are useful for semantic search and AI applications.\nChromaDB is an example of a vector database."
+        }
+      ]
+    },
+    {
+      "id": "indexing-script",
+      "icon": "⚙️",
+      "title": "Step 5: Index Documents into ChromaDB",
+      "blocks": [
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Not compatible with the in-browser runner: The browser sandbox does not include chromadb, sentence-transformers, or access to your local data/knowledge.txt and chroma_db/ folders. Run this script in your VS Code terminal inside Day28_RAG_Assistant instead."
+        },
+        {
+          "type": "p",
+          "text": "Split data/knowledge.txt into topic chunks, encode each chunk with all-MiniLM-L6-v2 and persist the collection to chroma_db/:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/index_documents.py",
+          "code": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\n\nPROJECT_ROOT = Path(__file__).resolve().parent.parent\nDOCUMENT_PATH = PROJECT_ROOT / \"data\" / \"knowledge.txt\"\nDATABASE_PATH = PROJECT_ROOT / \"chroma_db\"\nEMBED_MODEL = \"sentence-transformers/all-MiniLM-L6-v2\"\nCOLLECTION_NAME = \"knowledge_base\"\n\nprint(\"Loading embedding model...\")\nembedding_model = SentenceTransformer(EMBED_MODEL)\n\nraw_text = DOCUMENT_PATH.read_text(encoding=\"utf-8\")\nchunks = [block.strip() for block in raw_text.split(\"\\n\\n\") if block.strip()]\n\nprint(f\"Total document chunks: {len(chunks)}\")\nprint(\"Generating embeddings...\")\nvectors = embedding_model.encode(chunks).tolist()\n\nclient = chromadb.PersistentClient(path=str(DATABASE_PATH))\nexisting = [c.name for c in client.list_collections()]\nif COLLECTION_NAME in existing:\n    client.delete_collection(COLLECTION_NAME)\n\ncollection = client.create_collection(name=COLLECTION_NAME)\nids = [f\"chunk_{i}\" for i in range(len(chunks))]\ncollection.add(ids=ids, documents=chunks, embeddings=vectors)\n\nprint(\"\\nIndexing completed successfully!\")\nprint(f\"Stored chunks: {collection.count()}\")"
+        },
+        {
+          "type": "list",
+          "items": [
+            "1. Open Day28_RAG_Assistant in VS Code and open the integrated terminal.",
+            "2. Ensure sentence-transformers, chromadb, transformers, torch, and sentencepiece are installed in your active Python environment.",
+            "3. Save the code above as src/index_documents.py and verify data/knowledge.txt exists.",
+            "4. Run 'python src/index_documents.py' from the project root and compare output with the expected output below."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Run indexing",
+          "code": "python src/index_documents.py",
+          "output": "Loading embedding model...\nTotal document chunks: 6\nGenerating embeddings...\n\nIndexing completed successfully!\nStored chunks: 6"
+        }
+      ]
+    },
+    {
+      "id": "qa-assistant",
+      "icon": "🤖",
+      "title": "Step 6: Build & Run the RAG Question Assistant",
+      "blocks": [
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Not compatible with the in-browser runner: This script requires chromadb, sentence-transformers, transformers, torch, sentencepiece, and the persisted chroma_db/ directory. Run it locally in VS Code after running src/index_documents.py."
+        },
+        {
+          "type": "p",
+          "text": "Query ChromaDB with the question embedding and pass the top retrieved chunks into FLAN-T5 to answer from context:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/ask_question.py",
+          "code": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\nfrom transformers import pipeline\n\nPROJECT_ROOT = Path(__file__).resolve().parent.parent\nDATABASE_PATH = PROJECT_ROOT / \"chroma_db\"\nEMBED_MODEL = \"sentence-transformers/all-MiniLM-L6-v2\"\nGEN_MODEL = \"google/flan-t5-base\"\nCOLLECTION_NAME = \"knowledge_base\"\n\nprint(\"Loading embedding model...\")\nembedding_model = SentenceTransformer(EMBED_MODEL)\n\nprint(\"Loading answer generator...\")\ngenerator = pipeline(\"text2text-generation\", model=GEN_MODEL)\n\nclient = chromadb.PersistentClient(path=str(DATABASE_PATH))\ncollection = client.get_collection(name=COLLECTION_NAME)\n\nprint(\"\\nPersonal Knowledge Assistant ready! Type 'exit' to quit.\")\n\nwhile True:\n    question = input(\"\\nAsk a question: \").strip()\n    if question.lower() == \"exit\":\n        print(\"Goodbye!\")\n        break\n    if not question:\n        print(\"Please enter a question.\")\n        continue\n\n    query_embedding = embedding_model.encode([question]).tolist()\n    results = collection.query(query_embeddings=query_embedding, n_results=2)\n    retrieved_chunks = results[\"documents\"][0]\n    context = \"\\n\\n\".join(retrieved_chunks)\n\n    prompt = (\n        \"Answer the question using only the context below. \"\n        \"If the answer is not in the context, reply 'Not found in my documents.'\\n\\n\"\n        f\"Context:\\n{context}\\n\\n\"\n        f\"Question: {question}\\nAnswer:\"\n    )\n    response = generator(prompt, max_new_tokens=120)[0][\"generated_text\"]\n\n    print(\"\\nAnswer:\")\n    print(response)"
+        },
+        {
+          "type": "list",
+          "items": [
+            "1. Run 'python src/index_documents.py' first so chroma_db/ is populated.",
+            "2. Save the code above as src/ask_question.py inside Day28_RAG_Assistant/src/.",
+            "3. Run 'python src/ask_question.py' in your VS Code terminal and test both in-context questions and out-of-context questions (such as 'What is quantum computing?')."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Run Q&A assistant",
+          "code": "python src/ask_question.py",
+          "output": "Ask a question: Which frameworks are used for deep learning?\n\nAnswer:\nPyTorch and TensorFlow\n\nAsk a question: What is quantum computing?\n\nAnswer:\nNot found in my documents."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Prompt instructions reduce off-topic guesses but cannot guarantee zero hallucination. For production RAG, add overlapping/size-aware chunking, metadata, retrieval evaluation and source citations."
+        }
+      ]
+    },
+    {
+      "id": "workflow-summary",
+      "icon": "🧭",
+      "title": "Step 7: RAG Components & Production Considerations",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Component",
+            "Role in RAG"
+          ],
+          "rows": [
+            [
+              "read_text() & chunking",
+              "Loads knowledge.txt and splits text into manageable pieces"
+            ],
+            [
+              "SentenceTransformer",
+              "Encodes text chunks and user queries into dense vectors"
+            ],
+            [
+              "ChromaDB",
+              "Persists embeddings and retrieves top matching chunks by similarity"
+            ],
+            [
+              "pipeline() + FLAN-T5",
+              "Generates an answer conditioned on the retrieved chunks"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "ChromaDB handles retrieval while FLAN-T5 handles generation. Scaling beyond a small text file typically requires better chunking, metadata filtering, retrieval metrics and source verification."
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Personal Knowledge RAG Assistant",
+    "file": "src/ask_question.py",
+    "description": "Retrieves top matching chunks from a persistent ChromaDB store using all-MiniLM-L6-v2 and generates grounded answers with google/flan-t5-base. Run locally in VS Code (incompatible with the in-browser runner).",
+    "concepts": [
+      "SentenceTransformer embeddings",
+      "ChromaDB PersistentClient & collection.query()",
+      "Context-grounded prompting",
+      "FLAN-T5 text2text-generation pipeline"
+    ],
+    "code": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\nfrom transformers import pipeline\n\nPROJECT_ROOT = Path(__file__).resolve().parent.parent\nDATABASE_PATH = PROJECT_ROOT / \"chroma_db\"\nEMBED_MODEL = \"sentence-transformers/all-MiniLM-L6-v2\"\nGEN_MODEL = \"google/flan-t5-base\"\nCOLLECTION_NAME = \"knowledge_base\"\n\nembedding_model = SentenceTransformer(EMBED_MODEL)\ngenerator = pipeline(\"text2text-generation\", model=GEN_MODEL)\n\nclient = chromadb.PersistentClient(path=str(DATABASE_PATH))\ncollection = client.get_collection(name=COLLECTION_NAME)\n\nwhile True:\n    question = input(\"\\nAsk a question (or 'exit'): \").strip()\n    if question.lower() == \"exit\":\n        break\n    if not question:\n        continue\n\n    q_vec = embedding_model.encode([question]).tolist()\n    docs = collection.query(query_embeddings=q_vec, n_results=2)[\"documents\"][0]\n    context = \"\\n\\n\".join(docs)\n\n    prompt = (\n        \"Answer using only the context below. \"\n        \"If missing from context, reply 'Not found in my documents.'\\n\\n\"\n        f\"Context:\\n{context}\\n\\nQuestion: {question}\\nAnswer:\"\n    )\n    answer = generator(prompt, max_new_tokens=120)[0][\"generated_text\"]\n    print(\"Answer:\", answer)",
+    "output": "Ask a question (or 'exit'): What is RAG?\nAnswer: Retrieval-Augmented Generation combines information retrieval with language generation."
+  },
+  "practice": [
+    {
+      "title": "Inspect Top-K Retrieved Chunks",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Not compatible with the in-browser runner — run in VS Code inside Day28_RAG_Assistant after indexing. Query the ChromaDB collection directly and print the top 2 retrieved chunks and similarity distances for a sample question.",
+      "tasks": [
+        "Open Day28_RAG_Assistant in VS Code and run 'python src/index_documents.py' first if chroma_db does not exist yet",
+        "Connect to ./chroma_db and load the knowledge_base collection",
+        "Encode a query with sentence-transformers/all-MiniLM-L6-v2",
+        "Save as src/practice1.py (or practice1.py in project root) and run it in the VS Code terminal to print each returned chunk and its distance score"
+      ],
+      "hint": "collection.query(query_embeddings=q_vec, n_results=2) returns documents and distances under results[\"documents\"][0] and results[\"distances\"][0]. Run locally in VS Code rather than the browser runner.",
+      "starter": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\n\nDB_PATH = Path(\"chroma_db\")\nmodel = SentenceTransformer(\"sentence-transformers/all-MiniLM-L6-v2\")\nclient = chromadb.PersistentClient(path=str(DB_PATH))\ncollection = client.get_collection(\"knowledge_base\")\n\nquestion = \"How are vectors stored and searched?\"\n# TODO: query collection and print top chunks + distances",
+      "solution": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\n\nDB_PATH = Path(\"chroma_db\")\nmodel = SentenceTransformer(\"sentence-transformers/all-MiniLM-L6-v2\")\nclient = chromadb.PersistentClient(path=str(DB_PATH))\ncollection = client.get_collection(\"knowledge_base\")\n\nquestion = \"How are vectors stored and searched?\"\nq_vec = model.encode([question]).tolist()\nres = collection.query(query_embeddings=q_vec, n_results=2)\n\nfor doc, dist in zip(res[\"documents\"][0], res[\"distances\"][0]):\n    print(f\"Distance: {dist:.4f}\")\n    print(doc)\n    print(\"-\" * 30)",
+      "output": "Distance: 0.5412\nVECTOR DATABASES\n\nVector databases store and retrieve vector embeddings...\n------------------------------\nDistance: 0.7834\nEMBEDDINGS\n\nEmbeddings represent text, images, or other information..."
+    },
+    {
+      "title": "Add Topic Metadata During Indexing",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Not compatible with the in-browser runner — run in VS Code inside Day28_RAG_Assistant. Attach each chunk's first line as a topic metadata field when adding chunks to ChromaDB.",
+      "tasks": [
+        "Open Day28_RAG_Assistant in VS Code with data/knowledge.txt in place",
+        "Split data/knowledge.txt on blank lines into non-empty chunks",
+        "Extract the first line of each chunk as {\"topic\": first_line}",
+        "Save as practice2.py in Day28_RAG_Assistant and run 'python practice2.py' in your VS Code terminal to store chunks with metadatas in ChromaDB and verify count"
+      ],
+      "hint": "Pass metadatas=[{\"topic\": c.splitlines()[0]} for c in chunks] to collection.add(...). Run locally in VS Code rather than the browser runner.",
+      "starter": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\n\n# TODO: read data/knowledge.txt, build topic metadatas, and add to ChromaDB",
+      "solution": "from pathlib import Path\nimport chromadb\nfrom sentence_transformers import SentenceTransformer\n\nROOT = Path(\".\")\ntext = (ROOT / \"data\" / \"knowledge.txt\").read_text(encoding=\"utf-8\")\nchunks = [b.strip() for b in text.split(\"\\n\\n\") if b.strip()]\nmetadatas = [{\"topic\": c.splitlines()[0]} for c in chunks]\nids = [f\"doc_{i}\" for i in range(len(chunks))]\n\nembedder = SentenceTransformer(\"sentence-transformers/all-MiniLM-L6-v2\")\nvectors = embedder.encode(chunks).tolist()\n\nclient = chromadb.PersistentClient(path=str(ROOT / \"chroma_db\"))\nclient.delete_collection(\"knowledge_base\")\ncol = client.create_collection(\"knowledge_base\")\ncol.add(ids=ids, documents=chunks, embeddings=vectors, metadatas=metadatas)\nprint(\"Indexed with metadata count:\", col.count())",
+      "output": "Indexed with metadata count: 6"
+    }
+  ],
+  "checklist": [
+    "Understood how embeddings represent semantic meaning and support semantic search",
+    "Learned the indexing and retrieval workflow with ChromaDB",
+    "Installed sentence-transformers, chromadb, transformers, torch and sentencepiece",
+    "Created data/knowledge.txt and indexed chunks with src/index_documents.py",
+    "Tested grounded Q&A and out-of-context queries in src/ask_question.py"
+  ],
+  "quiz": [
+    {
+      "q": "What is the main advantage of semantic search over traditional keyword search?",
+      "options": [
+        "It matches similar meaning even when exact words differ",
+        "It eliminates the need for numerical representations",
+        "It only works on spreadsheets",
+        "It replaces all language models"
+      ],
+      "answer": 0,
+      "why": "Embeddings place semantically similar text closer in vector space even if different words are used."
+    },
+    {
+      "q": "What are the two main stages of a RAG application?",
+      "options": [
+        "Training and pruning",
+        "Indexing, and Retrieval & Generation",
+        "Compiling and linking",
+        "Tokenizing and encrypting"
+      ],
+      "answer": 1,
+      "why": "RAG first indexes document chunks into a vector store, then retrieves relevant chunks and generates an answer."
+    },
+    {
+      "q": "In today's RAG assistant, what role does ChromaDB play?",
+      "options": [
+        "It generates final sentences from scratch",
+        "It stores embeddings and retrieves relevant chunks",
+        "It replaces Python loops",
+        "It compiles C++ code"
+      ],
+      "answer": 1,
+      "why": "ChromaDB serves as the vector retrieval store while FLAN-T5 generates the answer from retrieved context."
+    },
+    {
+      "q": "Why does RAG still carry some risk of hallucination even with context instructions?",
+      "options": [
+        "Prompt wording alone cannot strictly guarantee a language model never guesses or extrapolates",
+        "ChromaDB deletes answers longer than ten words",
+        "Embeddings only work on uppercase letters",
+        "FLAN-T5 ignores all input strings"
+      ],
+      "answer": 0,
+      "why": "Language models can still extrapolate or misread context despite instructions to stick to provided text."
+    }
+  ]
+},
+{
+  "day": 29,
+  "title": "Conditional GANs (CGAN)",
+  "subtitle": "Generate specific MNIST digits on demand by conditioning a Generator and Discriminator on class labels.",
+  "level": "Intermediate",
+  "duration": "90-120 min",
+  "tags": [
+    "GAN",
+    "Conditional GAN",
+    "CGAN",
+    "PyTorch",
+    "torchvision",
+    "Generative AI"
+  ],
+  "goals": [
+    "Understand how class conditioning lets a CGAN control which category is generated",
+    "Use nn.Embedding and torch.cat to combine latent noise z and label embeddings in Generator and Discriminator",
+    "Train a PyTorch CGAN on MNIST, save sample grids per epoch, and save trained model weights"
+  ],
+  "sections": [
+    {
+      "id": "why-cgan",
+      "icon": "🎛️",
+      "title": "Step 1: Why Conditional GANs?",
+      "meta": "Controlled image generation",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Standard GANs generate samples from random noise z without controlling which class appears. A Conditional GAN (CGAN) feeds a class label y to both the Generator and Discriminator so you can request specific digits (0-9) on demand."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Generator G(z, y): takes latent noise z and target label y to produce a class-specific image",
+            "Discriminator D(x, y): evaluates whether an image x is real or fake given its label y",
+            "Adversarial training: D learns to separate real labeled pairs from fake pairs while G learns to fool D"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conditioning-mechanics",
+      "icon": "🧩",
+      "title": "Step 2: Label Embeddings & Concatenation",
+      "meta": "Merging noise, images and labels",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "In PyTorch, nn.Embedding maps integer class labels into dense vectors, and torch.cat merges them along the feature dimension before linear layers."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Component",
+            "Role in CGAN"
+          ],
+          "rows": [
+            [
+              "z (randn)",
+              "Random latent noise vector (size NZ = 100) providing sample variety"
+            ],
+            [
+              "nn.Embedding(10, 10)",
+              "Maps digit labels 0-9 into embedding vectors for G and D"
+            ],
+            [
+              "torch.cat(..., dim=1)",
+              "Concatenates z + label_emb for G, or flattened image + label_emb for D"
+            ],
+            [
+              "Tanh vs. Sigmoid",
+              "G outputs [-1, 1] via Tanh; D outputs probability [0, 1] via Sigmoid"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Not compatible with the in-browser runner: Training PyTorch models, downloading torchvision datasets, and writing PNG grids/weights to disk require a local Python environment with torch and torchvision installed."
+        }
+      ]
+    },
+    {
+      "id": "setup-cgan",
+      "icon": "🛠️",
+      "title": "Step 3: Setup & Project Structure",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Install torch and torchvision in your local Python environment and add them to requirements.txt:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Terminal",
+          "code": "python -m pip install torch torchvision"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Project layout",
+          "code": "Fraud_Detection_Project/\n├── src/\n│   ├── day25_pytorch.py\n│   ├── day25_training.py\n│   ├── day26_ann.py\n│   ├── day27_sentiment.py\n│   ├── day28_rag_assistant/\n│   └── day29_cgan.py         <- NEW\n└── requirements.txt"
+        }
+      ]
+    },
+    {
+      "id": "train-cgan",
+      "icon": "⚡",
+      "title": "Step 4: Build & Train the CGAN",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Create src/day29_cgan.py to load normalized MNIST images, train Generator and Discriminator with BCELoss and Adam, save grids per epoch to cgan_samples/, and save model weights:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/day29_cgan.py",
+          "code": "import os\nimport time\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torchvision import datasets, transforms\nfrom torchvision.utils import save_image\n\nDEVICE = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nBATCH_SIZE = 64\nLR = 0.0002\nNZ = 100\nN_CLASSES = 10\nIMG_SIZE = 28\nCHANNELS = 1\nEPOCHS = 50\nSAMPLE_DIR = \"cgan_samples\"\nos.makedirs(SAMPLE_DIR, exist_ok=True)\n\ntransform = transforms.Compose([\n    transforms.ToTensor(),\n    transforms.Normalize((0.5,), (0.5,))\n])\n\ntrain_data = datasets.MNIST(root=\"./data\", train=True, download=True, transform=transform)\ntrain_loader = torch.utils.data.DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)\n\n\nclass Generator(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.label_emb = nn.Embedding(N_CLASSES, N_CLASSES)\n        self.main = nn.Sequential(\n            nn.Linear(NZ + N_CLASSES, 256),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Linear(256, 512),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Linear(512, 1024),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Linear(1024, CHANNELS * IMG_SIZE * IMG_SIZE),\n            nn.Tanh()\n        )\n\n    def forward(self, z, labels):\n        label_embedding = self.label_emb(labels)\n        x = torch.cat([z, label_embedding], dim=1)\n        out = self.main(x)\n        return out.view(out.size(0), CHANNELS, IMG_SIZE, IMG_SIZE)\n\n\nclass Discriminator(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.label_emb = nn.Embedding(N_CLASSES, N_CLASSES)\n        self.main = nn.Sequential(\n            nn.Linear(CHANNELS * IMG_SIZE * IMG_SIZE + N_CLASSES, 1024),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Dropout(0.3),\n            nn.Linear(1024, 512),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Dropout(0.3),\n            nn.Linear(512, 256),\n            nn.LeakyReLU(0.2, inplace=True),\n            nn.Dropout(0.3),\n            nn.Linear(256, 1),\n            nn.Sigmoid()\n        )\n\n    def forward(self, img, labels):\n        img_flat = img.view(img.size(0), -1)\n        label_embedding = self.label_emb(labels)\n        x = torch.cat([img_flat, label_embedding], dim=1)\n        return self.main(x)\n\n\nG = Generator().to(DEVICE)\nD = Discriminator().to(DEVICE)\ncriterion = nn.BCELoss()\noptimizerD = optim.Adam(D.parameters(), lr=LR, betas=(0.5, 0.999))\noptimizerG = optim.Adam(G.parameters(), lr=LR, betas=(0.5, 0.999))\n\nfixed_z = torch.randn(N_CLASSES * 8, NZ, device=DEVICE)\nfixed_labels = torch.cat([torch.arange(N_CLASSES, device=DEVICE) for _ in range(8)])\n\nprint(f\"Starting CGAN training on {DEVICE} for {EPOCHS} epochs...\")\nstart_time = time.time()\n\nfor epoch in range(EPOCHS):\n    for i, (real_imgs, labels) in enumerate(train_loader):\n        bsz = real_imgs.size(0)\n        real_imgs = real_imgs.to(DEVICE)\n        labels = labels.to(DEVICE)\n\n        real_target = torch.ones(bsz, 1, device=DEVICE)\n        fake_target = torch.zeros(bsz, 1, device=DEVICE)\n\n        # 1. Train Discriminator\n        D.zero_grad()\n        d_loss_real = criterion(D(real_imgs, labels), real_target)\n\n        z = torch.randn(bsz, NZ, device=DEVICE)\n        fake_labels = torch.randint(0, N_CLASSES, (bsz,), device=DEVICE)\n        fake_imgs = G(z, fake_labels)\n        d_loss_fake = criterion(D(fake_imgs.detach(), fake_labels), fake_target)\n\n        d_loss = d_loss_real + d_loss_fake\n        d_loss.backward()\n        optimizerD.step()\n\n        # 2. Train Generator\n        G.zero_grad()\n        g_loss = criterion(D(fake_imgs, fake_labels), real_target)\n        g_loss.backward()\n        optimizerG.step()\n\n        if (i + 1) % 200 == 0:\n            print(\n                f\"Epoch [{epoch + 1}/{EPOCHS}] Batch [{i + 1}/{len(train_loader)}] \"\n                f\"D Loss: {d_loss.item():.4f} G Loss: {g_loss.item():.4f}\"\n            )\n\n    with torch.no_grad():\n        gen_imgs = G(fixed_z, fixed_labels) * 0.5 + 0.5\n        save_image(\n            gen_imgs.data,\n            os.path.join(SAMPLE_DIR, f\"epoch_{epoch + 1}.png\"),\n            nrow=N_CLASSES,\n            padding=2\n        )\n\nelapsed_min = (time.time() - start_time) / 60\nprint(f\"Training finished in {elapsed_min:.1f} min. Samples saved in '{SAMPLE_DIR}'.\")\ntorch.save(G.state_dict(), \"cgan_generator.pth\")\ntorch.save(D.state_dict(), \"cgan_discriminator.pth\")\nprint(\"Saved cgan_generator.pth and cgan_discriminator.pth\")"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Run from project root",
+          "code": "python src/day29_cgan.py",
+          "output": "Starting CGAN training on cpu for 50 epochs...\nEpoch [1/50] Batch [200/938] D Loss: 1.1842 G Loss: 0.8921\n...\nTraining finished in 14.2 min. Samples saved in 'cgan_samples'.\nSaved cgan_generator.pth and cgan_discriminator.pth"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Early epochs start as random noise; over later epochs, rows align with digits 0 through 9. For a quick test first, temporarily set EPOCHS = 2 or 3."
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "MNIST Conditional GAN Trainer",
+    "file": "src/day29_cgan.py",
+    "description": "Run locally in VS Code with torch and torchvision (not compatible with the in-browser runner). Trains a label-conditioned Generator and Discriminator on MNIST and saves sample grids and weights.",
+    "concepts": [
+      "nn.Embedding",
+      "torch.cat conditioning",
+      "BCELoss & Adam",
+      "torchvision.utils.save_image"
+    ],
+    "code": "import os\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torchvision import datasets, transforms\nfrom torchvision.utils import save_image\n\nDEVICE = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nBATCH_SIZE, LR, NZ, N_CLASSES, EPOCHS = 64, 0.0002, 100, 10, 5\nos.makedirs(\"cgan_samples\", exist_ok=True)\n\ntransform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])\ntrain_loader = torch.utils.data.DataLoader(\n    datasets.MNIST(root=\"./data\", train=True, download=True, transform=transform),\n    batch_size=BATCH_SIZE, shuffle=True\n)\n\nclass Generator(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.label_emb = nn.Embedding(N_CLASSES, N_CLASSES)\n        self.net = nn.Sequential(\n            nn.Linear(NZ + N_CLASSES, 256), nn.LeakyReLU(0.2, inplace=True),\n            nn.Linear(256, 512), nn.LeakyReLU(0.2, inplace=True),\n            nn.Linear(512, 1024), nn.LeakyReLU(0.2, inplace=True),\n            nn.Linear(1024, 784), nn.Tanh()\n        )\n    def forward(self, z, labels):\n        x = torch.cat([z, self.label_emb(labels)], dim=1)\n        return self.net(x).view(-1, 1, 28, 28)\n\nclass Discriminator(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.label_emb = nn.Embedding(N_CLASSES, N_CLASSES)\n        self.net = nn.Sequential(\n            nn.Linear(784 + N_CLASSES, 512), nn.LeakyReLU(0.2, inplace=True), nn.Dropout(0.3),\n            nn.Linear(512, 256), nn.LeakyReLU(0.2, inplace=True), nn.Dropout(0.3),\n            nn.Linear(256, 1), nn.Sigmoid()\n        )\n    def forward(self, img, labels):\n        x = torch.cat([img.view(img.size(0), -1), self.label_emb(labels)], dim=1)\n        return self.net(x)\n\nG, D = Generator().to(DEVICE), Discriminator().to(DEVICE)\ncriterion = nn.BCELoss()\nopt_d = optim.Adam(D.parameters(), lr=LR, betas=(0.5, 0.999))\nopt_g = optim.Adam(G.parameters(), lr=LR, betas=(0.5, 0.999))\nfixed_z = torch.randn(20, NZ, device=DEVICE)\nfixed_y = torch.arange(10, device=DEVICE).repeat(2)\n\nfor epoch in range(EPOCHS):\n    for real_x, y in train_loader:\n        b = real_x.size(0)\n        real_x, y = real_x.to(DEVICE), y.to(DEVICE)\n        ones = torch.ones(b, 1, device=DEVICE)\n        zeros = torch.zeros(b, 1, device=DEVICE)\n\n        opt_d.zero_grad()\n        z = torch.randn(b, NZ, device=DEVICE)\n        fake_y = torch.randint(0, N_CLASSES, (b,), device=DEVICE)\n        fake_x = G(z, fake_y)\n        d_loss = criterion(D(real_x, y), ones) + criterion(D(fake_x.detach(), fake_y), zeros)\n        d_loss.backward()\n        opt_d.step()\n\n        opt_g.zero_grad()\n        g_loss = criterion(D(fake_x, fake_y), ones)\n        g_loss.backward()\n        opt_g.step()\n\n    with torch.no_grad():\n        imgs = G(fixed_z, fixed_y) * 0.5 + 0.5\n        save_image(imgs, f\"cgan_samples/epoch_{epoch + 1}.png\", nrow=10)\n    print(f\"Epoch {epoch + 1}/{EPOCHS} - D Loss: {d_loss.item():.4f}, G Loss: {g_loss.item():.4f}\")",
+    "output": "Epoch 1/5 - D Loss: 1.1420, G Loss: 0.9105\n...\nEpoch 5/5 - D Loss: 1.0984, G Loss: 0.8412"
+  },
+  "practice": [
+    {
+      "title": "Generate a Specific Digit Batch",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Not compatible with the in-browser runner — run locally in VS Code after training. Load cgan_generator.pth and generate 16 images of a chosen target digit.",
+      "tasks": [
+        "Open your project in VS Code where cgan_generator.pth exists",
+        "Instantiate Generator() and load state_dict from cgan_generator.pth",
+        "Create 16 latent vectors and labels all set to target_digit (for example, 7) and save a grid"
+      ],
+      "hint": "Use torch.full((16,), target_digit, dtype=torch.long, device=DEVICE) for the labels tensor.",
+      "starter": "import torch\n# TODO: load Generator weights from cgan_generator.pth and save 16 samples of digit 7",
+      "solution": "import torch\nfrom torchvision.utils import save_image\n\nDEVICE = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nNZ, N_CLASSES = 100, 10\ntarget_digit = 7\n\nclass Generator(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.label_emb = torch.nn.Embedding(N_CLASSES, N_CLASSES)\n        self.main = torch.nn.Sequential(\n            torch.nn.Linear(NZ + N_CLASSES, 256), torch.nn.LeakyReLU(0.2, inplace=True),\n            torch.nn.Linear(256, 512), torch.nn.LeakyReLU(0.2, inplace=True),\n            torch.nn.Linear(512, 1024), torch.nn.LeakyReLU(0.2, inplace=True),\n            torch.nn.Linear(1024, 784), torch.nn.Tanh()\n        )\n    def forward(self, z, labels):\n        x = torch.cat([z, self.label_emb(labels)], dim=1)\n        return self.main(x).view(-1, 1, 28, 28)\n\nG = Generator().to(DEVICE)\nG.load_state_dict(torch.load(\"cgan_generator.pth\", map_location=DEVICE))\nG.eval()\n\nz = torch.randn(16, NZ, device=DEVICE)\nlabels = torch.full((16,), target_digit, dtype=torch.long, device=DEVICE)\nwith torch.no_grad():\n    imgs = G(z, labels) * 0.5 + 0.5\n    save_image(imgs, f\"digit_{target_digit}_grid.png\", nrow=4)\nprint(f\"Saved digit_{target_digit}_grid.png\")",
+      "output": "Saved digit_7_grid.png"
+    },
+    {
+      "title": "Inspect Output Tensor Shapes",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Not compatible with the in-browser runner — run locally in VS Code with torch installed. Verify tensor shapes from Generator and Discriminator for a batch of 8.",
+      "tasks": [
+        "Create a dummy batch of 8 MNIST-sized tensors (8, 1, 28, 28) and 8 integer labels in 0..9",
+        "Pass latent noise z and labels through Generator and print output shape",
+        "Pass generated images and labels through Discriminator and print validity shape"
+      ],
+      "hint": "Generator output should be (8, 1, 28, 28) and Discriminator output should be (8, 1).",
+      "starter": "import torch\n# TODO: check Generator and Discriminator output tensor shapes for batch size 8",
+      "solution": "import torch\n\nB, NZ, N_CLASSES = 8, 100, 10\nz = torch.randn(B, NZ)\nlabels = torch.randint(0, N_CLASSES, (B,))\n\nemb = torch.nn.Embedding(N_CLASSES, N_CLASSES)\ngen_in = torch.cat([z, emb(labels)], dim=1)\ngen_out = torch.nn.Linear(NZ + N_CLASSES, 784)(gen_in).view(B, 1, 28, 28)\ndisc_in = torch.cat([gen_out.view(B, -1), emb(labels)], dim=1)\ndisc_out = torch.nn.Linear(784 + N_CLASSES, 1)(disc_in)\n\nprint(\"Generator input shape :\", gen_in.shape)\nprint(\"Generator output shape:\", gen_out.shape)\nprint(\"Disc input shape      :\", disc_in.shape)\nprint(\"Disc output shape     :\", disc_out.shape)",
+      "output": "Generator input shape : torch.Size([8, 110])\nGenerator output shape: torch.Size([8, 1, 28, 28])\nDisc input shape      : torch.Size([8, 794])\nDisc output shape     : torch.Size([8, 1])"
+    }
+  ],
+  "checklist": [
+    "Understood why CGANs condition both G and D on class labels",
+    "Learned how nn.Embedding and torch.cat combine noise, images and labels",
+    "Installed torch and torchvision and updated requirements.txt",
+    "Ran src/day29_cgan.py locally and inspected generated sample grids"
+  ],
+  "quiz": [
+    {
+      "q": "What makes a Conditional GAN (CGAN) different from an unconditional GAN?",
+      "options": [
+        "It conditions both the Generator and Discriminator on class labels",
+        "It removes the Discriminator during training",
+        "It uses only decision trees",
+        "It cannot generate images"
+      ],
+      "answer": 0,
+      "why": "Passing class labels to both G and D lets the model generate targeted classes rather than arbitrary samples."
+    },
+    {
+      "q": "Why does the Generator in this CGAN use Tanh as its final activation?",
+      "options": [
+        "To output pixel values scaled to [-1, 1] matching the normalized training images",
+        "To convert probabilities into integer class IDs",
+        "To sort batches by loss",
+        "To disable gradients"
+      ],
+      "answer": 0,
+      "why": "MNIST tensors are normalized to [-1, 1], and Tanh matches that output range before rescaling to [0, 1] for saving."
+    },
+    {
+      "q": "What is the expected output shape of the Discriminator for a batch of B samples?",
+      "options": [
+        "(B, 1)",
+        "(B, 28, 28)",
+        "(100, 10)",
+        "(1, 1)"
+      ],
+      "answer": 0,
+      "why": "The Discriminator outputs one Sigmoid validity score per sample in the batch, giving shape (B, 1)."
+    }
+  ]
+},
+
+{
+  "day": 30,
+  "title": "Capstone: AI Fraud Detection & Investigation Platform",
+  "subtitle": "Combine an ANN anomaly detector, ChromaDB RAG retrieval and FLAN-T5 report generation into an end-to-end fraud investigation workflow.",
+  "level": "Intermediate",
+  "duration": "120 min",
+  "tags": [
+    "Capstone",
+    "ANN",
+    "PyTorch",
+    "RAG",
+    "ChromaDB",
+    "FLAN-T5"
+  ],
+  "goals": [
+    "Preprocess tabular transaction features and train a PyTorch ANN fraud probability classifier",
+    "Connect high-risk alerts to a persistent ChromaDB knowledge base via Sentence Transformers",
+    "Generate structured investigation reports with FLAN-T5 conditioned on retrieved fraud playbooks"
+  ],
+  "sections": [
+    {
+      "id": "capstone-architecture",
+      "icon": "🏗️",
+      "title": "Step 1: End-to-End Platform Architecture",
+      "meta": "ANN + RAG + FLAN-T5",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The capstone combines three stages: an ANN scores transaction fraud probability, a RAG retriever fetches matching fraud playbooks from ChromaDB for high-risk alerts, and FLAN-T5 drafts an investigator report from that context."
+        },
+        {
+          "type": "image",
+          "src": "images/day30/fraud-platform-architecture.jpg",
+          "alt": "Day 30 architecture diagram showing Stage 1 ANN fraud detection, Stage 2 RAG intelligence augmentation with ChromaDB, and Stage 3 investigator report generation",
+          "caption": "Three-stage fraud detection and RAG-assisted investigation pipeline."
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Not compatible with the in-browser runner: Local CSV/text files, scikit-learn, joblib, torch, sentence-transformers, chromadb, and transformers must be run in your local VS Code Python environment."
+        }
+      ]
+    },
+    {
+      "id": "data-and-knowledge",
+      "icon": "📄",
+      "title": "Step 2: Create Transaction Data & Fraud Knowledge Base",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Set up the project files and save both data/credit_card_transactions.csv and data/fraud_knowledge_base.txt inside your project folder:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Project layout",
+          "code": "Fraud_Detection_Project/\n├── data/\n│   ├── credit_card_transactions.csv\n│   ├── fraud_knowledge_base.txt\n│   └── processed_data.pkl\n├── chroma_db/\n├── models/\n│   ├── scaler.pkl\n│   └── fraud_ann.pth\n├── src/\n│   ├── 01_prepare_data.py\n│   ├── 02_train_ann.py\n│   └── 03_final_platform.py\n└── requirements.txt"
+        },
+        {
+          "type": "code",
+          "lang": "csv",
+          "title": "data/credit_card_transactions.csv (sample rows)",
+          "code": "transaction_id,user_id,amount,merchant_category,location_stability,time_of_day,is_fraud\nT1001,U552,12.50,retail,0.92,14,0\nT1002,U109,450.00,electronics,0.15,2,1\nT1003,U884,55.20,dining,0.88,18,0\nT1004,U552,1250.00,luxury,0.05,3,1\nT1005,U109,80.00,online,0.75,12,0"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "data/fraud_knowledge_base.txt",
+          "code": "FRAUD TYPE: Account Takeover (ATO)\nINDICATORS: Login from new IP address, password changed immediately before transaction, email domain mismatch.\nINVESTIGATION STEPS: Check user location history, contact customer via verified channel, freeze account temporarily.\n\nFRAUD TYPE: Card Not Present (CNP) Fraud\nINDICATORS: High transaction amount, multiple declines followed by success, shipping address differs significantly from billing address.\nINVESTIGATION STEPS: Verify AVS (Address Verification System) response, contact merchant, flag for manual review.\n\nFRAUD TYPE: Synthetic Identity Fraud\nINDICATORS: Multiple user profiles sharing same device ID but different names, rapid application for credit products with thin file.\nINVESTIGATION STEPS: Perform KBV (Knowledge Based Verification), request secondary ID documentation, check OFAC watchlists."
+        }
+      ]
+    },
+    {
+      "id": "prepare-and-train",
+      "icon": "🧠",
+      "title": "Step 3: Preprocess Data & Train the ANN Classifier",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First, encode merchant categories, scale numeric features with StandardScaler, and save the processed dataset and scaler:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/01_prepare_data.py",
+          "code": "from pathlib import Path\nimport joblib\nimport pandas as pd\nfrom sklearn.preprocessing import LabelEncoder, StandardScaler\n\nPROJECT_ROOT = Path(__file__).resolve().parent.parent\nDATA_PATH = PROJECT_ROOT / \"data\" / \"credit_card_transactions.csv\"\nPROCESSED_PATH = PROJECT_ROOT / \"data\" / \"processed_data.pkl\"\nSCALER_PATH = PROJECT_ROOT / \"models\" / \"scaler.pkl\"\n\ndef prepare_data():\n    if not DATA_PATH.exists():\n        print(\"Missing data/credit_card_transactions.csv\")\n        return\n\n    df = pd.read_csv(DATA_PATH)\n    le = LabelEncoder()\n    df[\"merchant_category_encoded\"] = le.fit_transform(df[\"merchant_category\"])\n\n    feature_cols = [\"amount\", \"location_stability\", \"time_of_day\", \"merchant_category_encoded\"]\n    X = df[feature_cols].values\n    y = df[\"is_fraud\"].values\n\n    scaler = StandardScaler()\n    X_scaled = scaler.fit_transform(X)\n\n    (PROJECT_ROOT / \"models\").mkdir(parents=True, exist_ok=True)\n    joblib.dump({\"X\": X_scaled, \"y\": y, \"features\": feature_cols}, PROCESSED_PATH)\n    joblib.dump(scaler, SCALER_PATH)\n    print(\"Saved processed_data.pkl and scaler.pkl\")\n\nif __name__ == \"__main__\":\n    prepare_data()"
+        },
+        {
+          "type": "p",
+          "text": "Next, train the PyTorch ANN and save weights to models/fraud_ann.pth:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/02_train_ann.py",
+          "code": "from pathlib import Path\nimport joblib\nfrom sklearn.model_selection import train_test_split\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import DataLoader, TensorDataset\n\nPROJECT_ROOT = Path(__file__).resolve().parent.parent\nPROCESSED_PATH = PROJECT_ROOT / \"data\" / \"processed_data.pkl\"\nMODEL_PATH = PROJECT_ROOT / \"models\" / \"fraud_ann.pth\"\n\nDEVICE = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nEPOCHS = 50\nBATCH_SIZE = 16\nLR = 0.001\n\nclass FraudDetectorANN(nn.Module):\n    def __init__(self, in_features=4):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(in_features, 64),\n            nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(64, 32),\n            nn.ReLU(),\n            nn.Linear(32, 1),\n            nn.Sigmoid()\n        )\n\n    def forward(self, x):\n        return self.net(x)\n\ndef train_model():\n    if not PROCESSED_PATH.exists():\n        print(\"Run src/01_prepare_data.py first.\")\n        return\n\n    bundle = joblib.load(PROCESSED_PATH)\n    X, y = bundle[\"X\"], bundle[\"y\"]\n    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n\n    train_ds = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32).unsqueeze(1))\n    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)\n\n    model = FraudDetectorANN(in_features=X.shape[1]).to(DEVICE)\n    criterion = nn.BCELoss()\n    optimizer = optim.Adam(model.parameters(), lr=LR)\n\n    for epoch in range(EPOCHS):\n        model.train()\n        total_loss = 0.0\n        for bx, by in train_loader:\n            bx, by = bx.to(DEVICE), by.to(DEVICE)\n            optimizer.zero_grad()\n            loss = criterion(model(bx), by)\n            loss.backward()\n            optimizer.step()\n            total_loss += loss.item()\n        if (epoch + 1) % 10 == 0:\n            print(f\"Epoch [{epoch + 1}/{EPOCHS}] Loss: {total_loss / len(train_loader):.4f}\")\n\n    model.eval()\n    with torch.no_grad():\n        preds = (model(torch.tensor(X_test, dtype=torch.float32, device=DEVICE)) >= 0.5).float()\n        acc = (preds.cpu().numpy().ravel() == y_test).mean()\n        print(f\"Validation Accuracy: {acc * 100:.1f}%\")\n\n    torch.save(model.state_dict(), MODEL_PATH)\n    print(f\"Saved model to {MODEL_PATH}\")\n\nif __name__ == \"__main__\":\n    train_model()"
+        }
+      ]
+    },
+    {
+      "id": "run-platform",
+      "icon": "🚨",
+      "title": "Step 4: Run the Integrated Fraud Investigation Platform",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Ensure your ChromaDB collection (such as fraud_playbooks or knowledge_base) is indexed from data/fraud_knowledge_base.txt, then run src/03_final_platform.py in VS Code:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Run pipeline in VS Code terminal",
+          "code": "python src/01_prepare_data.py\npython src/02_train_ann.py\npython src/03_final_platform.py",
+          "output": "Saved processed_data.pkl and scaler.pkl\nEpoch [50/50] Loss: 0.1420\nValidation Accuracy: 90.0%\nSaved model to models/fraud_ann.pth"
+        }
+      ]
+    },
+    {
+      "id": "thank-you-graduation",
+      "icon": "🎓",
+      "title": "Thank You for Completing the 30-Day ML Roadmap!",
+      "meta": "Graduation & Appreciation",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Thank you for showing up, writing code, debugging errors, and building real AI systems from Day 1 through Day 30. Your dedication turned theory into working Python, PyTorch, NLP, RAG, and Generative AI projects."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Days 1–15: Python foundations, data analysis, and classical Machine Learning",
+            "Days 16–26: Deep Learning fundamentals, PyTorch tensors, training loops, and ANNs",
+            "Days 27–29: Transformers & NLP, Vector Databases & RAG, and Conditional GANs",
+            "Day 30: Full-stack AI Fraud Detection & Investigation Capstone"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Open your dedicated Thank You & Graduation page at thanks.html (http://127.0.0.1:5500/thanks.html) to celebrate completing all 30 days!"
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "AI-Powered Fraud Detection & Investigation Platform",
+    "file": "src/03_final_platform.py",
+    "description": "Run locally in VS Code (not compatible with the in-browser runner). Scores transactions with the trained ANN, retrieves relevant fraud playbook context from ChromaDB, and generates an investigation summary with FLAN-T5.",
+    "concepts": [
+      "ANN inference & probability thresholding",
+      "ChromaDB similarity retrieval",
+      "Context-grounded FLAN-T5 generation",
+      "End-to-end AI system integration"
+    ],
+    "code": "from pathlib import Path\nimport textwrap\nimport chromadb\nimport joblib\nimport pandas as pd\nfrom sentence_transformers import SentenceTransformer\nimport torch\nimport torch.nn as nn\nfrom transformers import pipeline\n\nPROJECT_ROOT = Path(__file__).resolve().parent.parent\nMODEL_PATH = PROJECT_ROOT / \"models\" / \"fraud_ann.pth\"\nSCALER_PATH = PROJECT_ROOT / \"models\" / \"scaler.pkl\"\nCHROMA_PATH = PROJECT_ROOT / \"chroma_db\"\nEMBED_MODEL = \"sentence-transformers/all-MiniLM-L6-v2\"\nGEN_MODEL = \"google/flan-t5-base\"\nCOLLECTION_NAME = \"fraud_playbooks\"\nFRAUD_THRESHOLD = 0.75\nDEVICE = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\nclass FraudDetectorANN(nn.Module):\n    def __init__(self, in_features=4):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(in_features, 64),\n            nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(64, 32),\n            nn.ReLU(),\n            nn.Linear(32, 1),\n            nn.Sigmoid()\n        )\n\n    def forward(self, x):\n        return self.net(x)\n\nSAMPLE_TXNS = {\n    \"T1001\": {\"amount\": 12.50, \"location_stability\": 0.92, \"time_of_day\": 14, \"merchant_category_encoded\": 4, \"merchant_category\": \"retail\"},\n    \"T1002\": {\"amount\": 450.00, \"location_stability\": 0.15, \"time_of_day\": 2, \"merchant_category_encoded\": 1, \"merchant_category\": \"electronics\"},\n    \"T1004\": {\"amount\": 1250.00, \"location_stability\": 0.05, \"time_of_day\": 3, \"merchant_category_encoded\": 2, \"merchant_category\": \"luxury\"}\n}\n\nmodel = FraudDetectorANN(4).to(DEVICE)\nmodel.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))\nmodel.eval()\nscaler = joblib.load(SCALER_PATH)\n\nembedder = SentenceTransformer(EMBED_MODEL)\nclient = chromadb.PersistentClient(path=str(CHROMA_PATH))\ncollection = client.get_or_create_collection(COLLECTION_NAME)\n\nif collection.count() == 0 and (PROJECT_ROOT / \"data\" / \"fraud_knowledge_base.txt\").exists():\n    raw = (PROJECT_ROOT / \"data\" / \"fraud_knowledge_base.txt\").read_text(encoding=\"utf-8\")\n    docs = [b.strip() for b in raw.split(\"\\n\\n\") if b.strip()]\n    collection.add(\n        ids=[f\"kb_{i}\" for i in range(len(docs))],\n        documents=docs,\n        embeddings=embedder.encode(docs).tolist()\n    )\n\ngenerator = pipeline(\"text2text-generation\", model=GEN_MODEL)\n\nwhile True:\n    txn_id = input(\"\\nEnter Transaction ID (T1001, T1002, T1004 or 'exit'): \").strip()\n    if txn_id.lower() == \"exit\":\n        break\n    txn = SAMPLE_TXNS.get(txn_id)\n    if not txn:\n        print(\"Unknown Transaction ID.\")\n        continue\n\n    X_raw = [[txn[\"amount\"], txn[\"location_stability\"], txn[\"time_of_day\"], txn[\"merchant_category_encoded\"]]]\n    X_scaled = scaler.transform(X_raw)\n    with torch.no_grad():\n        prob = model(torch.tensor(X_scaled, dtype=torch.float32, device=DEVICE)).item()\n\n    print(f\"Transaction {txn_id} | Fraud Probability: {prob:.4f}\")\n    if prob < FRAUD_THRESHOLD:\n        print(\"Status: LOW RISK - Approved.\")\n        continue\n\n    query = f\"High amount {txn['amount']} at {txn['merchant_category']} with location stability {txn['location_stability']}\"\n    retrieved = collection.query(query_embeddings=embedder.encode([query]).tolist(), n_results=1)[\"documents\"][0][0]\n    prompt = (\n        \"Summarize the likely fraud type, investigation steps, and action from the context.\\n\"\n        f\"Transaction: {txn}\\nContext: {retrieved}\\nSummary:\"\n    )\n    report = generator(prompt, max_new_tokens=140)[0][\"generated_text\"]\n    print(textwrap.fill(report, width=70))",
+    "output": "Transaction T1001 | Fraud Probability: 0.0840\nStatus: LOW RISK - Approved.\n\nTransaction T1004 | Fraud Probability: 0.9125\nCard Not Present Fraud - verify AVS response, contact merchant, and flag for manual review."
+  },
+  "practice": [
+    {
+      "title": "Adjust the Fraud Alert Threshold",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Not compatible with the in-browser runner — run locally in VS Code. Test how changing FRAUD_THRESHOLD from 0.50 to 0.85 changes which transactions trigger RAG investigation.",
+      "tasks": [
+        "Load models/scaler.pkl and models/fraud_ann.pth in VS Code",
+        "Score sample transactions and compare classifications at thresholds 0.50 and 0.85",
+        "Print borderline cases whose probability falls between 0.50 and 0.85"
+      ],
+      "hint": "Compare prob >= 0.50 against prob >= 0.85 for each transaction probability.",
+      "starter": "probs = [(\"T1001\", 0.12), (\"T1002\", 0.82), (\"T1005\", 0.63)]\n# TODO: classify each transaction at threshold 0.50 vs 0.85",
+      "solution": "probs = [(\"T1001\", 0.12), (\"T1002\", 0.82), (\"T1005\", 0.63)]\nfor txn_id, p in probs:\n    t50 = \"HIGH\" if p >= 0.50 else \"LOW\"\n    t85 = \"HIGH\" if p >= 0.85 else \"LOW\"\n    print(f\"{txn_id} (p={p:.2f}) -> @0.50: {t50}, @0.85: {t85}\")",
+      "output": "T1001 (p=0.12) -> @0.50: LOW, @0.85: LOW\nT1002 (p=0.82) -> @0.50: HIGH, @0.85: LOW\nT1005 (p=0.63) -> @0.50: HIGH, @0.85: LOW"
+    },
+    {
+      "title": "Log Investigation Audits to JSONL",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Not compatible with the in-browser runner — run locally in VS Code. Append each investigated alert's transaction ID, fraud probability, and generated summary to reports/audit_log.jsonl.",
+      "tasks": [
+        "Create a reports/ directory if it does not exist",
+        "Serialize alert records with json.dumps(...) and append one JSON object per line",
+        "Verify the written line count in reports/audit_log.jsonl"
+      ],
+      "hint": "Open reports/audit_log.jsonl with mode 'a' and encoding='utf-8', then write json.dumps(record) + '\\n'.",
+      "starter": "import json\nfrom pathlib import Path\n\nrecord = {\"txn_id\": \"T1004\", \"prob\": 0.9125, \"status\": \"ESCALATED\"}\n# TODO: append record as a line to reports/audit_log.jsonl",
+      "solution": "import json\nfrom pathlib import Path\n\nout_dir = Path(\"reports\")\nout_dir.mkdir(exist_ok=True)\nlog_file = out_dir / \"audit_log.jsonl\"\n\nrecord = {\"txn_id\": \"T1004\", \"prob\": 0.9125, \"status\": \"ESCALATED\"}\nwith log_file.open(\"a\", encoding=\"utf-8\") as f:\n    f.write(json.dumps(record) + \"\\n\")\n\nprint(\"Lines in audit log:\", sum(1 for _ in log_file.open(\"r\", encoding=\"utf-8\")))",
+      "output": "Lines in audit log: 1"
+    },
+  ],
+  "checklist": []
+}
+   ]
 };
