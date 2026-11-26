@@ -10826,7 +10826,623 @@ Average used to fill: 245.0
    "why": "Pickled models depend on the library version that created them."
   }
  ]
-}
- 
+},
+// DAY 25 snippet. In course-data.js: after the previous day's closing }, paste this object (keep the comma), outside the previous day's quiz array. Copy the images/day25 folder into your site's images folder.
+{
+  "day": 25,
+  "title": "PyTorch Fundamentals",
+  "subtitle": "Deep learning begins: tensors, operations, devices, autograd and your first PyTorch training loop.",
+  "level": "Intermediate",
+  "duration": "60-90 min",
+  "tags": [
+    "PyTorch",
+    "Tensors",
+    "Autograd",
+    "Training Loop",
+    "Deep Learning"
+  ],
+  "goals": [
+    "Understand what PyTorch is and install the CPU version",
+    "Create tensors and read their ndim and shape",
+    "Use tensor operations, devices and autograd",
+    "Train a simple linear model with the PyTorch workflow"
+  ],
+  "sections": [
+    {
+      "id": "what",
+      "icon": "🧠",
+      "title": "Step 1: What is PyTorch?",
+      "meta": "Deep learning begins",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "PyTorch is a Python framework used to build and train machine learning and deep learning models."
+        },
+        {
+          "type": "p",
+          "text": "Deep learning is machine learning with neural networks: stacks of simple units that learn their own patterns from data. The more layers, the deeper the network."
+        },
+        {
+          "type": "image",
+          "src": "images/day25/ml_vs_dl.png",
+          "alt": "Traditional ML models matched to their deep learning counterparts",
+          "caption": "Same idea, deeper models: each classic ML tool has a deep learning counterpart"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Traditional ML",
+            "Deep Learning"
+          ],
+          "rows": [
+            [
+              "Logistic Regression",
+              "Neural Networks"
+            ],
+            [
+              "Decision Tree",
+              "Deep Neural Networks"
+            ],
+            [
+              "Random Forest",
+              "CNNs, RNNs, Transformers"
+            ],
+            [
+              "Scikit-learn",
+              "PyTorch"
+            ]
+          ]
+        },
+        {
+          "type": "image",
+          "src": "images/day25/neural_network.png",
+          "alt": "Diagram of a neural network with input, two hidden layers and an output",
+          "caption": "A neural network: inputs flow through hidden layers to an output, and every line is a weight the network learns"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Build neural networks",
+            "Train deep learning models",
+            "Work with GPUs",
+            "Build computer vision applications",
+            "Work with NLP and modern AI models"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "install",
+      "icon": "⚙️",
+      "title": "Step 2: Install PyTorch",
+      "meta": "CPU version first",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "We begin with the CPU version to avoid unnecessary GPU setup complications. In your VS Code terminal:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Terminal",
+          "code": "python -m pip install torch"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "title": "Check the installation",
+          "code": "python -c \"import torch; print(torch.__version__)\""
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Check GPU availability",
+          "code": "import torch\n\nprint(\"PyTorch Version:\", torch.__version__)\nprint(\"CUDA Available:\", torch.cuda.is_available())",
+          "output": "PyTorch Version: 2.x.x\nCUDA Available: False"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Your version number will differ. If CUDA Available is False, do not worry: every exercise runs on the CPU. For NVIDIA GPU acceleration later, use the install command from the official PyTorch installation selector."
+        }
+      ]
+    },
+    {
+      "id": "tensors",
+      "icon": "🔥",
+      "title": "Step 3: Understand Tensors",
+      "meta": "Most important concept",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A tensor is a data structure used to store numerical values in PyTorch. Think of tensors as an extension of NumPy arrays."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Type",
+            "Example",
+            "Dimension"
+          ],
+          "rows": [
+            [
+              "Scalar",
+              "10",
+              "0D"
+            ],
+            [
+              "Vector",
+              "[10, 20, 30]",
+              "1D"
+            ],
+            [
+              "Matrix",
+              "[[1, 2], [3, 4]]",
+              "2D"
+            ],
+            [
+              "3D Tensor",
+              "Multiple matrices (2 x 2 x 2)",
+              "3D"
+            ]
+          ]
+        },
+        {
+          "type": "image",
+          "src": "images/day25/tensors_dims.png",
+          "alt": "Scalar, vector, matrix and 3D tensor drawn as boxes",
+          "caption": "Tensors grow from a single number to stacks of matrices"
+        },
+        {
+          "type": "p",
+          "text": "Create a new file src/day25_pytorch.py in your project:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Fraud_Detection_Project",
+          "code": "Fraud_Detection_Project/\n|\n|-- src/\n|   |-- train.py\n|   |-- predict.py\n|   |-- app.py\n|   `-- day25_pytorch.py    <- NEW"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/day25_pytorch.py",
+          "code": "import torch\n\n# 1. Scalar (0D Tensor)\nscalar = torch.tensor(10)\n\n# 2. Vector (1D Tensor)\nvector = torch.tensor([10, 20, 30])\n\n# 3. Matrix (2D Tensor)\nmatrix = torch.tensor([\n    [1, 2],\n    [3, 4]\n])\n\n# 4. 3D Tensor\ntensor_3d = torch.tensor([\n    [[1, 2], [3, 4]],\n    [[5, 6], [7, 8]]\n])\n\nprint(\"Scalar:\", scalar)\nprint(\"Vector:\", vector)\nprint(\"Matrix:\\n\", matrix)\nprint(\"3D Tensor:\\n\", tensor_3d)\n\n# Check dimensions\nprint(\"\\nDimensions:\")\nprint(scalar.ndim)\nprint(vector.ndim)\nprint(matrix.ndim)\nprint(tensor_3d.ndim)\n\n# Check shapes\nprint(\"\\nShapes:\")\nprint(scalar.shape)\nprint(vector.shape)\nprint(matrix.shape)\nprint(tensor_3d.shape)",
+          "output": "Scalar: tensor(10)\nVector: tensor([10, 20, 30])\nMatrix:\n tensor([[1, 2],\n        [3, 4]])\n3D Tensor:\n tensor([[[1, 2],\n         [3, 4]],\n\n        [[5, 6],\n         [7, 8]]])\n\nDimensions:\n0\n1\n2\n3\n\nShapes:\ntorch.Size([])\ntorch.Size([3])\ntorch.Size([2, 2])\ntorch.Size([2, 2, 2])"
+        },
+        {
+          "type": "p",
+          "text": "Run it with: python src/day25_pytorch.py"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "ndim is the number of dimensions. shape is the size along each dimension. A matrix with 2 rows and 3 columns has shape (2, 3). A scalar has an empty shape, torch.Size([])."
+        }
+      ]
+    },
+    {
+      "id": "ops",
+      "icon": "➕",
+      "title": "Step 4: Tensor Operations",
+      "meta": "Math on tensors",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "PyTorch performs mathematical operations directly on tensors. Add this below your previous exercise:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "tensor_ops.py",
+          "code": "import torch\n\na = torch.tensor([10, 20, 30])\nb = torch.tensor([1, 2, 3])\n\n# Addition\nprint(\"Addition:\", a + b)\n\n# Subtraction\nprint(\"Subtraction:\", a - b)\n\n# Multiplication (element-wise)\nprint(\"Multiplication:\", a * b)\n\n# Division\nprint(\"Division:\", a / b)\n\n# Matrix multiplication\nx = torch.tensor([\n    [1, 2],\n    [3, 4]\n])\ny = torch.tensor([\n    [5, 6],\n    [7, 8]\n])\nprint(\"Matrix Multiplication:\\n\", torch.matmul(x, y))\n\n# Other useful operations\nprint(\"Mean:\", a.float().mean())\nprint(\"Maximum:\", a.max())\nprint(\"Minimum:\", a.min())",
+          "output": "Addition: tensor([11, 22, 33])\nSubtraction: tensor([ 9, 18, 27])\nMultiplication: tensor([10, 40, 90])\nDivision: tensor([10., 10., 10.])\nMatrix Multiplication:\n tensor([[19, 22],\n        [43, 50]])\nMean: tensor(20.)\nMaximum: tensor(30)\nMinimum: tensor(10)"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "a * b is element-wise multiplication. torch.matmul performs matrix multiplication when the shapes are compatible. Also notice a / b returns decimals (10.), and .mean() needs a float tensor, so we used a.float()."
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "These operations are fundamental to neural network calculations."
+        }
+      ]
+    },
+    {
+      "id": "device",
+      "icon": "🖥️",
+      "title": "Step 5: CPU vs GPU",
+      "meta": "Processing devices",
+      "blocks": [
+        {
+          "type": "table",
+          "head": [
+            "Device",
+            "Strength"
+          ],
+          "rows": [
+            [
+              "CPU",
+              "General-purpose processing. Good for everyday tasks and smaller models."
+            ],
+            [
+              "GPU",
+              "Highly parallel processing. Useful for large tensor operations and deep learning."
+            ]
+          ]
+        },
+        {
+          "type": "image",
+          "src": "images/day25/cpu_vs_gpu.png",
+          "alt": "A CPU with a few large cores next to a GPU with a grid of many small cores",
+          "caption": "CPU: a few powerful cores. GPU: thousands of small cores working in parallel"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "device.py",
+          "code": "import torch\n\nif torch.cuda.is_available():\n    device = torch.device(\"cuda\")\n    print(\"GPU Available!\")\nelse:\n    device = torch.device(\"cpu\")\n    print(\"Using CPU!\")\n\nnumbers = torch.tensor(\n    [10, 20, 30],\n    device=device\n)\n\nprint(\"Tensor:\", numbers)\nprint(\"Device:\", numbers.device)",
+          "output": "Using CPU!\nTensor: tensor([10, 20, 30])\nDevice: cpu"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "Tensors involved in the same operation generally need to be on the same device. On a machine with an NVIDIA GPU you would see GPU Available! and Device: cuda:0."
+        }
+      ]
+    },
+    {
+      "id": "autograd",
+      "icon": "📉",
+      "title": "Step 6: Autograd - Automatic Differentiation",
+      "meta": "Extremely important",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Suppose your model predicts a student's marks: actual 80, predicted 60. The model made an error, and during training it must adjust its parameters to reduce that error. Gradients tell it how. PyTorch's autograd calculates them automatically."
+        },
+        {
+          "type": "p",
+          "text": "Example: y = x squared. The derivative is dy/dx = 2x, so at x = 3 the gradient is 6. Let PyTorch calculate it:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "autograd.py",
+          "code": "import torch\n\n# Create a tensor that tracks gradients\nx = torch.tensor(3.0, requires_grad=True)\n\n# Mathematical operation\ny = x ** 2\n\n# Calculate gradient\ny.backward()\n\nprint(\"Value of x:\", x.item())\nprint(\"Value of y:\", y.item())\nprint(\"Gradient:\", x.grad.item())",
+          "output": "Value of x: 3.0\nValue of y: 9.0\nGradient: 6.0"
+        },
+        {
+          "type": "image",
+          "src": "images/day25/autograd_gradient.png",
+          "alt": "Curve y = x squared with a tangent line at x = 3 showing slope 6",
+          "caption": "At x = 3 the slope of y = x squared is 6, exactly the x.grad value autograd returns"
+        },
+        {
+          "type": "list",
+          "items": [
+            "We created x with requires_grad=True",
+            "PyTorch tracked the mathematical operation",
+            "y.backward() calculated the derivative",
+            "x.grad returned the gradient"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Neural networks have many parameters. Instead of calculating every derivative by hand, PyTorch calculates the gradients automatically."
+        }
+      ]
+    },
+    {
+      "id": "training",
+      "icon": "🏋️",
+      "title": "Step 7: Your First Mini Training Workflow",
+      "meta": "Learn y = 2x + 1",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Now we connect the concepts. A very simple linear model learns the relationship y = 2x + 1 from five data points. Create src/day25_training.py:"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "src/day25_training.py",
+          "code": "import torch\nimport torch.nn as nn\n\n# 1. Create training data\nX = torch.tensor(\n    [[1.0], [2.0], [3.0], [4.0], [5.0]]\n)\ny = torch.tensor(\n    [[3.0], [5.0], [7.0], [9.0], [11.0]]\n)\n\n# 2. Create a simple linear model\nmodel = nn.Linear(1, 1)\n\n# 3. Define loss function\nloss_function = nn.MSELoss()\n\n# 4. Define optimizer\noptimizer = torch.optim.SGD(\n    model.parameters(),\n    lr=0.01\n)\n\n# 5. Training loop\nfor epoch in range(1000):\n\n    # Forward pass\n    predictions = model(X)\n\n    # Calculate error\n    loss = loss_function(predictions, y)\n\n    # Clear previous gradients\n    optimizer.zero_grad()\n\n    # Calculate new gradients\n    loss.backward()\n\n    # Update model parameters\n    optimizer.step()\n\n    if (epoch + 1) % 100 == 0:\n        print(\n            f\"Epoch {epoch+1}, Loss: {loss.item():.4f}\"\n        )\n\n# 6. Test the trained model\ntest_input = torch.tensor([[6.0]])\n\nwith torch.no_grad():\n    prediction = model(test_input)\n\nprint(\"\\nPrediction for input 6:\")\nprint(prediction.item())\n\nprint(\"\\nLearned weight:\")\nprint(model.weight.item())\nprint(\"Learned bias:\")\nprint(model.bias.item())",
+          "output": "Epoch 100, Loss: 0.0065\nEpoch 200, Loss: 0.0033\nEpoch 300, Loss: 0.0017\nEpoch 400, Loss: 0.0009\nEpoch 500, Loss: 0.0004\nEpoch 600, Loss: 0.0002\nEpoch 700, Loss: 0.0001\nEpoch 800, Loss: 0.0001\nEpoch 900, Loss: 0.0000\nEpoch 1000, Loss: 0.0000\n\nPrediction for input 6:\n13.005916595458984\n\nLearned weight:\n2.0024757385253906\nLearned bias:\n0.9910624623298645"
+        },
+        {
+          "type": "p",
+          "text": "Run it with: python src/day25_training.py"
+        },
+        {
+          "type": "image",
+          "src": "images/day25/learned_line.png",
+          "alt": "Training points, the learned line close to y = 2x + 1, and a falling loss curve",
+          "caption": "What training achieves: the line fits the data and the loss keeps falling (NumPy simulation of this same loop)"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "The model should learn a weight close to 2 and a bias close to 1, and predict about 13 for input 6. The exact numbers vary slightly because the model starts with randomly initialized parameters, so your output will not match this block digit for digit."
+        }
+      ]
+    },
+    {
+      "id": "workflow",
+      "icon": "🔁",
+      "title": "Step 8: The Training Workflow",
+      "meta": "Foundation of PyTorch",
+      "blocks": [
+        {
+          "type": "image",
+          "src": "images/day25/training_loop.png",
+          "alt": "Six-step training loop drawn as a cycle",
+          "caption": "One epoch: forward pass, loss, zero gradients, backpropagation, optimizer step, then repeat"
+        },
+        {
+          "type": "table",
+          "head": [
+            "#",
+            "Stage",
+            "What happens"
+          ],
+          "rows": [
+            [
+              "1",
+              "Forward pass",
+              "Model receives input and generates predictions"
+            ],
+            [
+              "2",
+              "Loss calculation",
+              "Compare predictions against actual values"
+            ],
+            [
+              "3",
+              "Zero gradients",
+              "Clear gradients from the previous iteration"
+            ],
+            [
+              "4",
+              "Backpropagation",
+              "loss.backward() calculates gradients"
+            ],
+            [
+              "5",
+              "Optimizer step",
+              "optimizer.step() updates the model parameters"
+            ],
+            [
+              "6",
+              "Repeat",
+              "Continue training over multiple epochs"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "You will use this same workflow when building neural networks on Day 26."
+        }
+      ]
+    },
+    {
+      "id": "deliver",
+      "icon": "📦",
+      "title": "Step 9: Day 25 Deliverables",
+      "meta": "Run both files",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "src",
+          "code": "src/\n|-- day25_pytorch.py\n`-- day25_training.py"
+        },
+        {
+          "type": "p",
+          "text": "Create these two files and run both successfully."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Topic",
+            "What you learned"
+          ],
+          "rows": [
+            [
+              "PyTorch",
+              "Deep learning framework"
+            ],
+            [
+              "Tensors",
+              "Data representation"
+            ],
+            [
+              "Tensor operations",
+              "Mathematical calculations"
+            ],
+            [
+              "CPU vs GPU",
+              "Processing devices"
+            ],
+            [
+              "Autograd",
+              "Automatic gradient calculation"
+            ],
+            [
+              "Forward pass",
+              "Generate predictions"
+            ],
+            [
+              "Loss function",
+              "Measure prediction error"
+            ],
+            [
+              "Backpropagation",
+              "Calculate gradients"
+            ],
+            [
+              "Optimizer",
+              "Update model parameters"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "icon": "🏁",
+      "title": "Mini Project: PyTorch Fundamentals Tour",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Final Program below covers tensors, operations, device selection, autograd and the full training workflow in one file. It starts the weight and bias at 0 so that every run prints the same numbers."
+        }
+      ]
+    },
+    {
+      "id": "learned",
+      "icon": "✅",
+      "title": "What You Actually Learned",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "A tensor stores numbers; ndim and shape describe it",
+            "a * b is element-wise, torch.matmul is matrix multiplication",
+            "Tensors in one operation must be on the same device",
+            "requires_grad and backward() give automatic gradients",
+            "Training = forward pass, loss, zero_grad, backward, step, repeated over epochs",
+            "A model learns parameters close to the true ones, not exactly equal"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "PyTorch Fundamentals Tour",
+    "file": "day25_final.py",
+    "description": "One program combining Day 25: tensors with ndim and shape, element-wise and matrix operations, device selection, autograd and a full training loop that learns y = 2x + 1 and predicts unseen inputs.",
+    "concepts": [
+      "tensors",
+      "ndim and shape",
+      "tensor operations",
+      "device selection",
+      "autograd",
+      "training loop"
+    ],
+    "code": "import torch\nimport torch.nn as nn\n\nprint(\"=== PYTORCH FUNDAMENTALS ===\")\n\n# 1. Tensors: dimensions and shapes\nscalar = torch.tensor(10)\nvector = torch.tensor([10, 20, 30])\nmatrix = torch.tensor([[1, 2], [3, 4]])\ntensor_3d = torch.tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])\n\nprint(\"\\nTensors (ndim, shape):\")\nfor name, t in [(\"scalar\", scalar), (\"vector\", vector),\n                (\"matrix\", matrix), (\"tensor_3d\", tensor_3d)]:\n    print(f\"  {name:<10} {t.ndim}D  {tuple(t.shape)}\")\n\n# 2. Tensor operations\na = torch.tensor([10, 20, 30])\nb = torch.tensor([1, 2, 3])\nx = torch.tensor([[1, 2], [3, 4]])\ny_m = torch.tensor([[5, 6], [7, 8]])\n\nprint(\"\\nOperations:\")\nprint(\"  a + b:\", (a + b).tolist())\nprint(\"  a * b (element-wise):\", (a * b).tolist())\nprint(\"  a / b:\", (a / b).tolist())\nprint(\"  x matmul y:\", torch.matmul(x, y_m).tolist())\nprint(\"  mean of a:\", f\"{a.float().mean().item():.1f}\")\n\n# 3. Device\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(\"\\nDevice in use:\", device.type)\n\n# 4. Autograd\nv = torch.tensor(3.0, requires_grad=True)\nout = v ** 2\nout.backward()\nprint(\"\\nAutograd: x =\", v.item(), \"| y =\", out.item(), \"| gradient =\", v.grad.item())\n\n# 5. Training workflow: learn y = 2x + 1\nX = torch.tensor([[1.0], [2.0], [3.0], [4.0], [5.0]])\ny = torch.tensor([[3.0], [5.0], [7.0], [9.0], [11.0]])\n\nmodel = nn.Linear(1, 1)\nwith torch.no_grad():                 # fixed start so every run matches\n    model.weight.fill_(0.0)\n    model.bias.fill_(0.0)\n\nloss_function = nn.MSELoss()\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\n\nprint(\"\\nTraining (weight and bias start at 0):\")\nfor epoch in range(1000):\n    predictions = model(X)                 # forward pass\n    loss = loss_function(predictions, y)   # loss calculation\n    optimizer.zero_grad()                  # zero gradients\n    loss.backward()                        # backpropagation\n    optimizer.step()                       # optimizer step\n    if (epoch + 1) % 200 == 0:\n        print(f\"  Epoch {epoch + 1}, Loss: {loss.item():.4f}\")\n\nprint(\"\\nLearned weight:\", f\"{model.weight.item():.4f}\", \"(target 2)\")\nprint(\"Learned bias:\", f\"{model.bias.item():.4f}\", \"(target 1)\")\n\nprint(\"\\nPredictions on unseen inputs:\")\nwith torch.no_grad():\n    for value in [6.0, 7.0, 10.0]:\n        pred = model(torch.tensor([[value]])).item()\n        print(f\"  input {value:.0f} -> {pred:.2f} (true {2 * value + 1:.0f})\")",
+    "output": "=== PYTORCH FUNDAMENTALS ===\n\nTensors (ndim, shape):\n  scalar     0D  ()\n  vector     1D  (3,)\n  matrix     2D  (2, 2)\n  tensor_3d  3D  (2, 2, 2)\n\nOperations:\n  a + b: [11, 22, 33]\n  a * b (element-wise): [10, 40, 90]\n  a / b: [10.0, 10.0, 10.0]\n  x matmul y: [[19, 22], [43, 50]]\n  mean of a: 20.0\n\nDevice in use: cpu\n\nAutograd: x = 3.0 | y = 9.0 | gradient = 6.0\n\nTraining (weight and bias start at 0):\n  Epoch 200, Loss: 0.0081\n  Epoch 400, Loss: 0.0021\n  Epoch 600, Loss: 0.0005\n  Epoch 800, Loss: 0.0001\n  Epoch 1000, Loss: 0.0000\n\nLearned weight: 2.0039 (target 2)\nLearned bias: 0.9860 (target 1)\n\nPredictions on unseen inputs:\n  input 6 -> 13.01 (true 13)\n  input 7 -> 15.01 (true 15)\n  input 10 -> 21.02 (true 21)"
+  },
+  "practice": [
+    {
+      "title": "Tensor Toolbox: Student Marks",
+      "level": "Easy",
+      "file": "practice1.py",
+      "description": "Use shapes, averages, broadcasting, reshaping and matrix multiplication on a marks tensor.",
+      "tasks": [
+        "Print the shape and number of dimensions",
+        "Average marks per student (mean over dim=1), printed with 2 decimals",
+        "Average marks per subject (mean over dim=0), printed with 2 decimals",
+        "Add 5 bonus marks to every value and print it with .tolist()",
+        "Reshape marks to (3, 2) and print it with .tolist()",
+        "Use torch.matmul with weights [[0.3], [0.3], [0.4]] to get each student's weighted score"
+      ],
+      "hint": "mean(dim=1) averages across each row. torch.matmul of a (2, 3) tensor and a (3, 1) tensor gives a (2, 1) tensor; use .flatten() to print it.",
+      "starter": "import torch\n\nmarks = torch.tensor([\n    [70.0, 80.0, 90.0],\n    [60.0, 75.0, 85.0]\n])   # rows = students, columns = subjects\n\n# TODO 1: print the shape and the number of dimensions\n# TODO 2: average marks per student (mean over dim=1), printed with 2 decimals\n# TODO 3: average marks per subject (mean over dim=0), printed with 2 decimals\n# TODO 4: add 5 bonus marks to every value and print it with .tolist()\n# TODO 5: reshape marks to (3, 2) and print it with .tolist()\n# TODO 6: weights = [[0.3], [0.3], [0.4]]; use torch.matmul to get each student's weighted score (2 decimals)",
+      "solution": "import torch\n\nmarks = torch.tensor([\n    [70.0, 80.0, 90.0],\n    [60.0, 75.0, 85.0]\n])   # rows = students, columns = subjects\n\nprint(\"Shape:\", marks.shape)\nprint(\"Dimensions:\", marks.ndim)\n\nstudent_avg = marks.mean(dim=1)\nprint(\"Average per student:\", \" \".join(f\"{v:.2f}\" for v in student_avg.tolist()))\n\nsubject_avg = marks.mean(dim=0)\nprint(\"Average per subject:\", \" \".join(f\"{v:.2f}\" for v in subject_avg.tolist()))\n\nbonus = marks + 5\nprint(\"With bonus:\", bonus.tolist())\n\nreshaped = marks.reshape(3, 2)\nprint(\"Reshaped (3, 2):\", reshaped.tolist())\n\nweights = torch.tensor([[0.3], [0.3], [0.4]])\nweighted = torch.matmul(marks, weights)\nprint(\"Weighted score per student:\", \" \".join(f\"{v:.2f}\" for v in weighted.flatten().tolist()))",
+      "output": "Shape: torch.Size([2, 3])\nDimensions: 2\nAverage per student: 80.00 73.33\nAverage per subject: 65.00 77.50 87.50\nWith bonus: [[75.0, 85.0, 95.0], [65.0, 80.0, 90.0]]\nReshaped (3, 2): [[70.0, 80.0], [90.0, 60.0], [75.0, 85.0]]\nWeighted score per student: 81.00 74.50",
+      "note": "Adding 5 to the whole tensor works through broadcasting. The weighted scores weigh the third subject most (0.4)."
+    },
+    {
+      "title": "Gradient Descent with Autograd",
+      "level": "Medium",
+      "file": "practice2.py",
+      "description": "Minimise (x - 4)^2 by hand-written gradient descent and check a derivative with autograd.",
+      "tasks": [
+        "Create x = 0.0 with requires_grad=True and a learning rate of 0.1",
+        "Loop 20 steps: loss = (x - 4) ** 2, then loss.backward()",
+        "Inside torch.no_grad(): x -= lr * x.grad, then x.grad.zero_()",
+        "Every 5 steps print the step, x and the loss with 4 decimals",
+        "Compute the gradient of z = x^3 + 2x at x = 2 with autograd",
+        "Print the value you expect from the derivative 3x^2 + 2"
+      ],
+      "hint": "Gradients accumulate, so call x.grad.zero_() after every update. Update the tensor inside torch.no_grad() so the update itself is not tracked.",
+      "starter": "import torch\n\n# Part A: gradient descent with autograd (no nn module)\n# TODO 1: x = tensor 0.0 with requires_grad=True, lr = 0.1\n# TODO 2: loop 20 steps: loss = (x - 4) ** 2, then loss.backward()\n# TODO 3: inside torch.no_grad(): x -= lr * x.grad, then x.grad.zero_()\n# TODO 4: every 5 steps print the step, x and the loss (4 decimals)\n\n# Part B: derivative of z = x^3 + 2x at x = 2\n# TODO 5: compute it with autograd and print the gradient with 1 decimal\n# TODO 6: print the answer you expect from the derivative 3x^2 + 2",
+      "solution": "import torch\n\n# Part A: gradient descent with autograd (no nn module)\nx = torch.tensor(0.0, requires_grad=True)\nlr = 0.1\n\nfor step in range(1, 21):\n    loss = (x - 4) ** 2\n    loss.backward()\n\n    with torch.no_grad():\n        x -= lr * x.grad\n    x.grad.zero_()\n\n    if step % 5 == 0:\n        print(f\"Step {step}: x = {x.item():.4f}, loss = {loss.item():.4f}\")\n\n# Part B: derivative of z = x^3 + 2x at x = 2\nx2 = torch.tensor(2.0, requires_grad=True)\nz = x2 ** 3 + 2 * x2\nz.backward()\n\nprint(f\"Gradient of x^3 + 2x at x=2: {x2.grad.item():.1f}\")\nprint(\"Expected from 3x^2 + 2:\", 3 * 2 ** 2 + 2)",
+      "output": "Step 5: x = 2.6893, loss = 2.6844\nStep 10: x = 3.5705, loss = 0.2882\nStep 15: x = 3.8593, loss = 0.0309\nStep 20: x = 3.9539, loss = 0.0033\nGradient of x^3 + 2x at x=2: 14.0\nExpected from 3x^2 + 2: 14",
+      "note": "x moves toward the minimum at 4 and the loss shrinks each step. Without zero_(), gradients would add up and the steps would be wrong."
+    }
+  ],
+  "checklist": [
+    "Installed PyTorch and checked CUDA",
+    "Created scalar, vector, matrix and 3D tensors",
+    "Used ndim and shape",
+    "Ran tensor operations",
+    "Understood CPU vs GPU devices",
+    "Calculated a gradient with autograd",
+    "Ran day25_pytorch.py and day25_training.py"
+  ],
+  "quiz": [
+    {
+      "q": "What is the shape of a matrix with 2 rows and 3 columns?",
+      "options": [
+        "(3, 2)",
+        "(2, 3)",
+        "(6,)",
+        "(2, 3, 1)"
+      ],
+      "answer": 1,
+      "why": "Shape lists the size along each dimension, rows first: (2, 3)."
+    },
+    {
+      "q": "What does a * b do for two tensors of the same shape?",
+      "options": [
+        "Matrix multiplication",
+        "Element-wise multiplication",
+        "Dot product only",
+        "Concatenation"
+      ],
+      "answer": 1,
+      "why": "The * operator multiplies matching elements. Use torch.matmul for matrix multiplication."
+    },
+    {
+      "q": "What does requires_grad=True do?",
+      "options": [
+        "Moves the tensor to the GPU",
+        "Makes PyTorch track operations to compute gradients",
+        "Converts it to integers",
+        "Freezes the tensor"
+      ],
+      "answer": 1,
+      "why": "PyTorch records operations on the tensor so that backward() can calculate gradients automatically."
+    },
+    {
+      "q": "Why call optimizer.zero_grad() in each training iteration?",
+      "options": [
+        "To speed up training",
+        "To clear gradients left from the previous iteration",
+        "To reset the weights to zero",
+        "To change the learning rate"
+      ],
+      "answer": 1,
+      "why": "Gradients accumulate by default. Clearing them ensures each update uses only the current iteration's gradients."
+    },
+    {
+      "q": "Which order is the PyTorch training workflow?",
+      "options": [
+        "Backward, forward, loss, step",
+        "Forward pass, loss, zero grad, backward, optimizer step",
+        "Step, loss, forward, backward",
+        "Loss, step, zero grad, forward"
+      ],
+      "answer": 1,
+      "why": "Predict (forward pass), measure the error (loss), clear old gradients, compute new ones (backward), then update the parameters (step)."
+    }
+  ]
+},
   ]
 };
