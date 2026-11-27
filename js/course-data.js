@@ -13017,6 +13017,358 @@ Average used to fill: 245.0
     },
   ],
   "checklist": []
+},
+{
+  "day": 31,
+  "thanks": "thanks.html",
+  "title": "Bonus: Train, Save & Reuse Your First Model",
+  "subtitle": "From creating a dataset to a loadable joblib file in one small project",
+  "level": "Beginner to Intermediate",
+  "duration": "60 min",
+  "tags": [
+    "Bonus",
+    "Project",
+    "joblib",
+    "Pipeline",
+    "Deployment"
+  ],
+  "goals": [
+    "Follow the 8-step path from raw data to a saved model",
+    "Beat a baseline honestly and compare models with cross-validation",
+    "Save a joblib artifact with its feature list and metadata",
+    "Load it in a fresh program and predict with input checks"
+  ],
+  "sections": [
+    {
+      "id": "intro",
+      "icon": "🎁",
+      "title": "Surprise! Your first complete model, start to finish",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "You finished the 30-day roadmap, so here is a bonus: one small project that walks the **whole path a real model takes**, from creating a dataset to a saved `.joblib` file anyone can load and use. Keep the order in your head; you will reuse it on every project."
+        },
+        {
+          "type": "table",
+          "head": [
+            "Step",
+            "Question",
+            "Tool"
+          ],
+          "rows": [
+            [
+              "1. Create data",
+              "What am I predicting, from what?",
+              "pandas, NumPy, CSV"
+            ],
+            [
+              "2. Explore",
+              "Is the data clean and balanced?",
+              "shape, isnull, value_counts"
+            ],
+            [
+              "3. Split",
+              "How do I keep an honest test?",
+              "train_test_split"
+            ],
+            [
+              "4. Baseline",
+              "What does 'do nothing smart' score?",
+              "DummyClassifier"
+            ],
+            [
+              "5. Pipeline + train",
+              "How do I bundle scaling and model?",
+              "Pipeline"
+            ],
+            [
+              "6. Evaluate + compare",
+              "Is it good, and is a fancier model better?",
+              "report, cross_val_score"
+            ],
+            [
+              "7. Save",
+              "How do I reuse it tomorrow?",
+              "joblib"
+            ],
+            [
+              "8. Load + predict",
+              "Can someone else use it safely?",
+              "a predict function"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Our project: predict whether a student **passes** from study hours, sleep, attendance and previous score. The data is generated, so every learner gets identical results."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "🗂️",
+      "title": "Step 1: Create the dataset (runnable)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Real projects start from a CSV. We generate one with NumPy so you see how data becomes a file, then read it back exactly as you would any downloaded dataset."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Generate, save and reload a CSV",
+          "code": "import os\nimport numpy as np\nimport pandas as pd\n\nrng = np.random.RandomState(31)\nn = 600\ndf = pd.DataFrame({\n    \"hours_studied\": np.round(rng.uniform(0, 10, n), 1),\n    \"sleep_hours\": np.round(rng.uniform(4, 9, n), 1),\n    \"attendance\": rng.randint(40, 101, n),\n    \"previous_score\": np.round(rng.normal(60, 15, n)).clip(0, 100).astype(int),\n})\nsignal = (0.5 * df[\"hours_studied\"] + 0.3 * (df[\"sleep_hours\"] - 6.5)\n          + 0.05 * (df[\"attendance\"] - 70) + 0.06 * (df[\"previous_score\"] - 60) - 2.2\n          + rng.normal(0, 1.0, n))\ndf[\"passed\"] = (signal > 0).astype(int)\n\nos.makedirs(\"data\", exist_ok=True)\ndf.to_csv(\"data/students.csv\", index=False)\n\ndf = pd.read_csv(\"data/students.csv\")\nprint(\"Shape:\", df.shape)\nprint(df.head(3).to_string(index=False))",
+          "output": "Shape: (600, 5)\n hours_studied  sleep_hours  attendance  previous_score  passed\n           2.9          4.8          97              63       1\n           9.6          4.3          69              53       1\n           7.7          7.1          95              77       1"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "Notice the target `passed` is built from the features **plus noise**. Real data is never perfectly predictable, so never expect 100% accuracy."
+        }
+      ]
+    },
+    {
+      "id": "explore",
+      "icon": "🔍",
+      "title": "Step 2: Explore before modelling (runnable)",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Quality and balance checks",
+          "code": "print(\"Missing values:\", int(df.isnull().sum().sum()))\nprint(\"Duplicate rows:\", int(df.duplicated().sum()))\nprint(\"Class counts:\", df[\"passed\"].value_counts().to_dict())\nprint(\"Pass rate:\", round(float(df[\"passed\"].mean()), 3))\nprint(df[[\"hours_studied\", \"attendance\"]].describe().round(2).loc[[\"mean\", \"min\", \"max\"]].to_string())",
+          "output": "Missing values: 0\nDuplicate rows: 0\nClass counts: {1: 328, 0: 272}\nPass rate: 0.547\n      hours_studied  attendance\nmean           4.86       70.97\nmin            0.00       40.00\nmax           10.00      100.00"
+        },
+        {
+          "type": "callout",
+          "tone": "info",
+          "text": "Check missing values, duplicates and class balance first. Heavy imbalance would change how you judge the model (see Day 19)."
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "icon": "✂️",
+      "title": "Steps 3 and 4: Split and set a baseline (runnable)",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Split, then score a 'do nothing' model",
+          "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyClassifier\n\nX = df.drop(\"passed\", axis=1)\ny = df[\"passed\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\nprint(\"Train / test:\", len(X_train), \"/\", len(X_test))\n\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)\nprint(\"Baseline accuracy:\", round(baseline.score(X_test, y_test), 3))",
+          "output": "Train / test: 480 / 120\nBaseline accuracy: 0.55"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "The baseline is the score to beat. If your model barely beats 'always predict the most common class', it has learned almost nothing."
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "icon": "🏋️",
+      "title": "Steps 5 and 6: Pipeline, train, evaluate (runnable)",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Train a scaling + Logistic Regression pipeline",
+          "code": "from sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, confusion_matrix, classification_report\n\npipe = Pipeline([\n    (\"scaler\", StandardScaler()),\n    (\"model\", LogisticRegression(max_iter=1000, random_state=42)),\n])\npipe.fit(X_train, y_train)\n\npred = pipe.predict(X_test)\nacc = accuracy_score(y_test, pred)\nprint(\"Test accuracy:\", round(acc, 3))\nprint(confusion_matrix(y_test, pred))\nprint(classification_report(y_test, pred, target_names=[\"Fail\", \"Pass\"]))",
+          "output": "Test accuracy: 0.875\n[[47  7]\n [ 8 58]]\n              precision    recall  f1-score   support\n\n        Fail       0.85      0.87      0.86        54\n        Pass       0.89      0.88      0.89        66\n\n    accuracy                           0.88       120\n   macro avg       0.87      0.87      0.87       120\nweighted avg       0.88      0.88      0.88       120"
+        },
+        {
+          "type": "p",
+          "text": "Is a fancier model worth it? Compare candidates with **cross-validation on the training data only**, so the test set stays untouched."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Compare two models fairly",
+          "code": "from sklearn.model_selection import cross_val_score\nfrom sklearn.ensemble import RandomForestClassifier\n\ncandidates = {\n    \"Logistic Regression\": pipe,\n    \"Random Forest\": RandomForestClassifier(n_estimators=50, random_state=42),\n}\nfor name, model in candidates.items():\n    scores = cross_val_score(model, X_train, y_train, cv=5)\n    print(f\"{name}: {scores.mean():.3f}\")",
+          "output": "Logistic Regression: 0.823\nRandom Forest: 0.792"
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "If two models score about the same, **keep the simpler one**: it is faster, easier to explain and easier to maintain. We keep the pipeline."
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "icon": "💾",
+      "title": "Step 7: Save it with joblib (runnable)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A trained model disappears when Python closes. `joblib` writes it to a file. Save an **artifact**: the pipeline plus everything needed to use it correctly (feature order, label names, version)."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Save the model artifact",
+          "code": "import joblib\n\nartifact = {\n    \"pipeline\": pipe,\n    \"features\": list(X.columns),\n    \"target_names\": {0: \"Fail\", 1: \"Pass\"},\n    \"model_version\": \"1.0\",\n    \"test_accuracy\": round(float(acc), 3),\n}\nos.makedirs(\"models\", exist_ok=True)\njoblib.dump(artifact, \"models/student_model_v1.joblib\")\nprint(\"Saved:\", os.path.exists(\"models/student_model_v1.joblib\"))",
+          "output": "Saved: True"
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "text": "A `.joblib` file loads reliably only with the **same scikit-learn version** that saved it. Write the version in `requirements.txt`. Only load joblib files you created or trust: loading can run code."
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "icon": "🚀",
+      "title": "Step 8: Load it and predict (runnable)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Loading the file in a fresh program is the real test. Wrap prediction in a small function that **checks the input** so bad data gives a clear error instead of a wrong answer."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "title": "Load and use the saved model",
+          "code": "loaded = joblib.load(\"models/student_model_v1.joblib\")\n\ndef predict_student(art, record):\n    missing = [f for f in art[\"features\"] if f not in record]\n    if missing:\n        raise ValueError(f\"Missing features: {missing}\")\n    row = pd.DataFrame([record], columns=art[\"features\"])\n    proba = float(art[\"pipeline\"].predict_proba(row)[0, 1])\n    return {\"pass_probability\": round(proba, 3), \"prediction\": art[\"target_names\"][int(proba >= 0.5)]}\n\nprint(predict_student(loaded, {\"hours_studied\": 8.0, \"sleep_hours\": 7.5, \"attendance\": 92, \"previous_score\": 75}))\nprint(predict_student(loaded, {\"hours_studied\": 1.0, \"sleep_hours\": 5.0, \"attendance\": 45, \"previous_score\": 40}))\n\ntry:\n    predict_student(loaded, {\"hours_studied\": 5.0})\nexcept ValueError as error:\n    print(\"Error:\", error)",
+          "output": "{'pass_probability': 0.997, 'prediction': 'Pass'}\n{'pass_probability': 0.001, 'prediction': 'Fail'}\nError: Missing features: ['sleep_hours', 'attendance', 'previous_score']"
+        }
+      ]
+    },
+    {
+      "id": "ship",
+      "icon": "📦",
+      "title": "Where this goes next",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "text",
+          "title": "Suggested project folder",
+          "code": "student_model/\n  data/students.csv\n  models/student_model_v1.joblib\n  src/train.py       # steps 1-7\n  src/predict.py     # step 8\n  requirements.txt   # pin scikit-learn and pandas versions\n  README.md"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Split the final program below into `train.py` and `predict.py`.",
+            "Wrap `predict_student` in a FastAPI endpoint (Days 23 and 24).",
+            "Retrain when new data arrives and bump `model_version`.",
+            "Re-check the baseline and metrics every time you retrain."
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "text": "You just practised the full loop of applied ML: data, model, evidence, file, reuse. Everything else in the field is a deeper version of these eight steps. Well done!"
+        }
+      ]
+    }
+  ],
+  "finalProgram": {
+    "title": "Student Pass Predictor: data to joblib",
+    "file": "student_model.py",
+    "description": "The whole bonus project in one script: create data, train against a baseline, save a joblib artifact, reload it and predict.",
+    "concepts": [
+      "dataset creation",
+      "baseline",
+      "Pipeline",
+      "joblib artifact",
+      "input validation"
+    ],
+    "code": "import os\nimport joblib\nimport numpy as np\nimport pandas as pd\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\n\ndef make_dataset(n=600, seed=31):\n    rng = np.random.RandomState(seed)\n    df = pd.DataFrame({\n        \"hours_studied\": np.round(rng.uniform(0, 10, n), 1),\n        \"sleep_hours\": np.round(rng.uniform(4, 9, n), 1),\n        \"attendance\": rng.randint(40, 101, n),\n        \"previous_score\": np.round(rng.normal(60, 15, n)).clip(0, 100).astype(int),\n    })\n    signal = (0.5 * df[\"hours_studied\"] + 0.3 * (df[\"sleep_hours\"] - 6.5)\n              + 0.05 * (df[\"attendance\"] - 70) + 0.06 * (df[\"previous_score\"] - 60) - 2.2\n              + rng.normal(0, 1.0, n))\n    df[\"passed\"] = (signal > 0).astype(int)\n    return df\n\ndef train_and_save(path=\"models/student_model_v1.joblib\"):\n    df = make_dataset()\n    X, y = df.drop(\"passed\", axis=1), df[\"passed\"]\n    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\n    baseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train).score(X_test, y_test)\n    pipe = Pipeline([(\"scaler\", StandardScaler()), (\"model\", LogisticRegression(max_iter=1000, random_state=42))])\n    pipe.fit(X_train, y_train)\n    acc = pipe.score(X_test, y_test)\n    os.makedirs(os.path.dirname(path), exist_ok=True)\n    joblib.dump({\"pipeline\": pipe, \"features\": list(X.columns), \"target_names\": {0: \"Fail\", 1: \"Pass\"},\n                 \"model_version\": \"1.0\", \"test_accuracy\": round(float(acc), 3)}, path)\n    return round(baseline, 3), round(acc, 3)\n\ndef predict_student(path, record):\n    art = joblib.load(path)\n    missing = [f for f in art[\"features\"] if f not in record]\n    if missing:\n        raise ValueError(f\"Missing features: {missing}\")\n    row = pd.DataFrame([record], columns=art[\"features\"])\n    proba = float(art[\"pipeline\"].predict_proba(row)[0, 1])\n    return {\"pass_probability\": round(proba, 3), \"prediction\": art[\"target_names\"][int(proba >= 0.5)]}\n\nbaseline, accuracy = train_and_save()\nprint(\"Baseline accuracy:\", baseline)\nprint(\"Model accuracy:\", accuracy)\nprint(predict_student(\"models/student_model_v1.joblib\", {\"hours_studied\": 8.0, \"sleep_hours\": 7.5, \"attendance\": 92, \"previous_score\": 75}))\nprint(predict_student(\"models/student_model_v1.joblib\", {\"hours_studied\": 1.0, \"sleep_hours\": 5.0, \"attendance\": 45, \"previous_score\": 40}))",
+    "output": "Baseline accuracy: 0.55\nModel accuracy: 0.875\n{'pass_probability': 0.997, 'prediction': 'Pass'}\n{'pass_probability': 0.001, 'prediction': 'Fail'}"
+  },
+  "practice": [
+    {
+      "title": "Churn Dataset Builder",
+      "level": "Easy",
+      "file": "practice1_dataset.py",
+      "description": "Turn generated data into a CSV, reload it and find the baseline to beat.",
+      "tasks": [
+        "Save and reload a CSV",
+        "Check class counts",
+        "Stratified split",
+        "Baseline accuracy"
+      ],
+      "hint": "Create the folder with os.makedirs(\"data\", exist_ok=True) before to_csv. DummyClassifier(strategy=\"most_frequent\").",
+      "starter": "import os\nimport numpy as np\nimport pandas as pd\n\nrng = np.random.RandomState(5)\nn = 400\ndf = pd.DataFrame({\n    \"tenure_months\": rng.randint(1, 61, n),\n    \"monthly_bill\": np.round(rng.uniform(20, 120, n), 2),\n    \"support_calls\": rng.poisson(2, n),\n})\nsignal = 0.5 * df[\"support_calls\"] + 0.02 * (df[\"monthly_bill\"] - 70) - 0.04 * df[\"tenure_months\"] - 0.3 + rng.normal(0, 1, n)\ndf[\"churned\"] = (signal > 0).astype(int)\n\n# TODO 1: save df to data/customers.csv (create the data folder first)\n\n# TODO 2: read it back and print its shape\n\n# TODO 3: print the class counts of churned (value_counts().to_dict())\n\n# TODO 4: stratified 80/20 split (random_state=42), then print the\n#         accuracy of DummyClassifier(strategy=\"most_frequent\") on the test set (3 decimals)",
+      "solution": "import os\nimport numpy as np\nimport pandas as pd\n\nrng = np.random.RandomState(5)\nn = 400\ndf = pd.DataFrame({\n    \"tenure_months\": rng.randint(1, 61, n),\n    \"monthly_bill\": np.round(rng.uniform(20, 120, n), 2),\n    \"support_calls\": rng.poisson(2, n),\n})\nsignal = 0.5 * df[\"support_calls\"] + 0.02 * (df[\"monthly_bill\"] - 70) - 0.04 * df[\"tenure_months\"] - 0.3 + rng.normal(0, 1, n)\ndf[\"churned\"] = (signal > 0).astype(int)\n\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.model_selection import train_test_split\n\nos.makedirs(\"data\", exist_ok=True)\ndf.to_csv(\"data/customers.csv\", index=False)\ndf = pd.read_csv(\"data/customers.csv\")\nprint(\"Shape:\", df.shape)\nprint(\"Class counts:\", df[\"churned\"].value_counts().to_dict())\n\nX = df.drop(\"churned\", axis=1)\ny = df[\"churned\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\nbaseline = DummyClassifier(strategy=\"most_frequent\").fit(X_train, y_train)\nprint(\"Baseline accuracy:\", round(baseline.score(X_test, y_test), 3))",
+      "output": "Shape: (400, 4)\nClass counts: {0: 238, 1: 162}\nBaseline accuracy: 0.6"
+    },
+    {
+      "title": "Ship It with joblib",
+      "level": "Medium",
+      "file": "practice2_ship_it.py",
+      "description": "Save a trained pipeline, reload it and serve safe predictions.",
+      "tasks": [
+        "Save an artifact dict",
+        "Reload it",
+        "Write a validating predict function",
+        "Test a good and a bad record"
+      ],
+      "hint": "The artifact holds the pipeline AND the feature list. Build the row with pd.DataFrame([record], columns=art[\"features\"]).",
+      "starter": "import os\nimport numpy as np\nimport pandas as pd\n\nrng = np.random.RandomState(6)\nn = 400\ndf = pd.DataFrame({\n    \"tenure_months\": rng.randint(1, 61, n),\n    \"monthly_bill\": np.round(rng.uniform(20, 120, n), 2),\n    \"support_calls\": rng.poisson(2, n),\n})\nsignal = 0.5 * df[\"support_calls\"] + 0.02 * (df[\"monthly_bill\"] - 70) - 0.04 * df[\"tenure_months\"] - 0.3 + rng.normal(0, 1, n)\ndf[\"churned\"] = (signal > 0).astype(int)\n\nimport joblib\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\n\nX = df.drop(\"churned\", axis=1)\ny = df[\"churned\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\npipe = Pipeline([(\"scaler\", StandardScaler()), (\"model\", LogisticRegression(max_iter=1000, random_state=42))])\npipe.fit(X_train, y_train)\n\n# TODO 1: save {\"pipeline\": pipe, \"features\": list(X.columns)} to models/churn_v1.joblib\n\n# TODO 2: reload it into a new variable\n\n# TODO 3: write predict_churn(art, record) -> raise ValueError(\"Missing features: [...]\") if any\n#         feature is absent; otherwise return {\"churn_probability\": ..., \"prediction\": \"Churn\" or \"Stay\"}\n\n# TODO 4: print the prediction for {\"tenure_months\": 3, \"monthly_bill\": 110.0, \"support_calls\": 6}\n#         then catch and print the error for {\"tenure_months\": 3}",
+      "solution": "import os\nimport numpy as np\nimport pandas as pd\n\nrng = np.random.RandomState(6)\nn = 400\ndf = pd.DataFrame({\n    \"tenure_months\": rng.randint(1, 61, n),\n    \"monthly_bill\": np.round(rng.uniform(20, 120, n), 2),\n    \"support_calls\": rng.poisson(2, n),\n})\nsignal = 0.5 * df[\"support_calls\"] + 0.02 * (df[\"monthly_bill\"] - 70) - 0.04 * df[\"tenure_months\"] - 0.3 + rng.normal(0, 1, n)\ndf[\"churned\"] = (signal > 0).astype(int)\n\nimport joblib\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\n\nX = df.drop(\"churned\", axis=1)\ny = df[\"churned\"]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)\npipe = Pipeline([(\"scaler\", StandardScaler()), (\"model\", LogisticRegression(max_iter=1000, random_state=42))])\npipe.fit(X_train, y_train)\n\nos.makedirs(\"models\", exist_ok=True)\njoblib.dump({\"pipeline\": pipe, \"features\": list(X.columns)}, \"models/churn_v1.joblib\")\nart = joblib.load(\"models/churn_v1.joblib\")\n\ndef predict_churn(art, record):\n    missing = [f for f in art[\"features\"] if f not in record]\n    if missing:\n        raise ValueError(f\"Missing features: {missing}\")\n    row = pd.DataFrame([record], columns=art[\"features\"])\n    proba = float(art[\"pipeline\"].predict_proba(row)[0, 1])\n    return {\"churn_probability\": round(proba, 3), \"prediction\": \"Churn\" if proba >= 0.5 else \"Stay\"}\n\nprint(predict_churn(art, {\"tenure_months\": 3, \"monthly_bill\": 110.0, \"support_calls\": 6}))\ntry:\n    predict_churn(art, {\"tenure_months\": 3})\nexcept ValueError as error:\n    print(\"Error:\", error)",
+      "output": "{'churn_probability': 0.994, 'prediction': 'Churn'}\nError: Missing features: ['monthly_bill', 'support_calls']",
+      "note": "Saving the feature list is what lets the predict function check input and keep the column order."
+    }
+  ],
+  "checklist": [
+    "I can list the 8 steps of a small ML project",
+    "I created a dataset and saved it as CSV",
+    "I checked missing values and class balance",
+    "I measured a baseline before trusting my model",
+    "I compared models with cross-validation, not the test set",
+    "I saved the pipeline plus its feature list with joblib",
+    "I loaded the model and predicted with input validation"
+  ],
+  "quiz": [
+    {
+      "q": "Why measure a baseline before training your model?",
+      "options": [
+        "It makes training faster",
+        "It shows the score a model must beat to be useful",
+        "It scales the features",
+        "It saves the model"
+      ],
+      "answer": 1,
+      "why": "If a model barely beats 'always predict the most common class' it has learned almost nothing."
+    },
+    {
+      "q": "Why compare models with cross-validation on the training data?",
+      "options": [
+        "The test set stays untouched for the final check",
+        "It is faster than testing",
+        "Cross-validation raises accuracy",
+        "Test data cannot be used at all"
+      ],
+      "answer": 0,
+      "why": "Choosing a model on the test set would make the final score optimistic."
+    },
+    {
+      "q": "Why store the feature list inside the saved artifact?",
+      "options": [
+        "To make the file smaller",
+        "So predictions can validate input and keep the column order",
+        "joblib requires it",
+        "To improve accuracy"
+      ],
+      "answer": 1,
+      "why": "The pipeline needs the same columns in the same order as in training."
+    },
+    {
+      "q": "What must match when loading a joblib model on another machine?",
+      "options": [
+        "The file name",
+        "The scikit-learn version",
+        "The CSV name",
+        "The screen size"
+      ],
+      "answer": 1,
+      "why": "A pickled model depends on the library version that created it."
+    }
+  ]
 }
    ]
 };

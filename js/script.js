@@ -209,7 +209,7 @@
   /* Progress helpers */
   function checks(n) { var d = findDay(n); return store.get("ml30:check:" + n, d ? d.checklist.map(function () { return false; }) : []); }
   function isDone(n) { var c = checks(n); return c.length > 0 && c.every(Boolean); }
-  function doneCount() { return days.filter(function (d) { return isDone(d.day); }).length; }
+  function doneCount() { return days.filter(function (d) { return d.day <= TOTAL && isDone(d.day); }).length; }
   function findDay(n) { return days.filter(function (d) { return d.day === n; })[0]; }
 
   function updateProgress() {
@@ -233,6 +233,11 @@
           '<span class="state">🔒 Locked</span></div>';
       }
     }
+    days.filter(function (d) { return d.day > TOTAL; }).forEach(function (b) {
+      html += '<a class="card open bonus' + (isDone(b.day) ? " done" : "") + '" style="border-color:#7c5cff" href="#/day/' + b.day + '">' +
+        '<span class="num">🎁 BONUS · DAY ' + b.day + "</span><h3>" + esc(b.title) + "</h3>" +
+        '<span class="state">' + (isDone(b.day) ? "✅ Completed" : "▶ Start bonus lesson") + "</span></a>";
+    });
     $("#roadmapGrid").innerHTML = html;
   }
 
@@ -329,7 +334,7 @@
 
     lesson.innerHTML =
       '<div class="lesson-head"><a class="back" href="#/">← All days</a><br>' +
-      '<span class="daybadge">DAY ' + d.day + " / " + TOTAL + "</span><h1>" + esc(d.title) + "</h1><p>" + esc(d.subtitle) + "</p>" +
+      '<span class="daybadge">' + (d.day > TOTAL ? "🎁 BONUS DAY " + d.day : "DAY " + d.day + " / " + TOTAL) + "</span><h1>" + esc(d.title) + "</h1><p>" + esc(d.subtitle) + "</p>" +
       '<div class="meta-row"><span>🎓 ' + esc(d.level) + "</span><span>⏱ " + esc(d.duration) + "</span>" +
       (COURSE.colabBase ? '<a class="btn colab" target="_blank" rel="noopener" href="' + esc(COURSE.colabBase + "day-" + (d.day < 10 ? "0" : "") + d.day + ".ipynb") + '">Open in Colab ↗</a>' : "") + "</div>" +
       '<div class="tags">' + d.tags.map(function (t) { return '<span class="tag">' + esc(t) + "</span>"; }).join("") + "</div></div>" +
@@ -338,8 +343,9 @@
       d.goals.map(function (g) { return "<li>" + esc(g) + "</li>"; }).join("") + "</ul></article>" + secs +
       extra + '<article class="box" id="s-checklist"><h2>✅ End of Day ' + d.day + ' Checklist</h2><div id="checkList"></div><div class="done-msg" id="doneMsg"></div></article>' +
       '<article class="box" id="s-quiz"><h2>❓ Quick Quiz</h2><div id="quiz"></div><p class="score" id="score"></p></article>' +
+      (d.thanks ? '<article class="box" id="s-thanks"><h2>🎓 Thank You</h2><div id="thanksBody"></div></article>' : "") +
       '<div class="pager">' + (prev ? '<a class="btn" href="#/day/' + prev.day + '">← Day ' + prev.day + "</a>" : "<span></span>") +
-      (next ? '<a class="btn primary" href="#/day/' + next.day + '">Day ' + next.day + " →</a>" : '<span class="pill">More days coming soon</span>') +
+      (next ? '<a class="btn primary" href="#/day/' + next.day + '">' + (next.day > TOTAL ? "🎁 Bonus Day " : "Day ") + next.day + " →</a>" : '<span class="pill">' + (d.day > TOTAL ? "🎉 Course complete" : "More days coming soon") + '</span>') +
       "</div></div></div>";
 
     bindCopy(); bindToc(); bindPlayground(); renderChecklist(d); renderQuiz(d);
@@ -377,17 +383,84 @@
     });
   }
 
+  /* Celebration: confetti poppers drawn over the whole page */
+  var confetti = { parts: [], canvas: null, ctx: null, running: false };
+  function celebrate(count) {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var c = confetti.canvas;
+    if (!c) {
+      c = confetti.canvas = document.createElement("canvas");
+      c.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:9999;pointer-events:none";
+      document.body.appendChild(c);
+      confetti.ctx = c.getContext("2d");
+    }
+    var ctx = confetti.ctx;
+    if (!ctx) { c.remove(); confetti.canvas = null; return; }
+    c.width = window.innerWidth; c.height = window.innerHeight;
+    var colors = ["#6366f1", "#22d3ee", "#fbbf24", "#fb7185", "#34d399", "#a78bfa"], n = count || 110;
+    function add(x, y, vx, vy) {
+      confetti.parts.push({ x: x, y: y, vx: vx, vy: vy, size: 4 + Math.random() * 5, color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1, rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 0.15 });
+    }
+    for (var i = 0; i < n; i++) {
+      add(c.width * (0.2 + Math.random() * 0.6), c.height * 0.35, (Math.random() - 0.5) * 9, (Math.random() - 1.15) * 9);   // centre burst
+    }
+    for (var j = 0; j < n / 2; j++) {                                                                                 // two corner poppers
+      add(0, c.height, 3 + Math.random() * 7, -(9 + Math.random() * 9));
+      add(c.width, c.height, -(3 + Math.random() * 7), -(9 + Math.random() * 9));
+    }
+    if (confetti.running) return;
+    confetti.running = true;
+    (function frame() {
+      ctx.clearRect(0, 0, c.width, c.height);
+      confetti.parts = confetti.parts.filter(function (p) { return p.alpha > 0.02 && p.y < c.height + 20; });
+      confetti.parts.forEach(function (p) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.vx *= 0.99; p.alpha -= 0.008; p.rot += p.vrot;
+        ctx.save(); ctx.globalAlpha = Math.max(0, p.alpha); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65); ctx.restore();
+      });
+      if (confetti.parts.length) { requestAnimationFrame(frame); }
+      else { confetti.running = false; c.remove(); confetti.canvas = null; }
+    })();
+  }
+  /* The embedded thank-you page asks the parent to celebrate (its own canvas is off-screen in a tall frame) */
+  window.addEventListener("message", function (e) {
+    var fr = document.querySelector(".thanks-frame");
+    if (e.data && e.data.type === "celebrate" && fr && e.source === fr.contentWindow) celebrate(110);
+  });
+
+  /* Thank-you page: unlocks when the day's checklist is complete (set d.thanks in course-data.js) */
+  function renderThanks(d, unlocked, animate) {
+    var box = $("#thanksBody");
+    if (!box || !d.thanks) return;
+    if (!unlocked) {
+      box.dataset.open = "";
+      box.innerHTML = "<p>🔒 Tick every item in the Day " + d.day + " checklist to unlock your thank-you page.</p>";
+      return;
+    }
+    if (box.dataset.open === "1") return;
+    box.dataset.open = "1";
+    box.innerHTML = '<iframe class="thanks-frame" src="' + esc(d.thanks) + '" title="Thank you" style="width:100%;height:1100px;border:0;border-radius:16px;background:#090d16"></iframe>' +
+      '<p><button type="button" class="btn primary" id="celebrateBtn">🎉 Celebrate</button> <a class="btn" target="_blank" rel="noopener" href="' + esc(d.thanks) + '">Open the thank-you page in full ↗</a></p>';
+    $("#celebrateBtn").addEventListener("click", function () { celebrate(110); });
+    if (animate) celebrate(130);
+    var fr = box.querySelector("iframe");
+    fr.addEventListener("load", function () {
+      try { fr.style.height = "400px"; fr.style.height = fr.contentDocument.documentElement.scrollHeight + "px"; } catch (e) { fr.style.height = "1100px"; }
+    });
+  }
+
   function renderChecklist(d) {
     var state = checks(d.day), box = $("#checkList");
     box.innerHTML = d.checklist.map(function (c, i) {
       return '<label class="check"><input type="checkbox" data-i="' + i + '"' + (state[i] ? " checked" : "") + "><span>" + esc(c) + "</span></label>";
     }).join("");
-    var msg = function () { $("#doneMsg").textContent = state.every(Boolean) ? "🎉 Day " + d.day + " complete! Great work." : ""; };
+    var msg = function (anim) { $("#doneMsg").textContent = state.every(Boolean) ? "🎉 Day " + d.day + " complete! Great work." : ""; renderThanks(d, state.every(Boolean), anim === true); };
     box.querySelectorAll("input").forEach(function (inp) {
       inp.addEventListener("change", function () {
         state[+inp.dataset.i] = inp.checked;
         store.set("ml30:check:" + d.day, state);
-        msg(); updateProgress(); renderRoadmap();
+        msg(true); updateProgress(); renderRoadmap();
       });
     });
     msg();

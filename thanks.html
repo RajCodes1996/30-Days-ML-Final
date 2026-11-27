@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <base target="_top" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Thank You — 30 Days of Machine Learning</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -342,7 +343,7 @@
       <p>
         Thank you for trusting this roadmap with your time and energy. Whether you are preparing for your next engineering role, building your own AI products, or teaching others what you have learned, remember that every great system starts with the exact habit you just proved: consistent daily progress.
       </p>
-      <div class="signature">— With gratitude, The 30 Days of ML Team</div>
+      <div class="signature">— With gratitude, The 30 Days of ML Team (Developer Rajarshi-Yadav)</div>
     </section>
 
     <div class="milestones">
@@ -426,9 +427,14 @@
       requestAnimationFrame(animate);
     }
 
-    spawnBurst(110);
+    // Embedded in the course page? Then the parent page draws the confetti over the whole screen.
+    const embedded = window.parent !== window;
+    if (!embedded) spawnBurst(110);
     animate();
-    document.getElementById('celebrate-btn').addEventListener('click', () => spawnBurst(100));
+    document.getElementById('celebrate-btn').addEventListener('click', () => {
+      if (embedded) window.parent.postMessage({ type: 'celebrate' }, '*');
+      else spawnBurst(100);
+    });
   </script>
 </body>
 </html>
