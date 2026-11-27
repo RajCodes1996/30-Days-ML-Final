@@ -505,6 +505,18 @@
 
   /* Theme */
   function applyTheme(t) { if (t) document.documentElement.setAttribute("data-theme", t); }
+  /* Reset progress: clears every day's checklist on this device (the theme choice is kept) */
+  function resetProgress() {
+    if (!window.confirm("Reset all progress? This clears every checklist tick on this device and cannot be undone.")) return;
+    try {
+      Object.keys(localStorage).filter(function (k) { return k.indexOf("ml30:check:") === 0; })
+        .forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) {}
+    route();
+  }
+  var resetBtn = $("#resetBtn");
+  if (resetBtn) resetBtn.addEventListener("click", resetProgress);
+
   applyTheme(store.get("ml30:theme", null));
   $("#themeBtn").addEventListener("click", function () {
     var cur = document.documentElement.getAttribute("data-theme");
