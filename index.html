@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>30 Days Of Machine Learning</title>
   <meta name="description" content="A hands-on 30 day roadmap to learn Machine Learning with Python, NumPy, Pandas and scikit-learn.">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16.png">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <meta name="theme-color" content="#071635">
+  <meta property="og:image" content="images/logo.png">
   <link rel="stylesheet" href="css/style.css">
   <style>
     #devIntro{position:fixed;inset:0;z-index:10000;display:none;background:rgba(5,8,15,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -13,12 +19,15 @@
     #devClose{position:absolute;top:14px;right:18px;z-index:2;width:42px;height:42px;border-radius:50%;border:1px solid rgba(148,163,184,.35);background:rgba(15,23,42,.9);color:#fff;font-size:1.3rem;cursor:pointer}
     #devClose:hover{border-color:#22d3ee}
     body.dev-open{overflow:hidden}
+    .brand{display:flex;align-items:center}
+    .brand-logo{height:48px;width:auto;display:block;object-fit:contain}
+    @media(max-width:600px){.brand-logo{height:40px}}
     .reset-btn{display:block;margin:.9rem auto 0;padding:.45rem 1rem;font-size:.82rem;cursor:pointer}
   </style>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#/">🧠 <span>30 Days Of <b>ML</b></span></a>
+    <a class="brand" href="#/" aria-label="30 Days Of ML - Home"><img class="brand-logo" src="images/logo.jpg" alt="30 Days Of ML" width="592" height="365"></a>
     <div class="topbar-right">
       <span class="pill" id="topProgress">0 / 30 days</span>
       <button class="icon-btn" id="devBtn" aria-label="About the developer" title="About the developer">👤</button>
