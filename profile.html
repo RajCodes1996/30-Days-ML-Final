@@ -98,6 +98,21 @@ h2 em{font-style:normal;color:var(--pur)}
 .foot{text-align:center;color:var(--mut);font-size:.82rem;padding:1.6rem 1rem 2.2rem}
 @media(max-width:820px){.hero{grid-template-columns:1fr}.photo{order:-1;max-width:320px}.links{display:none}.nav-in{justify-content:space-between}.checks{grid-template-columns:1fr}.tag{left:8px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
+.caret{display:inline-block;width:.09em;height:1em;margin-left:.1em;background:var(--pur2);vertical-align:-.14em;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.cert-pdf{cursor:pointer;text-align:left;font:inherit;color:inherit;border-color:rgba(139,124,247,.55);background:linear-gradient(135deg,rgba(108,92,231,.24),var(--card));transition:transform .2s,border-color .2s,box-shadow .2s}
+.cert-pdf:hover{transform:translateY(-2px);border-color:var(--pur);box-shadow:0 10px 26px rgba(108,92,231,.3)}
+.cert-pdf b{font-size:.95rem}.cert-pdf span{display:block}
+.pdf-modal{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;background:rgba(5,8,15,.96)}
+.pdf-modal:not([hidden]){display:flex}
+.pdf-head{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;padding:.7rem 1.25rem;border-bottom:1px solid var(--line);background:#0f1422}
+.embedded .pdf-head{padding-right:4.3rem}
+.pdf-head b{font-size:1rem;margin-right:auto}
+.pdf-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+#pdfFrame{flex:1;width:100%;border:0;background:#fff}
+.pdf-note{color:var(--mut);font-size:.78rem;text-align:center;padding:.4rem 1rem;background:#0f1422}
+body.pdf-open{overflow:hidden}
+@media(prefers-reduced-motion:reduce){.caret{animation:none}.cert-pdf{transition:none}}
 </style>
 </head>
 <body>
@@ -112,8 +127,9 @@ h2 em{font-style:normal;color:var(--pur)}
 <header class="hero" id="top">
   <div>
     <span class="pill"><i class="dot"></i>Welcome, learner</span>
-    <h2>30 Days Of Machine Learning by<em> Rajarshi Yadav </em></h2>
-    <div class="sub">Teacher. Engineer. Problem Solver.</div>
+    <br>
+    <h2 data-tw>30 Days Of Machine Learning by<em> Rajarshi Yadav </em></h2>
+    <div class="sub" data-tw>Teacher. Engineer. Problem Solver.</div>
     <div class="checks">
       <div><span class="tick">✓</span>8+ years: industry + classroom</div>
       <div><span class="tick">✓</span>Python, AI/ML, FullStack Development &amp; Computer Science Teacher</div>
@@ -210,7 +226,7 @@ h2 em{font-style:normal;color:var(--pur)}
     <div class="cert"><b>Explore Generative AI</b><span>Microsoft · 2026</span></div>
     <div class="cert"><b>Fundamentals of Digital Marketing</b><span>Google Digital Unlocked · 2021</span></div>
     <div class="cert"><b>Software Development Internship</b><span>JP Techno Park</span></div>
-    <div class="cert"><b>Certifications PDF</b><span>Click Here!</span></div>
+    <button type="button" class="cert cert-pdf" id="pdfOpen" aria-haspopup="dialog"><b>📄 Certifications PDF</b><span>Click here to view · 27 pages</span></button>
   </div>
 </div></div>
 
@@ -236,6 +252,19 @@ h2 em{font-style:normal;color:var(--pur)}
 </section>
 <p class="foot">Open to teaching, mentoring and development collaborations · References available on request</p>
 
+<div class="pdf-modal" id="pdfModal" role="dialog" aria-modal="true" aria-label="Certifications PDF" hidden>
+  <div class="pdf-head">
+    <b>Certifications PDF</b>
+    <span class="pdf-actions">
+      <a class="btn sm" href="docs/Rajarshi_Yadav_Certifications.pdf" target="_blank" rel="noopener">Open in new tab ↗</a>
+      <a class="btn sm" href="docs/Rajarshi_Yadav_Certifications.pdf" download>⬇ Download</a>
+      <button class="btn sm" id="pdfClose" type="button">✕ Close</button>
+    </span>
+  </div>
+  <iframe id="pdfFrame" title="Certifications PDF"></iframe>
+  <p class="pdf-note">If the PDF does not show on your device, use “Open in new tab” or “Download”.</p>
+</div>
+
 <script>
 (function () {
   var embedded = window.parent !== window;
@@ -247,6 +276,49 @@ h2 em{font-style:normal;color:var(--pur)}
       window.parent.postMessage({ type: "enter-course" }, "*");
     });
   });
+
+  /* Typewriter: types every [data-tw] element in order, keeping its markup. Add data-tw to any element to animate it. */
+  (function () {
+    var els = Array.prototype.slice.call(document.querySelectorAll("[data-tw]"));
+    if (!els.length) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;   // show full text
+    var caret = document.createElement("span"); caret.className = "caret"; caret.setAttribute("aria-hidden", "true");
+    var jobs = els.map(function (el) {
+      el.style.minHeight = el.getBoundingClientRect().height + "px";          // no layout jump while typing
+      el.setAttribute("aria-label", el.textContent.replace(/\s+/g, " ").trim());
+      var parts = [], walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), n;
+      while ((n = walker.nextNode())) { parts.push({ node: n, text: n.nodeValue }); n.nodeValue = ""; }
+      return { el: el, parts: parts };
+    });
+    function typeJob(k) {
+      if (k >= jobs.length) { setTimeout(function () { caret.remove(); }, 5000); return; }
+      var job = jobs[k], p = 0, c = 0;
+      job.el.appendChild(caret);
+      (function step() {
+        if (p >= job.parts.length) { setTimeout(function () { typeJob(k + 1); }, 250); return; }
+        var part = job.parts[p];
+        part.node.nodeValue = part.text.slice(0, ++c);
+        if (c >= part.text.length) { p++; c = 0; }
+        setTimeout(step, 38 + Math.random() * 40);
+      })();
+    }
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(function () { setTimeout(function () { typeJob(0); }, 350); });
+  })();
+
+  /* Certifications PDF viewer (lazy-loaded when opened) */
+  (function () {
+    var open = document.getElementById("pdfOpen"), modal = document.getElementById("pdfModal"),
+        frame = document.getElementById("pdfFrame"), closeBtn = document.getElementById("pdfClose");
+    if (!open || !modal) return;
+    function show() {
+      if (!frame.getAttribute("src")) frame.setAttribute("src", "docs/Rajarshi_Yadav_Certifications.pdf#view=FitH");
+      modal.hidden = false; document.body.classList.add("pdf-open"); closeBtn.focus();
+    }
+    function hide() { modal.hidden = true; document.body.classList.remove("pdf-open"); open.focus(); }
+    open.addEventListener("click", show);
+    closeBtn.addEventListener("click", hide);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !modal.hidden) hide(); });
+  })();
 })();
 </script>
 </body>
