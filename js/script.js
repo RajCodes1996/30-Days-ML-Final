@@ -6,6 +6,15 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   };
+  /* Light inline formatting for lesson text: `code`, **bold**, *italic* (no lookbehind, works on older iPhones) */
+  var md = function (t) {
+    return String(t).split(/(`[^`\n]+`)/).map(function (part) {
+      if (part.length > 2 && part.charAt(0) === "`" && part.slice(-1) === "`") return "<code>" + esc(part.slice(1, -1)) + "</code>";
+      return esc(part)
+        .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[^*\w])\*([^\s*][^*\n]*?[^\s*]|[^\s*])\*(?![*\w])/g, "$1<em>$2</em>");
+    }).join("");
+  };
 
   /* Safe storage (can be blocked in some browsers) */
   var store = {
@@ -115,7 +124,7 @@
       (r.output ? '<button type="button" class="pg-btn pg-check">✔ Check output</button>' : "") +
       '<button type="button" class="pg-btn pg-reset">↺ Reset code</button>' +
       '<button type="button" class="pg-btn pg-fresh" title="Forget all variables">⟲ Fresh session</button></span></div>' +
-      '<textarea class="pg-editor" spellcheck="false" rows="' + rows + '">' + esc(r.code) + "</textarea>" +
+      '<textarea class="pg-editor" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" rows="' + rows + '">' + esc(r.code) + "</textarea>" +
       '<div class="pg-out" hidden><div class="pg-status"></div><pre class="pg-text"></pre><div class="pg-figs"></div><div class="pg-check-msg"></div></div></div>';
   }
 
@@ -258,13 +267,13 @@
   /* Block renderer */
   function block(b) {
     switch (b.type) {
-      case "p": return "<p>" + esc(b.text) + "</p>";
-      case "list": return "<ul>" + b.items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>";
-      case "callout": return '<div class="callout ' + b.tone + '">' + esc(b.text) + "</div>";
+      case "p": return "<p>" + md(b.text) + "</p>";
+      case "list": return "<ul>" + b.items.map(function (i) { return "<li>" + md(i) + "</li>"; }).join("") + "</ul>";
+      case "callout": return '<div class="callout ' + b.tone + '">' + md(b.text) + "</div>";
       case "table":
-        return '<div class="tbl"><table><thead><tr>' + b.head.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") +
+        return '<div class="tbl"><table><thead><tr>' + b.head.map(function (h) { return "<th>" + md(h) + "</th>"; }).join("") +
           "</tr></thead><tbody>" + b.rows.map(function (r) {
-            return "<tr>" + r.map(function (c) { return "<td>" + esc(c) + "</td>"; }).join("") + "</tr>";
+            return "<tr>" + r.map(function (c) { return "<td>" + md(c) + "</td>"; }).join("") + "</tr>";
           }).join("") + "</tbody></table></div>";
       case "code":
         var tryBtn = "";
@@ -280,7 +289,7 @@
         return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || "") + '" loading="lazy">' +
           (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "") + "</figure>";
       case "details":
-        return "<details><summary>" + esc(b.summary) + "</summary>" + b.blocks.map(block).join("") + "</details>";
+        return "<details><summary>" + md(b.summary) + "</summary>" + b.blocks.map(block).join("") + "</details>";
       default: return "";
     }
   }
@@ -381,6 +390,21 @@
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     });
+    /* Highlight the section being read; on phones the chip bar scrolls to keep it in view */
+    if (!("IntersectionObserver" in window)) return;
+    var map = {};
+    btns.forEach(function (b) { var el = $("#s-" + b.dataset.t); if (el) map[el.id] = b; });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        btns.forEach(function (x) { x.classList.remove("active"); });
+        var b = map[en.target.id]; if (!b) return;
+        b.classList.add("active");
+        var bar = b.parentNode;
+        if (bar.scrollWidth > bar.clientWidth) bar.scrollTo({ left: b.offsetLeft - bar.clientWidth / 2 + b.offsetWidth / 2, behavior: "smooth" });
+      });
+    }, { rootMargin: "-30% 0px -60% 0px" });
+    Object.keys(map).forEach(function (id) { io.observe(document.getElementById(id)); });
   }
 
   /* Celebration: confetti poppers drawn over the whole page */
@@ -445,9 +469,11 @@
     $("#celebrateBtn").addEventListener("click", function () { celebrate(110); });
     if (animate) celebrate(130);
     var fr = box.querySelector("iframe");
-    fr.addEventListener("load", function () {
+    function fit() {
       try { fr.style.height = "400px"; fr.style.height = fr.contentDocument.documentElement.scrollHeight + "px"; } catch (e) { fr.style.height = "1100px"; }
-    });
+    }
+    fr.addEventListener("load", fit);
+    var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { if (fr.isConnected) fit(); }, 200); });   // rotate / resize
   }
 
   function renderChecklist(d) {

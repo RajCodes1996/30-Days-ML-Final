@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <base target="_top" />
 <title>Rajarshi Yadav — Developer Portfolio</title>
@@ -127,7 +127,6 @@ body.pdf-open{overflow:hidden}
 <header class="hero" id="top">
   <div>
     <span class="pill"><i class="dot"></i>Welcome, learner</span>
-    <br>
     <h2 data-tw>30 Days Of Machine Learning by<em> Rajarshi Yadav </em></h2>
     <div class="sub" data-tw>Teacher. Engineer. Problem Solver.</div>
     <div class="checks">
@@ -226,7 +225,7 @@ body.pdf-open{overflow:hidden}
     <div class="cert"><b>Explore Generative AI</b><span>Microsoft · 2026</span></div>
     <div class="cert"><b>Fundamentals of Digital Marketing</b><span>Google Digital Unlocked · 2021</span></div>
     <div class="cert"><b>Software Development Internship</b><span>JP Techno Park</span></div>
-    <button type="button" class="cert cert-pdf" id="pdfOpen" aria-haspopup="dialog"><b>Certifications PDF</b><span>Click here to view · 27 pages</span></button>
+    <button type="button" class="cert cert-pdf" id="pdfOpen" aria-haspopup="dialog"><b>📄 Certifications PDF</b><span>Click here to view · 27 pages</span></button>
   </div>
 </div></div>
 
@@ -311,6 +310,8 @@ body.pdf-open{overflow:hidden}
         frame = document.getElementById("pdfFrame"), closeBtn = document.getElementById("pdfClose");
     if (!open || !modal) return;
     function show() {
+      /* Most phone browsers cannot render a PDF inside a page: open it in the device's own viewer instead */
+      if (navigator.pdfViewerEnabled === false) { window.open("docs/Rajarshi_Yadav_Certifications.pdf", "_blank", "noopener"); return; }
       if (!frame.getAttribute("src")) frame.setAttribute("src", "docs/Rajarshi_Yadav_Certifications.pdf#view=FitH");
       modal.hidden = false; document.body.classList.add("pdf-open"); closeBtn.focus();
     }
